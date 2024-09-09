@@ -7,4 +7,4 @@ echo HelloWorld;
 # rm /root/.ssh/known_hosts
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y rootsu@$(cat /root/ubhost);
 
-rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80  -L 39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
+rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80  -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
