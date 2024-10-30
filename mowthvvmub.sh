@@ -17,4 +17,5 @@ cd /home/Shinobi;
 pm2 restart camera;
 cd /home/Shinobi;
 pm2 restart cron;
+killall ssh;
 fi;
