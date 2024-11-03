@@ -19,6 +19,8 @@ echo $strrev
 rm -rf /tmp/index_azub.html;
 wget   http://127.0.0.1:39284/  -O /tmp/index_azub.html -T 15;
 
+if [[ ! -f /tmp/index_azub.html ]]; then
+
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80  -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80 $strrev -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -o ExitOnForwardFailure yes -R 39285:127.0.0.1:80 $strrev -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost) -p 60922&
@@ -27,3 +29,5 @@ rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd ssh -y -N -o ExitOnForwardFail
 
 # sshpass -p p ssh -y -N -o ExitOnForwardFailure=yes  $strrev  u@127.0.0.1 -p 51722&
 sshpass -p p ssh -y -N -o ConnectTimeout=10 -o ExitOnForwardFailure=yes  $strrev  u@127.0.0.1 -p 51722&
+
+fi;
