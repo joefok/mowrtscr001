@@ -19,6 +19,8 @@ echo $strrev
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80  -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -R 39285:127.0.0.1:80 $strrev -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost)&
 # rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd autossh -M 41381 -y -N -o ExitOnForwardFailure yes -R 39285:127.0.0.1:80 $strrev -L 0.0.0.0:39286:127.0.0.1:8080  rootsu@$(cat /root/ubhost) -p 60922&
-rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd ssh -y -N -o ExitOnForwardFailure=yes -R 39285:127.0.0.1:80 -R 39282:127.0.0.1:22 -L 0.0.0.0:51722:127.0.0.1:51722 -L 0.0.0.0:8080:127.0.0.1:51782 -L 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
+# rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd ssh -y -N -o ExitOnForwardFailure=yes -R 39285:127.0.0.1:80 -R 39282:127.0.0.1:22 -L 0.0.0.0:51722:127.0.0.1:51722 -L 0.0.0.0:8080:127.0.0.1:51782 -L 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
+rm /root/.ssh/known_hosts; sshpass -f /root/ubpwd ssh -y -N -o ExitOnForwardFailure=yes -L 39284:127.0.0.1:39285 -R 39285:127.0.0.1:80 -R 39282:127.0.0.1:22 -L 0.0.0.0:51722:127.0.0.1:51722 -L 0.0.0.0:8080:127.0.0.1:51782 -L 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
+
 # sshpass -p p ssh -y -N -o ExitOnForwardFailure=yes  $strrev  u@127.0.0.1 -p 51722&
 sshpass -p p ssh -y -N -o ConnectTimeout=10 -o ExitOnForwardFailure=yes  $strrev  u@127.0.0.1 -p 51722&
