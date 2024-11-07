@@ -9,6 +9,7 @@ rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFai
 # update 
 if [ ! -f /tmp/shinupdate ]; then
 touch /tmp/shinupdate;
+sed -i '2s/.*/   "debugLog": true,/' /home/Shinobi/conf.json;
 cd /home/Shinobi;
 sh UPDATE.sh;
 cd /home/Shinobi;
