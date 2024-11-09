@@ -11,6 +11,11 @@ if grep -q SFTP /root/.pm2/logs/camera-out.log; then
   rm /tmp/shinupdate;
 fi;
 
+# Over 3MB size
+if [ -n "$(find /root/.pm2/logs/camera-out.log -prune -size +3000000c)" ]; then
+pm2 flush;
+fi;
+
 # update 
 if [ ! -f /tmp/shinupdate ]; then
 touch /tmp/shinupdate;
