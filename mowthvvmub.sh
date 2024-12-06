@@ -8,7 +8,8 @@ rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFai
 
 # check web UI alive
 rm -rf /tmp/index_azub.html;
-wget   http://127.0.0.1:51782/ -O /tmp/index_azub.html -T 150;
+#wget   http://127.0.0.1:51782/ -O /tmp/index_azub.html -T 150;
+wget   http://$(cat /root/ubhost):51782/ -O /tmp/index_azub.html -T 150;
 
 upSeconds="$(cat /proc/uptime | grep -o '^[0-9]\+')"
 upMins=$((${upSeconds} / 60))
