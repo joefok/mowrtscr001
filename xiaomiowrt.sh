@@ -1,9 +1,10 @@
 #!/bin/ash
 echo HelloWorld;
 rm -rf /tmp/index_azub.html;
-rm -rf /tmp/index_ten.html;
+#rm -rf /tmp/index_ten.html;
 wget   http://127.0.0.1:58000/html/index.html?origin=xxx  -O /tmp/index_azub.html -T 15;
 wget   http://127.0.0.1:8002/html/index.html?noredirect  -O /tmp/index_ten.html -T 29;
+wget http://127.0.0.1:8002/html/index.html?noredirect  -O /tmp/index_ten.html -T 29;
 wget http://127.0.0.1:8002/html/index.html?noredirect  -O /tmp/index_ten.html -T 29;
 
 port=$(tr -cd 0-9 </dev/urandom | head -c 3);
