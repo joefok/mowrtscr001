@@ -23,7 +23,7 @@ then
   echo "Internet connection is working."
 else
   echo "Internet connection is not working."
-  reboot
+  #reboot
 fi
 else
   echo "System has been up for less than 10 minutes."
