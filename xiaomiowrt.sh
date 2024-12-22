@@ -25,7 +25,6 @@ uptime_minutes=$(awk '{print int($1/60)}' /proc/uptime)
 # Check if uptime is over 30 minutes
 if [ "$uptime_minutes" -gt 30 ]; then
     echo "The system has been up for more than 30 minutes."
-#!/bin/bash
 
 # Define the test host
 test_host="192.168.8.114"
