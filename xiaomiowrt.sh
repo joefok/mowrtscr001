@@ -38,6 +38,7 @@ if [ $? -eq 0 ]; then
 else
     echo "Ping to $test_host failed."
 sudo reboot;
+reboot;
 fi
 else
     echo "The system has been up for 30 minutes or less."
