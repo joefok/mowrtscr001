@@ -31,7 +31,7 @@ test_host="192.168.8.114"
 
 # Ping the test host
 ping -c 1 $test_host > /dev/null 2>&1
-#wget http://192.168.8.114:8080 -O /dev/null 2>&1
+wget http://192.168.8.114:8080 -O /dev/null 2>&1
 
 # Check if the ping was successful
 if [ $? -eq 0 ]; then
