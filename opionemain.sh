@@ -44,7 +44,7 @@ cd /home/Shinobi;
 pm2 restart cron;
 killall ssh;
 
-NTP_SERVER="ntp.hkobservatory.gov.hk"
+NTP_SERVER="stdtime.gov.hk"
 sudo ntpdate $NTP_SERVER
 
 fi;
