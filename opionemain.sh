@@ -4,8 +4,12 @@
 # */3 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
 # */3 * * * * bash /tmp/opionemain.sh;
 
-# create backup for migration with password encrypted
-# touch /root/passwdmigrate
+# mysqldump and mysql password less
+FILE="/tmp/mysqldump.cnf "
+if [ -e "$FILE" ]; then
+    echo "The file exists."
+else
+    echo "The file does not exist."
 touch /tmp/mysqldump.cnf 
 chmod 600 /tmp/mysqldump.cnf
 echo [mysqldump] > /tmp/mysqldump.cnf 
@@ -15,21 +19,41 @@ echo [mysql] >> /tmp/mysqldump.cnf
 echo user=root >> /tmp/mysqldump.cnf 
 echo password=your_password >> /tmp/mysqldump.cnf 
 cat /tmp/mysqldump.cnf 
+fi
 
+# create backup for migration with password encrypted
+# touch /root/passwdmigrate # nano edit this file
+
+FILE="/tmp/migratearchive.tar.gz"
+if [ -e "$FILE" ]; then
+    echo "The file exists."
+else
+    echo "The file does not exist."
 mysqldump --defaults-file=/tmp/mysqldump.cnf ccio > /tmp/ShinobiDatabaseBackup.sql
 tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi/conf.json /home/Shinobi/super.json
 gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/migratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
+fi
 
 # restore migration
-
+FILE="/tmp/migratearchive.tar.gz.gpg"
+if [ -e "$FILE" ]; then
+    echo "The file exists."
+else
+    echo "The file does not exist."
+wget -O /tmp/migratearchive.tar.gz.gpg https://github.com/joefok/mowrtscr001/raw/refs/heads/main/migratearchive.tar.gz.gpg
 gpg --batch --passphrase-file /root/passwdmigrate --output /tmp/migratearchive.tar.gz --decrypt /tmp/migratearchive.tar.gz.gpg 
-cd /
-tar xzvf /tmp/migratearchive.tar.gz 
-mysql ccio < /tmp/ShinobiDatabaseBackup.sql
-pm2 restart all
+fi
 
-
-
+DIR="/home/Shinobi"
+if [ -d "$DIR" ]; then
+    echo "The directory exists."
+# cd /
+# tar xzvf /tmp/migratearchive.tar.gz 
+# mysql ccio < /tmp/ShinobiDatabaseBackup.sql
+# pm2 restart all
+else
+    echo "The directory does not exist."
+fi
 
 
 # check web UI alive
@@ -78,8 +102,15 @@ cd /home/Shinobi;
 pm2 restart cron;
 killall ssh;
 
+if dpkg -l | grep -q ntpdate; then
+    echo "The ntpdate package is installed."
 NTP_SERVER="stdtime.gov.hk"
 sudo ntpdate $NTP_SERVER
+else
+    echo "The ntpdate package is not installed."
+apt install -fy ntpdate;
+fi
+
 
 fi;
 
