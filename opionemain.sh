@@ -35,6 +35,8 @@ sed -i '1s/.*/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20a
 sed -i '2s/.*/APT::Periodic::Unattended-Upgrade "0";/' /etc/apt/apt.conf.d/20auto-upgrades;
 #sed -i '2s/.*/   "debugLog": false,/' /home/Shinobi/conf.json;
 cd /home/Shinobi;
+pm2 stop camera;
+pm2 stop all;
 sh UPDATE.sh;
 cd /home/Shinobi;
 pm2 flush;
