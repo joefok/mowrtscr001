@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# sample cron job
+# */3 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
+# */3 * * * * bash /tmp/opionemain.sh;
+
+# create backup for migration with password encrypted
+# touch /root/
+
+# restore migration
+
+
+
+
 # check web UI alive
 rm -rf /tmp/index_azub.html;
 wget   http://127.0.0.1:8080/ -O /tmp/index_azub.html -T 150;
