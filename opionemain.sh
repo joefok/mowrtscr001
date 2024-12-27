@@ -5,9 +5,29 @@
 # */3 * * * * bash /tmp/opionemain.sh;
 
 # create backup for migration with password encrypted
-# touch /root/
+# touch /root/passwdmigrate
+touch /tmp/mysqldump.cnf 
+chmod 600 /tmp/mysqldump.cnf
+echo [mysqldump] > /tmp/mysqldump.cnf 
+echo user=root >> /tmp/mysqldump.cnf 
+echo password=your_password >> /tmp/mysqldump.cnf 
+echo [mysql] >> /tmp/mysqldump.cnf 
+echo user=root >> /tmp/mysqldump.cnf 
+echo password=your_password >> /tmp/mysqldump.cnf 
+cat /tmp/mysqldump.cnf 
+
+mysqldump --defaults-file=/tmp/mysqldump.cnf ccio > /tmp/ShinobiDatabaseBackup.sql
+tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi/conf.json /home/Shinobi/super.json
+gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/migratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
 
 # restore migration
+
+gpg --batch --passphrase-file /root/passwdmigrate --output /tmp/migratearchive.tar.gz --decrypt /tmp/migratearchive.tar.gz.gpg 
+cd /
+tar xzvf /tmp/migratearchive.tar.gz 
+mysql ccio < /tmp/ShinobiDatabaseBackup.sql
+pm2 restart all
+
 
 
 
