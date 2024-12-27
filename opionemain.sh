@@ -2,7 +2,7 @@
 
 # check web UI alive
 rm -rf /tmp/index_azub.html;
-wget   http://127.0.0.1:51782/ -O /tmp/index_azub.html -T 150;
+wget   http://127.0.0.1:8080/ -O /tmp/index_azub.html -T 150;
 if [[ ! -f /tmp/index_azub.html ]]; then
       rm /tmp/shinupdate;
 fi;
