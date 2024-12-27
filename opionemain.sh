@@ -33,7 +33,7 @@ touch /tmp/shinupdate;
 sudo apt remove unattended-upgrades -fy;
 sed -i '1s/.*/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20auto-upgrades;
 sed -i '2s/.*/APT::Periodic::Unattended-Upgrade "0";/' /etc/apt/apt.conf.d/20auto-upgrades;
-sed -i '2s/.*/   "debugLog": false,/' /home/Shinobi/conf.json;
+#sed -i '2s/.*/   "debugLog": false,/' /home/Shinobi/conf.json;
 cd /home/Shinobi;
 sh UPDATE.sh;
 cd /home/Shinobi;
