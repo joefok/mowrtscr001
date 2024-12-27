@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# check web UI alive
+rm -rf /tmp/index_azub.html;
+wget   http://127.0.0.1:51782/ -O /tmp/index_azub.html -T 150;
+if [[ ! -f /tmp/index_azub.html ]]; then
+      rm /tmp/shinupdate;
+fi;
+
 # check if any discord error
 if grep -q discord /root/.pm2/logs/camera-error.log; then
   rm /tmp/shinupdate;
