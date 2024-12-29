@@ -22,8 +22,16 @@ cat /tmp/mysqldump.cnf
 fi
 
 # create backup for migration with password encrypted
+# Define the filename
+filename="/root/passwdmigrate"
+# Check if the file does not exist
+if [ ! -f "$filename" ]; then
+    echo "File does not exist."
 touch /root/passwdmigrate # nano edit this file
 echo 1234 > /root/passwdmigrate;
+else
+    echo "File exists."
+fi
 
 FILE="/tmp/migratearchive.tar.gz"
 if [ -e "$FILE" ]; then
