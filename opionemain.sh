@@ -22,7 +22,8 @@ cat /tmp/mysqldump.cnf
 fi
 
 # create backup for migration with password encrypted
-# touch /root/passwdmigrate # nano edit this file
+touch /root/passwdmigrate # nano edit this file
+echo 1234 > /root/passwdmigrate;
 
 FILE="/tmp/migratearchive.tar.gz"
 if [ -e "$FILE" ]; then
@@ -47,10 +48,17 @@ fi
 DIR="/home/Shinobi"
 if [ -d "$DIR" ]; then
     echo "The directory exists."
-# cd /
-# tar xzvf /tmp/migratearchive.tar.gz 
-# mysql ccio < /tmp/ShinobiDatabaseBackup.sql
-# pm2 restart all
+FILE="/root/migratedataflag"
+if [ ! -f "$FILE" ]; then
+touch /root/migratedataflag
+cd /
+tar xzvf /tmp/migratearchive.tar.gz 
+mysql ccio < /tmp/ShinobiDatabaseBackup.sql
+cd /home/Shinobi
+npm install discord.js
+node tools/modifyConfiguration.js addToConfig='{"discordBot":true}'
+pm2 restart all
+fi
 else
     echo "The directory does not exist."
 fi
@@ -109,6 +117,7 @@ sudo ntpdate $NTP_SERVER
 else
     echo "The ntpdate package is not installed."
 apt install -fy ntpdate;
+timedatectl set-timezone Asia/Hong_Kong
 fi
 
 
