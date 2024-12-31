@@ -28,19 +28,9 @@ filename="/root/passwdmigrate"
 if [ ! -f "$filename" ]; then
     echo "File does not exist."
 touch /root/passwdmigrate # nano edit this file
-echo 1234 > /root/passwdmigrate;
+hostname -I | awk '{print $1}'  > /root/passwdmigrate;
 else
     echo "File exists."
-fi
-
-FILE="/tmp/migratearchive.tar.gz"
-if [ -e "$FILE" ]; then
-    echo "The file exists."
-else
-    echo "The file does not exist."
-mysqldump --defaults-file=/tmp/mysqldump.cnf ccio > /tmp/ShinobiDatabaseBackup.sql
-tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi/conf.json /home/Shinobi/super.json
-gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/migratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
 fi
 
 # restore migration
@@ -71,6 +61,20 @@ else
     echo "The directory does not exist."
 fi
 
+
+# BACKUP 
+FILE="/tmp/migratearchive.tar.gz"
+if [ -e "$FILE" ]; then
+    echo "The file exists."
+else
+    echo "The file does not exist."
+mysqldump --defaults-file=/tmp/mysqldump.cnf ccio > /tmp/ShinobiDatabaseBackup.sql
+tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi/conf.json /home/Shinobi/super.json
+gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/migratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
+fi
+# scp /tmp/MOVMmigratearchive.tar.gz.gpg rootsu@localhost:/tmp/migratearchive.tar.gz.gpg
+# rm -rf /tmp/migratearchive.tar.gz
+# rm -rf /tmp/migratearchive.tar.gz.gpg
 
 # check web UI alive
 rm -rf /tmp/index_azub.html;
