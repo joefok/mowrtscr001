@@ -72,7 +72,7 @@ mysqldump --defaults-file=/tmp/mysqldump.cnf ccio > /tmp/ShinobiDatabaseBackup.s
 tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi/conf.json /home/Shinobi/super.json
 gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/migratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
 fi
-# scp /tmp/MOVMmigratearchive.tar.gz.gpg rootsu@localhost:/tmp/migratearchive.tar.gz.gpg
+# scp /tmp/migratearchive.tar.gz.gpg rootsu@localhost:/tmp/migratearchive.tar.gz.gpg
 # rm -rf /tmp/migratearchive.tar.gz
 # rm -rf /tmp/migratearchive.tar.gz.gpg
 
