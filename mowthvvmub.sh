@@ -34,6 +34,7 @@ fi;
 
 # update 
 if [ ! -f /tmp/shinupdate ]; then
+timedatectl set-timezone Asia/Hong_Kong;
 touch /tmp/shinupdate;
 sudo apt remove unattended-upgrades -fy;
 sed -i '1s/.*/APT::Periodic::Update-Package-Lists "0";/' /etc/apt/apt.conf.d/20auto-upgrades;
