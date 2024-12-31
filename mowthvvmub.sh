@@ -122,4 +122,6 @@ tar czvf /tmp/migratearchive.tar.gz /tmp/ShinobiDatabaseBackup.sql /home/Shinobi
 gpg --batch --passphrase-file /root/passwdmigrate --symmetric --cipher-algo aes256 -o /tmp/MOVMmigratearchive.tar.gz.gpg /tmp/migratearchive.tar.gz
 fi
 # scp /tmp/MOVMmigratearchive.tar.gz.gpg rootsu@localhost:/tmp/MOVMmigratearchive.tar.gz.gpg
+# rm -rf /tmp/migratearchive.tar.gz
+# rm -rf /tmp/MOVMmigratearchive.tar.gz.gpg
 
