@@ -59,3 +59,21 @@ else
 docker run --restart=always --name myPostgresDb -p 5432:5432 -e POSTGRES_USER=postgresUser -e POSTGRES_PASSWORD=postgresPW -e POSTGRES_DB=postgresDB -d postgres
 fi
 
+
+# Function to check if a package is installed
+check_package_installed() {
+    PACKAGE_NAME=$1
+    dpkg-query -W -f='${Status}' $PACKAGE_NAME 2>/dev/null | grep -q "ok installed"
+}
+
+# Check if postgresql-client is installed
+if check_package_installed "postgresql-client"; then
+    echo "postgresql-client is installed."
+else
+    echo "postgresql-client is not installed."
+sudo apt-get install -fy postgresql-client postgresql-client-common
+psql postgresql://postgresUser:postgresPW@localhost:5432/postgresDB mydatabase -c "CREATE TABLE table_name ( column1 text, column2 text, column3 text, column4	text	, column5	text	, column6	text	, column7	text	, column8	text	, column9	text	, column10	text	, column11	text	, column12	text	, column13	text	, column14	text	, column15	text	, column16	text	, column17	text	, column18	text	, column19	text	, column20	text	, column21	text	, column22	text	, column23	text	, column24	text	, column25	text	, column26	text	, column27	text	, column28 text );"
+
+fi
+
+
