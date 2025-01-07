@@ -77,3 +77,31 @@ psql postgresql://postgresUser:postgresPW@localhost:5432/postgresDB mydatabase -
 fi
 
 
+# INSTALL SQLCMD FOR MSSQL
+# Step 5: Verify the installation
+echo "Verifying sqlcmd installation..."
+if command -v sqlcmd &> /dev/null
+then
+    echo "sqlcmd installed successfully!"
+else
+    echo "Failed to install sqlcmd."
+# Step 1: Import the public repository GPG keys
+echo "Importing Microsoft GPG keys..."
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+# Step 2: Register the Microsoft Ubuntu repository
+echo "Adding Microsoft repository..."
+sudo curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+
+# Step 3: Update the sources list and install SQL Server tools
+echo "Updating package lists and installing SQL Server tools..."
+sudo apt-get update
+export ACCEPT_EULA=Y
+sudo apt-get install -fy mssql-tools unixodbc-dev
+
+# Step 4: Add sqlcmd to PATH for easy access
+echo "Adding sqlcmd to PATH..."
+echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
+source ~/.bashrc
+
+fi
