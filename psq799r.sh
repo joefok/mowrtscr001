@@ -105,4 +105,13 @@ echo "Adding sqlcmd to PATH..."
 echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
 source ~/.bashrc
 
+# CREATE TABLE
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE MyTable;";
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE my_table;";
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE ImgFulfill;";
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "CREATE TABLE MyTable ( column1 NVARCHAR(4000), column2 NVARCHAR(4000), column3 NVARCHAR(4000), column4 NVARCHAR(4000), column5 NVARCHAR(4000), column6 NVARCHAR(4000), column7 NVARCHAR(4000), column8 NVARCHAR(4000), column9 NVARCHAR(4000), column10 NVARCHAR(4000), column11 NVARCHAR(4000), column12 NVARCHAR(4000), column13 NVARCHAR(4000), column14 NVARCHAR(4000), column15 NVARCHAR(4000), column16 NVARCHAR(4000), column17 NVARCHAR(4000), column18 NVARCHAR(4000), column19 NVARCHAR(4000), column20 NVARCHAR(4000), column21 NVARCHAR(4000), column22 NVARCHAR(4000), column23 NVARCHAR(4000), column24 NVARCHAR(4000), column25 NVARCHAR(4000), column26 NVARCHAR(4000), column27 NVARCHAR(4000), column28 NVARCHAR(4000) );";
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "CREATE TABLE my_table ( date1 DATETIME2(3), date2 DATETIME2(3), image IMAGE, text1 NVARCHAR(MAX), text2 NVARCHAR(MAX), text3 NVARCHAR(MAX) ); ";
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "CREATE TABLE ImgFulfill( date1 DATETIME2(3), date2 DATETIME2(3), image IMAGE, text1 NVARCHAR(MAX), text2 NVARCHAR(MAX), text3 NVARCHAR(MAX) );";
+
+
 fi
