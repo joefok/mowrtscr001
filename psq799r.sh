@@ -96,8 +96,9 @@ sudo curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.l
 # Step 3: Update the sources list and install SQL Server tools
 echo "Updating package lists and installing SQL Server tools..."
 sudo apt-get update
-export ACCEPT_EULA=Y
-sudo apt-get install -fy mssql-tools unixodbc-dev
+# export ACCEPT_EULA=Y
+# sudo apt-get install -fy mssql-tools unixodbc-dev
+sudo ACCEPT_EULA=Y DEBIAN_FRONTEND=noninteractive apt-get install -y msodbcsql17 mssql-tools unixodbc-dev
 
 # Step 4: Add sqlcmd to PATH for easy access
 echo "Adding sqlcmd to PATH..."
