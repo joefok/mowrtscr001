@@ -1,5 +1,7 @@
 #!/bin/bash
 echo HelloWorld;
+# * 7-23 * * * if [ ! -f /tmp/u428jump.sh ] ; then wget https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/u428jump.sh -O /tmp/u428jump.sh; bash /tmp/u428jump.sh; fi;
+# */5 * * * * bash /tmp/u428jump.sh;
 
 # env file list
 # /root/tenhost
