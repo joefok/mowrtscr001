@@ -129,3 +129,27 @@ else
     echo "Hostname is already set to $desired_hostname."
 fi
 
+#!/bin/bash
+
+# Desired timezone
+desired_timezone="Asia/Hong_Kong"
+
+# Get the current timezone
+current_timezone=$(timedatectl show --property=Timezone --value)
+
+# Check if the current timezone matches the desired timezone
+if [ "$current_timezone" != "$desired_timezone" ]; then
+    echo "Current timezone is $current_timezone. Changing to $desired_timezone..."
+    
+    # Set the timezone
+    sudo timedatectl set-timezone $desired_timezone
+
+    # Verify the change
+    if [ "$(timedatectl show --property=Timezone --value)" == "$desired_timezone" ]; then
+        echo "Timezone successfully changed to $desired_timezone."
+    else
+        echo "Failed to change the timezone."
+    fi
+else
+    echo "Timezone is already set to $desired_timezone."
+fi
