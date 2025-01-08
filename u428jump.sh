@@ -145,6 +145,16 @@ if [ "$current_timezone" != "$desired_timezone" ]; then
     
     # Set the timezone
     sudo timedatectl set-timezone $desired_timezone
+#!/bin/bash
+
+# Prevent the system from going to sleep on lid close
+sudo sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
+
+# Apply the changes
+sudo systemctl restart systemd-logind
+
+# Use systemd-inhibit to prevent the system from sleeping or going idle
+systemd-inhibit --what=idle:sleep:shutdown:handle-lid-switch sleep infinity &
 
     # Verify the change
     if [ "$(timedatectl show --property=Timezone --value)" == "$desired_timezone" ]; then
