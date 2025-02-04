@@ -115,3 +115,4 @@ sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "CREATE TABLE ImgFulfill( date1 DATE
 
 
 fi
+# END
