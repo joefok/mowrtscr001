@@ -6,7 +6,7 @@ rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFai
 
 # MAINTENANCE CHECK
 # Check if Docker is installed
-if ! command -v docker &> /dev/null then
+if [ ! command -v docker &> /dev/null ]; then
     echo "Docker is not installed. Installing Docker..."
 
     # Update the package list
