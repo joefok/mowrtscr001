@@ -32,8 +32,6 @@ if ! command -v docker &> /dev/null then
     sudo systemctl enable docker
 
     echo "Docker has been installed successfully."
-else
-    echo "Docker is already installed."
 fi
 
 # install mssql database
