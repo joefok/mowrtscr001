@@ -77,8 +77,7 @@ fi
 # INSTALL SQLCMD FOR MSSQL
 # Step 5: Verify the installation
 echo "Verifying sqlcmd installation..."
-if command -v sqlcmd &> /dev/null
-then
+if [ command -v sqlcmd &> /dev/null ]; then
     echo "sqlcmd installed successfully!"
 else
     echo "Failed to install sqlcmd."
