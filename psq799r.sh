@@ -64,7 +64,7 @@ check_package_installed() {
 }
 
 # Check if postgresql-client is installed
-if check_package_installed "postgresql-client"; then
+if [ check_package_installed "postgresql-client" ]; then
     echo "postgresql-client is installed."
 else
     echo "postgresql-client is not installed."
