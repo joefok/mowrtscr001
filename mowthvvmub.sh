@@ -4,7 +4,8 @@
 # docker
 # rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no  -N -L 0.0.0.0:51744:127.0.0.1:51744 -R 51722:127.0.0.1:22 -R 51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
 # ninja
-rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no  -N -L 0.0.0.0:65022:$(cat /root/ubhost):65022 -L 0.0.0.0:51744:127.0.0.1:51744 -R 0.0.0.0:51722:127.0.0.1:22 -R 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
+#rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no  -N -L 0.0.0.0:65022:$(cat /root/ubhost):65022 -L 0.0.0.0:51744:127.0.0.1:51744 -R 0.0.0.0:51722:127.0.0.1:22 -R 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
+rm /root/.ssh/known_hosts; sshpass -p $(cat /root/ubpwd) ssh  -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no  -N -L 0.0.0.0:65022:$(cat /root/ubhost):65022 -L 0.0.0.0:51744:127.0.0.1:51744 -R 0.0.0.0:51722:127.0.0.1:22 -R 0.0.0.0:51782:127.0.0.1:51782 rootsu@$(cat /root/ubhost) -p 60922&
 
 # check web UI alive
 rm -rf /tmp/index_azub.html;
