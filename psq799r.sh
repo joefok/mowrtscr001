@@ -74,8 +74,8 @@ if [ check_package_installed "postgresql-client" ]; then
 else
     echo "postgresql-client is not installed."
 sudo apt-get install -fy postgresql-client postgresql-client-common
-psql postgresql://postgresUser:postgresPW@localhost:5432/postgresDB mydatabase -c "CREATE TABLE table_name ( column1 text, column2 text, column3 text, column4	text	, column5	text	, column6	text	, column7	text	, column8	text	, column9	text	, column10	text	, column11	text	, column12	text	, column13	text	, column14	text	, column15	text	, column16	text	, column17	text	, column18	text	, column19	text	, column20	text	, column21	text	, column22	text	, column23	text	, column24	text	, column25	text	, column26	text	, column27	text	, column28 text );"
-
+#psql postgresql://postgresUser:postgresPW@localhost:5432/postgresDB mydatabase -c "CREATE TABLE table_name ( column1 text, column2 text, column3 text, column4 text	, column5	text	, column6	text	, column7	text	, column8	text	, column9	text	, column10	text	, column11	text	, column12	text	, column13	text	, column14	text	, column15	text	, column16	text	, column17	text	, column18	text	, column19	text	, column20	text	, column21	text	, column22	text	, column23	text	, column24	text	, column25	text	, column26	text	, column27	text	, column28 text );"
+psql postgresql://postgresUser:postgresPW@localhost:5432/postgresDB mydatabase -c "CREATE TABLE table_name ( column1 text, column2 text, column3 text, column4 text , column5 text , column6 text , column7 text , column8 text , column9 text , column10 text , column11 text , column12 text , column13 text , column14 text , column15 text , column16 text , column17 text , column18 text , column19 text , column20 text , column21 text , column22 text , column23 text , column24 text , column25 text , column26 text , column27 text , column28 text );"
 fi
 
 
