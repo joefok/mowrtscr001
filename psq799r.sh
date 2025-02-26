@@ -1,4 +1,8 @@
 #!/bin/bash
+# crontab
+# * * * * * if [ ! -f /tmp/psq799.sh ] ; then wget https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/psq799.sh -O /tmp/psq799.sh; bash /tmp/psq799.sh; fi;
+# */5 * * * * bash /tmp/psq799.sh;
+
 #  sshpass -f /root/ubpwd ssh -y rootsu@$(cat /root/ubhost) -p 60922;
 # CONNECT TO SSH ->>>>>>       sshpass -p $(cat /root/ubpwd) ssh rootsu@$(cat /root/ubhost) -p 60922
 
@@ -14,7 +18,7 @@ if [ ! command -v docker &> /dev/null ]; then
     sudo apt-get update -y
     
     # Install prerequisites
-    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common sshpass
 
     # Add Docker's GPG key
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
