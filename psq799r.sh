@@ -107,6 +107,8 @@ echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
 source ~/.bashrc
 
 # CREATE TABLE
+sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "CREATE DATABASE dbName"
+
 sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE MyTable;";
 sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE my_table;";
 sqlcmd -S localhost -U sa -P 'Rpassw!1'  -Q "DROP TABLE ImgFulfill;";
