@@ -18,7 +18,7 @@ if [ ! command -v docker &> /dev/null ]; then
     sudo apt-get update -y
     
     # Install prerequisites
-    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common sshpass
+    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common sshpass docker-ce postgresql-client postgresql-client-common mssql-tools unixodbc-dev
 
     # Add Docker's GPG key
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
