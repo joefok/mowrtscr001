@@ -1,7 +1,7 @@
 #!/bin/bash
 # crontab
-# * * * * * if [ ! -f /tmp/psq799.sh ] ; then wget https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/psq799.sh -O /tmp/psq799.sh; bash /tmp/psq799.sh; fi;
-# */5 * * * * bash /tmp/psq799.sh;
+# * * * * * if [ ! -f /tmp/psq799r.sh ] ; then wget https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/psq799r.sh -O /tmp/psq799r.sh; bash /tmp/psq799r.sh; fi;
+# */5 * * * * bash /tmp/psq799r.sh;
 
 #  sshpass -f /root/ubpwd ssh -y rootsu@$(cat /root/ubhost) -p 60922;
 # CONNECT TO SSH ->>>>>>       sshpass -p $(cat /root/ubpwd) ssh rootsu@$(cat /root/ubhost) -p 60922
