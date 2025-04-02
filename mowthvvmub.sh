@@ -52,7 +52,7 @@ pm2 restart cron;
 echo 'HostKeyAlgorithms +ssh-rsa,ssh-dss' | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart sshd
 killall ssh;
-sed -i '990s/.*/$.each(getMonitorsFromIds(["BBTrm01R","BBTrm01L","BBlobb006","BBexam003","BBexam002","BBexam001","BBTrm02R","BBTrm02L","BBlobb004","BBexam006","BBexam005","BBexam004","BBTrm03R","BBTrm03L","BBlobb002","BBexam009","BBexam008","b1usbWcm1","BBconfeL","BBTrm04R","BBlobb103","BBlobb142","BBMEET01L","BBMEET01R","BBTrm05R","BBTrm05L","BBlobb143","BBlobb113","BBMEET2L","BBMEET2R"]),function(monitorId,monitor){/' /home/Shinobi/web/assets/js/bs5.liveGrid.js;
+sed -i '984s/.*/$.each(getMonitorsFromIds(["BBTrm01R","BBTrm01L","BBlobb006","BBexam003","BBexam002","BBexam001","BBTrm02R","BBTrm02L","BBlobb004","BBexam006","BBexam005","BBexam004","BBTrm03R","BBTrm03L","BBlobb002","BBexam009","BBexam008","b1usbWcm1","BBconfeL","BBTrm04R","BBlobb103","BBlobb142","BBMEET01L","BBMEET01R","BBTrm05R","BBTrm05L","BBlobb143","BBlobb113","BBMEET2L","BBMEET2R"]),function(monitorId,monitor){/' /home/Shinobi/web/assets/js/bs5.liveGrid.js;
 
 fi;
 
