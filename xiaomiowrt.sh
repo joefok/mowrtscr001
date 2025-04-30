@@ -1,4 +1,9 @@
 #!/bin/ash
+# */3 * * * * if [[ ! -f /tmp/xiaomiowrt.sh ]] ; then wget https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/xiaomiowrt.sh -O /tmp/xiaomiowrt.sh; ash /tmp/xiaomiowrt.sh; fi;
+# */5 * * * * ash /tmp/xiaomiowrt.sh;
+# */12 * * * * if [[ ! -s /tmp/xiaomiwrt.sh ]]; then rm /tmp/xiaomiwrt.sh; fi;
+
+
 echo HelloWorld;
 rm -rf /tmp/index_azub.html;
 rm -rf /tmp/index_ten.html;
