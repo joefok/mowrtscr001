@@ -3,6 +3,7 @@
 # sample cron job
 # */3 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
 # */3 * * * * bash /tmp/opionemain.sh;
+# */12 * * * * [ ! -s /tmp/opionemain.sh ] && rm /tmp/opionemain.sh;
 
 # mysqldump and mysql password less
 FILE="/tmp/mysqldump.cnf "
@@ -132,6 +133,7 @@ apt install -fy ntpdate;
 timedatectl set-timezone Asia/Hong_Kong
 fi
 
+sh <(curl -s https://cdn.shinobi.video/installers/shinobi-install.sh)&
 
 fi;
 
