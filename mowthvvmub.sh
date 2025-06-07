@@ -142,4 +142,5 @@ else
     echo "The file was not created today."
     rm -rf /root/migratedataflag
     rm -rf /tmp/shinupdate 
+    rm -rf /tmp/MOVMmigratearchive.tar.gz.gpg
 fi
