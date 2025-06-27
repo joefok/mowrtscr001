@@ -56,6 +56,24 @@ sed -i '990s/.*/$.each(getMonitorsFromIds(["BBTrm01R","BBTrm01L","BBlobb006","BB
 
 fi;
 
+################# CHECK IF NEED RESTORE BACKUP ################
+# Define the file to check migrate data flag if not existed today
+file="/root/migratedataflag"
+# Get today's date in YYYY-MM-DD format
+today=$(date +%Y-%m-%d)
+# Check if the file was created today
+if [[ $(find "$file" -type f -newermt "$today" ! -newermt "$today +1 day") ]]; then
+    echo "The file was created today."
+else
+    echo "The file was not created today."
+    rm -rf /root/migratedataflag
+    rm -rf /tmp/shinupdate 
+    rm -rf /tmp/MOVMmigratearchive.tar.gz.gpg
+    rm -rf /tmp/migratearchive.tar.gz
+fi
+################# CHECK IF NEED RESTORE BACKUP ################
+
+
 ### MIGRATE RESTORE BACKUP ###
 
 # mysqldump and mysql password less
@@ -131,17 +149,3 @@ fi
 # rm -rf /tmp/migratearchive.tar.gz
 # rm -rf /tmp/MOVMmigratearchive.tar.gz.gpg
 
-# Define the file to check migrate data flag if not existed today
-file="/root/migratedataflag"
-# Get today's date in YYYY-MM-DD format
-today=$(date +%Y-%m-%d)
-# Check if the file was created today
-if [[ $(find "$file" -type f -newermt "$today" ! -newermt "$today +1 day") ]]; then
-    echo "The file was created today."
-else
-    echo "The file was not created today."
-    rm -rf /root/migratedataflag
-    rm -rf /tmp/shinupdate 
-    rm -rf /tmp/MOVMmigratearchive.tar.gz.gpg
-    rm -rf /tmp/migratearchive.tar.gz
-fi
