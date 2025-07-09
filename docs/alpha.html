@@ -5,9 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Secure TOTP Generator</title>
-  <!-- Load otplib and CryptoJS from reliable CDNs -->
-  <script src="https://cdn.jsdelivr.net/npm/otplib@12.0.1/otplib.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://unpkg.com/@otplib/preset-browser@12.0.1/buffer.js"></script>
+  <script src="https://unpkg.com/@otplib/preset-browser@12.0.1/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -46,9 +46,7 @@
   </div>
 
   <script>
-    // Encrypted secret (AES encrypted with passphrase)
-    const encryptedSecret = "NdkaL3xWWlxRSFh/7d74WHcVcM0em8ZuWVgkLiEJzcC608C4wPtcn4JgGvXXKyUO"; // Replace with actual encrypted secret
-    const passphrase = "your-passphrase"; // Replace with actual passphrase
+    const encryptedSecret = CryptoJS.AES.encrypt("PVTPMBHTZTJBO44254BPVDZKEBCKZS4K", "your-passphrase").toString();
 
     function decryptSecret(encrypted, pass) {
       const bytes = CryptoJS.AES.decrypt(encrypted, pass);
@@ -56,12 +54,12 @@
     }
 
     function updateCode() {
-      const secret = decryptSecret(encryptedSecret, passphrase);
+      const secret = decryptSecret(encryptedSecret, "your-passphrase");
       if (!secret) {
         document.getElementById('totpCode').innerText = 'Error';
         return;
       }
-      const code = otplib.authenticator.generate(secret);
+      const code = window.otplib.authenticator.generate(secret);
       document.getElementById('totpCode').innerText = code;
     }
 
@@ -75,7 +73,7 @@
     }
 
     updateCode();
-    setInterval(updateCode, 30000); // Refresh every 30 seconds
+    setInterval(updateCode, 30000);
   </script>
 </body>
 </html>
