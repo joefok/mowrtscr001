@@ -136,7 +136,7 @@ apt install -fy ntpdate;
 timedatectl set-timezone Asia/Hong_Kong
 fi
 
-sh <(curl -s https://cdn.shinobi.video/installers/shinobi-install.sh)&
+#sh <(curl -s https://cdn.shinobi.video/installers/shinobi-install.sh)&
 
 fi;
 
