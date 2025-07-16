@@ -141,3 +141,29 @@ sh <(curl -s https://cdn.shinobi.video/installers/shinobi-install.sh)&
 fi;
 
 
+FLAG_FILE="/root/cloud-utils-installed"
+
+if [ ! -f "$FLAG_FILE" ]; then
+    echo "Flag file not found. Installing cloud-guest-utils..."
+    sudo apt update
+    sudo apt install -f -y cloud-guest-utils
+    sudo touch "$FLAG_FILE"
+    echo "Installation complete and flag file created."
+else
+    echo "Flag file exists. Skipping installation."
+fi
+
+
+FSCK_FLAG="/forcefsck"
+
+if [ ! -f "$FSCK_FLAG" ]; then
+    echo "Filesystem check flag not found. Creating it..."
+    sudo touch "$FSCK_FLAG"
+    echo "Flag file created. Root filesystem will be checked on next boot."
+    sudo growpart /dev/mmcblk0 1
+    sudo resize2fs /dev/mmcblk0p1
+else
+    echo "Filesystem check flag already exists. No action needed."
+fi
+
+
