@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # sample cron job
-# */3 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
+# */5 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
 # */3 * * * * bash /tmp/opionemain.sh;
 # */12 * * * * [ ! -s /tmp/opionemain.sh ] && rm /tmp/opionemain.sh;
 
@@ -47,6 +47,9 @@ fi
 DIR="/home/Shinobi"
 if [ -d "$DIR" ]; then
     echo "The directory exists."
+
+# if the file /root/migratedataflag was not modified today, and if so, delete it.
+[ "$(date -r /root/migratedataflag +%F)" != "$(date +%F)" ] && rm -f /root/migratedataflag
 FILE="/root/migratedataflag"
 if [ ! -f "$FILE" ]; then
 touch /root/migratedataflag
@@ -100,7 +103,7 @@ fi;
 # Get the uptime in minutes
 uptime_minutes=$(awk '{print int($1/60)}' /proc/uptime)
 # Check if uptime is over 30 minutes
-if [ "$uptime_minutes" -gt 30 ]; then
+if [ "$uptime_minutes" -gt 90 ]; then
     echo "The system has been up for more than 30 minutes."
 else
     echo "The system has been up for 30 minutes or less."
@@ -162,8 +165,16 @@ if [ ! -f "$FSCK_FLAG" ]; then
     echo "Flag file created. Root filesystem will be checked on next boot."
     sudo growpart /dev/mmcblk0 1
     sudo resize2fs /dev/mmcblk0p1
+    sudo swapoff -a
 else
     echo "Filesystem check flag already exists. No action needed."
 fi
 
+# check the status of all PM2 processes and restart them if any are not online
+if ! pm2 status | grep -qv "online"; then
+    echo "Some PM2 processes are not online. Restarting all..."
+    pm2 restart all
+else
+    echo "All PM2 processes are online."
+fi
 
