@@ -129,15 +129,27 @@ cd /home/Shinobi;
 pm2 restart cron;
 killall ssh;
 
-if dpkg -l | grep -q ntpdate; then
-    echo "The ntpdate package is installed."
-NTP_SERVER="stdtime.gov.hk"
-sudo ntpdate $NTP_SERVER
+if timedatectl | grep -q 'Time zone.*UTC'; then
+    if dpkg -l | grep -q ntpdate; then
+        echo "The ntpdate package is installed."
+    else
+        echo "The ntpdate package is not installed. Installing..."
+        sudo apt install -fy ntpdate
+    fi
+    NTP_SERVER="stdtime.gov.hk"
+    sudo ntpdate $NTP_SERVER
+    sudo timedatectl set-timezone Asia/Hong_Kong
+
+# swap
+sudo swapoff -a && sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+# swap 
+sudo sysctl vm.swappiness=100 && echo 'vm.swappiness=100' | sudo tee -a /etc/sysctl.conf
+
+
 else
-    echo "The ntpdate package is not installed."
-apt install -fy ntpdate;
-timedatectl set-timezone Asia/Hong_Kong
+    echo "Timezone does not contain UTC. No changes made."
 fi
+
 
 #sh <(curl -s https://cdn.shinobi.video/installers/shinobi-install.sh)&
 
