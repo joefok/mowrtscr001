@@ -177,7 +177,7 @@ if [ ! -f "$FSCK_FLAG" ]; then
     echo "Flag file created. Root filesystem will be checked on next boot."
     sudo growpart /dev/mmcblk0 1
     sudo resize2fs /dev/mmcblk0p1
-    sudo swapoff -a
+    #sudo swapoff -a
 else
     echo "Filesystem check flag already exists. No action needed."
 fi
