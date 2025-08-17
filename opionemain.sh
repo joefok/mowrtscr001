@@ -141,7 +141,7 @@ if timedatectl | grep -q 'Time zone.*UTC'; then
     sudo timedatectl set-timezone Asia/Hong_Kong
 
 # swap
-sudo swapoff -a && sudo dd if=/dev/zero of=/swapfile bs=1M count=4096 && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo swapoff -a && sudo dd if=/dev/zero of=/swapfile bs=1M count=768 && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 # swap 
 sudo sysctl vm.swappiness=100 && echo 'vm.swappiness=100' | sudo tee -a /etc/sysctl.conf
 
