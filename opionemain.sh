@@ -144,12 +144,16 @@ if timedatectl | grep -q 'Time zone.*UTC'; then
     NTP_SERVER="stdtime.gov.hk"
     sudo ntpdate $NTP_SERVER
     sudo timedatectl set-timezone Asia/Hong_Kong
-
+pm2 stop camera;
+pm2 stop all;
 # swap
 sudo swapoff -a && sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 # swap 
 sudo sysctl vm.swappiness=100 && echo 'vm.swappiness=100' | sudo tee -a /etc/sysctl.conf
-
+cd /home/Shinobi;
+pm2 restart camera;
+cd /home/Shinobi;
+pm2 restart cron;
 else
     echo "Timezone does not contain UTC. No changes made."
 fi
@@ -181,11 +185,18 @@ else
     echo "Filesystem check flag already exists. No action needed."
 fi
 
-# check the status of all PM2 processes and restart them if any are not online
+
+# Get the uptime in minutes
+uptime_minutes=$(awk '{print int($1/60)}' /proc/uptime)
+# Check if uptime is over 30 minutes
+if [ "$uptime_minutes" -gt 90 ]; then
+    echo "The system has been up for more than 30 minutes."
+    # check the status of all PM2 processes and restart them if any are not online
 if ! pm2 status | grep -qv "online"; then
     echo "Some PM2 processes are not online. Restarting all..."
     pm2 restart all
-else
-    echo "All PM2 processes are online."
 fi
+fi
+
+
 
