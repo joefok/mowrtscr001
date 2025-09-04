@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoHg Secure TOTP Generator</title>
+  <script src="https://unpkg.com/@otplib/preset-browser@12.0.1/buffer.js"></script>
+  <script src="https://unpkg.com/@otplib/preset-browser@12.0.1/index.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 2em;
+      background-color: #f9f9f9;
+    }
+    .code {
+      font-size: 5em;
+      font-weight: bold;
+      color: #333;
+      user-select: none;
+      cursor: pointer;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    .message {
+      margin-top: 1em;
+      font-size: 1.2em;
+      color: green;
+    }
+    @media (max-width: 600px) {
+      .code {
+        font-size: 4em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your mOhG TOTP Code</h1>
+    <div class="code" onclick="copyCode()" id="totpCode">------</div>
+    <div class="message" id="copyMessage"></div>
+  </div>
+
+  <script>
+    const encryptedSecret = CryptoJS.AES.encrypt("C6WMO2MF3CTIOEFF", "your-passphrase").toString();
+
+    function decryptSecret(encrypted, pass) {
+      const bytes = CryptoJS.AES.decrypt(encrypted, pass);
+      return bytes.toString(CryptoJS.enc.Utf8);
+    }
+
+    function updateCode() {
+      const secret = decryptSecret(encryptedSecret, "your-passphrase");
+      if (!secret) {
+        document.getElementById('totpCode').innerText = 'Error';
+        return;
+      }
+      const code = window.otplib.authenticator.generate(secret);
+      document.getElementById('totpCode').innerText = code;
+    }
+
+    function copyCode() {
+      const code = document.getElementById('totpCode').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        document.getElementById('copyMessage').innerText = 'Code copied to clipboard!';
+      }).catch(() => {
+        document.getElementById('copyMessage').innerText = 'Failed to copy code.';
+      });
+    }
+
+    updateCode();
+    setInterval(updateCode, 30000);
+  </script>
+</body>
+</html>
