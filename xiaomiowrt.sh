@@ -49,6 +49,10 @@ else
 sudo reboot;
 reboot;
 fi
+
+[ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi down || wifi up
 else
     echo "The system has been up for 30 minutes or less."
+
+wifi up
 fi
