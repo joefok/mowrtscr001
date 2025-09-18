@@ -57,5 +57,7 @@ fi
 else
     echo "The system has been up for 30 minutes or less."
 
-wifi up
+if [[ ! -f /tmp/wifiup ]]; then wifi up;
+touch /tmp/wifiup; fi;
+
 fi
