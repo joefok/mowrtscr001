@@ -50,7 +50,7 @@ else
 #reboot;
 fi
 
-[ $(date +%H) -eq 23 ] && wifi up
+[ $(date +%H) -eq 23 ] && [ $(date +%M) -lt 13 ] && wifi up
 [ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi down
 #[ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi down || wifi up
 
