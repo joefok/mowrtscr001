@@ -1,4 +1,3 @@
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +7,28 @@
     body { margin: 0; background: #f7f7f7; }
     canvas { display: block; margin: 40px auto; background: #fff; border: 2px solid #888; }
     #info { text-align: center; font-family: sans-serif; margin-top: 10px; }
-    video { display: none; }
+    #corner {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 160px;
+      height: 120px;
+      border: 2px solid #444;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #gestureBar {
+      width: 100%;
+      height: 10px;
+      background: gray;
+    }
+    video {
+      width: 100%;
+      height: auto;
+    }
   </style>
 </head>
 <body>
@@ -16,19 +36,23 @@
 <div id="info">
   <span>Jump by moving your head upward! (Allow camera access)</span>
 </div>
-<video id="webcam" autoplay playsinline width="300" height="300"></video>
+<div id="corner">
+  <video id="webcam" autoplay playsinline></video>
+  <div id="gestureBar"></div>
+</div>
 https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0</script>
 https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@4.4.0</script>
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const video = document.getElementById('webcam');
+const gestureBar = document.getElementById('gestureBar');
 
 const GROUND_Y = 170;
 const DINO_WIDTH = 44, DINO_HEIGHT = 47;
 const CACTUS_WIDTH = 20, CACTUS_HEIGHT = 40;
-const GRAVITY = 0.7;
-const JUMP_VELOCITY = -12;
+const GRAVITY = 0.35;
+const JUMP_VELOCITY = -6;
 const DINO_X = 50;
 
 let dino = {}, cacti = [], cactusTimer = 0;
@@ -103,7 +127,7 @@ function drawScore() {
 function update() {
   if (!gameOver) {
     dino.frame++;
-    if (dino.frame % 7 === 0) dino.legSwap = !dino.legSwap;
+    if (dino.frame % 14 === 0) dino.legSwap = !dino.legSwap;
 
     if (dino.jumping) {
       dino.vy += GRAVITY;
@@ -123,11 +147,11 @@ function update() {
         width: CACTUS_WIDTH,
         height: CACTUS_HEIGHT
       });
-      cactusTimer = 60 + Math.floor(Math.random() * 60);
+      cactusTimer = 120 + Math.floor(Math.random() * 60);
     }
 
     for (let i = 0; i < cacti.length; i++) {
-      cacti[i].x -= 6;
+      cacti[i].x -= 3;
     }
     cacti = cacti.filter(c => c.x + c.width > 0);
 
@@ -208,10 +232,12 @@ async function detectPose() {
     const nose = poses[0].keypoints.find(k => k.name === 'nose');
     if (nose && nose.score > 0.5) {
       if (lastNoseY !== null && jumpCooldown === 0) {
-        // Detect a quick upward movement (nose.y decreases by at least 20 pixels)
         if (lastNoseY - nose.y > 20) {
           jump();
-          jumpCooldown = 15; // Prevent multiple jumps in a row
+          gestureBar.style.background = "lime";
+          jumpCooldown = 15;
+        } else {
+          gestureBar.style.background = "gray";
         }
       }
       lastNoseY = nose.y;
