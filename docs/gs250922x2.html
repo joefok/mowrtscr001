@@ -2,58 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dino Jump with Face Gesture</title>
+  <title>Dino Jump with Gesture Logic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #f7f7f7;
-      font-family: sans-serif;
-      overflow-x: hidden;
+      margin: 0; padding: 0; background: #f7f7f7;
+      font-family: sans-serif; overflow-x: hidden;
     }
     canvas {
-      display: block;
-      margin: 20px auto;
-      background: #fff;
-      border: 2px solid #888;
-      max-width: 100%;
-      height: auto;
+      display: block; margin: 20px auto;
+      background: #fff; border: 2px solid #888;
+      max-width: 100%; height: auto;
     }
     #info {
-      text-align: center;
-      margin: 10px;
-      font-size: 1em;
+      text-align: center; margin: 10px; font-size: 1em;
     }
     #corner {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      width: 160px;
-      max-width: 40vw;
-      border: 2px solid #444;
-      background: #000;
-      z-index: 10;
+      position: fixed; top: 10px; right: 10px;
+      width: 160px; max-width: 40vw;
+      border: 2px solid #444; background: #000; z-index: 10;
     }
     #gestureBar {
-      width: 100%;
-      height: 10px;
-      background: gray;
+      width: 100%; height: 10px; background: gray;
     }
     video {
-      width: 100%;
-      height: auto;
-      display: block;
+      width: 100%; height: auto; display: block;
     }
     @media (max-width: 600px) {
-      #corner {
-        width: 40vw;
-        min-width: 100px;
-      }
-      canvas {
-        width: 98vw !important;
-        height: auto !important;
-      }
+      #corner { width: 40vw; min-width: 100px; }
+      canvas { width: 98vw !important; height: auto !important; }
     }
   </style>
 </head>
@@ -86,7 +63,11 @@ let dino = {}, cacti = [], cactusTimer = 0;
 let score = 0, highScore = 0, gameOver = false;
 let restartTimer = 0;
 let detector;
-let lastNoseY = null;
+
+// --- Gesture logic variables ---
+const noseHistory = [];
+const HISTORY_LENGTH = 8; // frames
+const GESTURE_THRESHOLD = 22; // pixels, adjust for sensitivity
 let jumpCooldown = 0;
 
 function initDino() {
@@ -239,7 +220,7 @@ function restart() {
   gameOver = false;
 }
 
-// Webcam gesture detection
+// --- Gesture detection logic ---
 async function initWebcamAndDetector() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -259,8 +240,15 @@ async function detectPose() {
   if (poses.length > 0) {
     const nose = poses[0].keypoints.find(k => k.name === 'nose');
     if (nose && nose.score > 0.5) {
-      if (lastNoseY !== null && jumpCooldown === 0) {
-        if (Math.abs(lastNoseY - nose.y) > 20) {
+      // Add to history
+      noseHistory.push(nose.y);
+      if (noseHistory.length > HISTORY_LENGTH) noseHistory.shift();
+
+      // Gesture detection: compare current nose.y to average of previous
+      if (noseHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
+        const avgPrev = noseHistory.slice(0, HISTORY_LENGTH - 2).reduce((a, b) => a + b, 0) / (HISTORY_LENGTH - 2);
+        const delta = nose.y - avgPrev;
+        if (Math.abs(delta) > GESTURE_THRESHOLD) {
           jump();
           gestureBar.style.background = "lime";
           jumpCooldown = 15;
@@ -268,7 +256,6 @@ async function detectPose() {
           gestureBar.style.background = "gray";
         }
       }
-      lastNoseY = nose.y;
     }
   }
   if (jumpCooldown > 0) jumpCooldown--;
