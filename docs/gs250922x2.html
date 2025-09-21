@@ -1,25 +1,39 @@
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Dino Jump with Face Gesture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; background: #f7f7f7; }
-    canvas { display: block; margin: 40px auto; background: #fff; border: 2px solid #888; }
-    #info { text-align: center; font-family: sans-serif; margin-top: 10px; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f7f7f7;
+      font-family: sans-serif;
+      overflow-x: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 20px auto;
+      background: #fff;
+      border: 2px solid #888;
+      max-width: 100%;
+      height: auto;
+    }
+    #info {
+      text-align: center;
+      margin: 10px;
+      font-size: 1em;
+    }
     #corner {
-      position: absolute;
+      position: fixed;
       top: 10px;
       right: 10px;
       width: 160px;
-      height: 120px;
+      max-width: 40vw;
       border: 2px solid #444;
       background: #000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      z-index: 10;
     }
     #gestureBar {
       width: 100%;
@@ -29,16 +43,27 @@
     video {
       width: 100%;
       height: auto;
+      display: block;
+    }
+    @media (max-width: 600px) {
+      #corner {
+        width: 40vw;
+        min-width: 100px;
+      }
+      canvas {
+        width: 98vw !important;
+        height: auto !important;
+      }
     }
   </style>
 </head>
 <body>
 <canvas id="game" width="600" height="200"></canvas>
 <div id="info">
-  <span>Jump by moving your head up or down! (Allow camera access)</span>
+  <span id="status">Jump by moving your head up or down! (Allow camera access)</span>
 </div>
 <div id="corner">
-  <video id="webcam" autoplay playsinline></video>
+  <video id="webcam" autoplay playsinline muted></video>
   <div id="gestureBar"></div>
 </div>
 https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0</script>
@@ -48,6 +73,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const video = document.getElementById('webcam');
 const gestureBar = document.getElementById('gestureBar');
+const statusText = document.getElementById('status');
 
 const GROUND_Y = 170;
 const DINO_WIDTH = 44, DINO_HEIGHT = 47;
@@ -219,10 +245,11 @@ async function initWebcamAndDetector() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
     video.srcObject = stream;
     await video.play();
+    statusText.textContent = "Camera active. Move head up/down to jump!";
     detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet);
     detectPose();
   } catch (e) {
-    document.getElementById('info').innerHTML = "<span style='color:red'>Camera access denied or not supported.</span>";
+    statusText.textContent = "Camera access denied or not supported.";
   }
 }
 
