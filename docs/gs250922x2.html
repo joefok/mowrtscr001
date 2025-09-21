@@ -1,3 +1,4 @@
+ 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,7 +35,7 @@
 <body>
 <canvas id="game" width="600" height="200"></canvas>
 <div id="info">
-  <span>Jump by moving your head upward! (Allow camera access)</span>
+  <span>Jump by moving your head up or down! (Allow camera access)</span>
 </div>
 <div id="corner">
   <video id="webcam" autoplay playsinline></video>
@@ -232,7 +233,7 @@ async function detectPose() {
     const nose = poses[0].keypoints.find(k => k.name === 'nose');
     if (nose && nose.score > 0.5) {
       if (lastNoseY !== null && jumpCooldown === 0) {
-        if (lastNoseY - nose.y > 20) {
+        if (Math.abs(lastNoseY - nose.y) > 20) {
           jump();
           gestureBar.style.background = "lime";
           jumpCooldown = 15;
