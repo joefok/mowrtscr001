@@ -10,7 +10,7 @@
       margin: 0; padding: 0; background: #f7f7f7;
       font-family: sans-serif; overflow-x: hidden;
     }
-    canvas {
+    canvas#game {
       display: block; margin: 20px auto;
       background: #fff; border: 2px solid #888;
       max-width: 100%; height: auto;
@@ -23,6 +23,7 @@
       width: 160px; max-width: 40vw;
       border: 2px solid #444; background: #000; z-index: 10;
       border-radius: 8px; box-shadow: 0 2px 8px #0002;
+      display: flex; flex-direction: column; align-items: center;
     }
     #gestureBar {
       width: 100%; height: 10px; background: gray;
@@ -36,14 +37,19 @@
       color: red; font-size: 0.9em; text-align: center;
       margin-top: 5px;
     }
+    #videoWrap {
+      position: relative; width: 100%; height: auto;
+    }
     video {
       width: 100%; height: auto; display: block; border-radius: 8px 8px 0 0;
     }
     canvas#overlay {
-      position: absolute;
-      top: 10px; right: 10px;
-      width: 160px; max-width: 40vw;
-      pointer-events: none;
+      position: absolute; left: 0; top: 0;
+      width: 100%; height: 100%; pointer-events: none;
+    }
+    @media (max-width: 600px) {
+      #corner { width: 40vw; min-width: 100px; }
+      canvas#game { width: 98vw !important; height: auto !important; }
     }
   </style>
 </head>
@@ -54,14 +60,18 @@
   <div id="errorMsg"></div>
 </div>
 <div id="corner">
-  <video id="webcam" autoplay playsinline muted></video>
-  <canvas id="overlay" width="160" height="120"></canvas>
+  <div id="videoWrap" style="width:100%; position:relative;">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="overlay" width="160" height="120"></canvas>
+  </div>
   <div id="gestureMsg"></div>
   <div id="gestureBar"></div>
 </div>
 https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0</script>
 https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@4.4.0</script>
 <script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 const video = document.getElementById('webcam');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
@@ -70,12 +80,175 @@ const gestureMsg = document.getElementById('gestureMsg');
 const statusText = document.getElementById('status');
 const errorMsg = document.getElementById('errorMsg');
 
+const GROUND_Y = 170;
+const DINO_WIDTH = 44, DINO_HEIGHT = 47;
+const CACTUS_WIDTH = 20, CACTUS_HEIGHT = 40;
+const GRAVITY = 0.35;
+const JUMP_VELOCITY = -6;
+const DINO_X = 50;
+
+let dino = {}, cacti = [], cactusTimer = 0;
+let score = 0, highScore = 0, gameOver = false;
+let restartTimer = 0;
 let detector;
+
+// --- Gesture logic variables ---
 const noseHistory = [];
 const HISTORY_LENGTH = 8;
 const GESTURE_THRESHOLD = 22;
 let jumpCooldown = 0;
 
+function initDino() {
+  dino = {
+    x: DINO_X,
+    y: GROUND_Y - DINO_HEIGHT,
+    vy: 0,
+    jumping: false,
+    alive: true,
+    frame: 0,
+    legSwap: false
+  };
+}
+
+function drawDino() {
+  ctx.save();
+  ctx.translate(dino.x, dino.y);
+  ctx.fillStyle = "#666";
+  ctx.fillRect(0, 10, 34, 30);
+  ctx.fillRect(28, 0, 16, 18);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(39, 6, 3, 3);
+  ctx.fillStyle = "#222";
+  ctx.fillRect(40, 7, 1, 1);
+  ctx.fillStyle = "#444";
+  ctx.fillRect(10, 30, 8, 6);
+  ctx.fillRect(24, 30, 8, 6);
+  ctx.fillStyle = "#333";
+  if (dino.legSwap) {
+    ctx.fillRect(8, 40, 8, 7);
+    ctx.fillRect(24, 40, 8, 7);
+  } else {
+    ctx.fillRect(14, 40, 8, 7);
+    ctx.fillRect(18, 40, 8, 7);
+  }
+  ctx.restore();
+}
+
+function drawCactus(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.fillStyle = "#228B22";
+  ctx.fillRect(0, 0, CACTUS_WIDTH, CACTUS_HEIGHT);
+  ctx.fillRect(-5, 10, 5, 15);
+  ctx.fillRect(CACTUS_WIDTH, 20, 5, 10);
+  ctx.restore();
+}
+
+function drawGround() {
+  ctx.strokeStyle = "#888";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y + 1);
+  ctx.lineTo(canvas.width, GROUND_Y + 1);
+  ctx.stroke();
+}
+
+function drawScore() {
+  ctx.font = "20px monospace";
+  ctx.fillStyle = "#444";
+  ctx.fillText("Score: " + score, 10, 30);
+  ctx.fillText("High: " + highScore, 10, 55);
+}
+
+function update() {
+  if (!gameOver) {
+    dino.frame++;
+    if (dino.frame % 14 === 0) dino.legSwap = !dino.legSwap;
+
+    if (dino.jumping) {
+      dino.vy += GRAVITY;
+      dino.y += dino.vy;
+      if (dino.y >= GROUND_Y - DINO_HEIGHT) {
+        dino.y = GROUND_Y - DINO_HEIGHT;
+        dino.vy = 0;
+        dino.jumping = false;
+      }
+    }
+
+    cactusTimer--;
+    if (cactusTimer <= 0) {
+      cacti.push({
+        x: canvas.width,
+        y: GROUND_Y - CACTUS_HEIGHT,
+        width: CACTUS_WIDTH,
+        height: CACTUS_HEIGHT
+      });
+      cactusTimer = 120 + Math.floor(Math.random() * 60);
+    }
+
+    for (let i = 0; i < cacti.length; i++) {
+      cacti[i].x -= 3;
+    }
+    cacti = cacti.filter(c => c.x + c.width > 0);
+
+    for (let c of cacti) {
+      if (
+        dino.x + DINO_WIDTH > c.x &&
+        dino.x < c.x + c.width &&
+        dino.y + DINO_HEIGHT > c.y &&
+        dino.y < c.y + c.height
+      ) {
+        gameOver = true;
+        dino.alive = false;
+        if (score > highScore) highScore = score;
+        restartTimer = 60;
+      }
+    }
+
+    score++;
+  } else {
+    restartTimer--;
+    if (restartTimer <= 0) {
+      restart();
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGround();
+  drawDino();
+  for (let c of cacti) drawCactus(c);
+  drawScore();
+  if (gameOver) {
+    ctx.font = "32px sans-serif";
+    ctx.fillStyle = "#c00";
+    ctx.fillText("GAME OVER", canvas.width/2-100, 100);
+  }
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function jump() {
+  if (!gameOver && !dino.jumping) {
+    dino.vy = JUMP_VELOCITY;
+    dino.jumping = true;
+  }
+}
+
+function restart() {
+  initDino();
+  cacti = [];
+  cactusTimer = 0;
+  score = 0;
+  gameOver = false;
+}
+
+// --- Gesture detection logic with overlay ---
 async function initWebcamAndDetector() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -96,14 +269,28 @@ async function detectPose() {
     octx.clearRect(0, 0, overlay.width, overlay.height);
     if (poses.length > 0) {
       const keypoints = poses[0].keypoints;
+      // Draw keypoints
+      let minX=9999, minY=9999, maxX=0, maxY=0;
       keypoints.forEach(k => {
         if (k.score > 0.5) {
+          const x = k.x * overlay.width / video.videoWidth;
+          const y = k.y * overlay.height / video.videoHeight;
           octx.fillStyle = "red";
           octx.beginPath();
-          octx.arc(k.x * overlay.width / video.videoWidth, k.y * overlay.height / video.videoHeight, 3, 0, 2 * Math.PI);
+          octx.arc(x, y, 3, 0, 2 * Math.PI);
           octx.fill();
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
         }
       });
+      // Draw bounding box if at least one keypoint detected
+      if (minX < maxX && minY < maxY) {
+        octx.strokeStyle = "lime";
+        octx.lineWidth = 2;
+        octx.strokeRect(minX-4, minY-4, (maxX-minX)+8, (maxY-minY)+8);
+      }
       const nose = keypoints.find(k => k.name === 'nose');
       if (nose && nose.score > 0.5) {
         noseHistory.push(nose.y);
@@ -131,6 +318,13 @@ async function detectPose() {
 }
 
 initWebcamAndDetector();
+
+// --- Dino game logic ---
+const gameCanvas = document.getElementById('game');
+const gameCtx = gameCanvas.getContext('2d');
+restart();
+loop();
 </script>
 </body>
 </html>
+ 
