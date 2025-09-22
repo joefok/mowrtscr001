@@ -317,12 +317,13 @@ function update() {
       if (dino.vy < 0) dino.vy += GRAVITY_ASC;
       else             dino.vy += GRAVITY_DESC;
       dino.y += dino.vy;
+dino.jumping = false;
 
       // ===== Ceiling clamp: never go beyond the top border =====
       if (dino.y < TOP_MARGIN) {
         dino.y = TOP_MARGIN;
         dino.vy = 0; // start descending next frame (GRAVITY_DESC)
-dino.jumping = false;
+#dino.jumping = false;
       }
 
       // Land on ground
