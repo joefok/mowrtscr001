@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dino Jump — MoveNet Head-Gesture (with CDN Fallback & Diagnostics)</title>
+  <title>Dino Jump — Eye-Up Gesture (MoveNet, CDN Fallback & Diagnostics)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f7f7f7; color:#222; }
@@ -26,7 +26,7 @@
 <canvas id="game" width="600" height="200"></canvas>
 
 <div id="info">
-  <span id="status">Allow camera, then move your head <strong>up</strong> to jump.</span>
+  <span id="status">Allow camera, then move your <strong>eyes up</strong> to jump.</span>
   <div id="errorMsg"></div>
 </div>
 
@@ -72,7 +72,6 @@
       diag(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • Pose-Detection: ${pdOK ? '<b>ok</b>' : '<i>missing</i>'}`);
 
       if (tfOK && pdOK) {
-        // Continue to app after a tick so the banner is visible
         setTimeout(startApp, 10);
       } else {
         console.error('Libraries not loaded:', { tfOK, pdOK });
@@ -85,7 +84,11 @@
 <!-- ====== App code ====== -->
 <script>
 /* ================================================================
-   Dino Jump with MoveNet (no bare imports; CDN fallback + diagnostics)
+   Dino Jump with MoveNet — Eye-Up Trigger
+   - Eye keypoint(s): average of left/right when both confident,
+     or fallback to whichever is confident.
+   - Upward-only detection with smoothing & cooldown.
+   - No ESM imports; uses global `tf` and `poseDetection`.
    ================================================================ */
 
 const video = document.getElementById('webcam');
@@ -95,13 +98,15 @@ const statusText = document.getElementById('status');
 const errorMsg = document.getElementById('errorMsg');
 
 let detector;
-// Gesture tracking
-const noseHistory = [];
+
+// --- Eye-based gesture tracking constants/vars ---
+const eyeHistory = [];
 const HISTORY_LENGTH = 8;
-// ~8% of video height; tune 0.06–0.10
-const GESTURE_THRESHOLD_RATIO = 0.08;
+// Eyes move slightly less than nose; start at ~6% of video height
+const GESTURE_THRESHOLD_RATIO = 0.06;
+
 let jumpCooldown = 0;
-// Smoothing
+// Light smoothing to reduce jitter
 let smoothY = null;
 const SMOOTH_ALPHA = 0.25;
 
@@ -142,7 +147,7 @@ async function initWebcamAndDetector() {
     video.srcObject = stream;
 
     await video.play(); // iOS needs autoplay+muted+playsinline
-    statusText.textContent = "Camera ready. Move head UP to jump!";
+    statusText.textContent = "Camera ready. Move your eyes UP to jump!";
     video.onloadedmetadata = () => resizeOverlay();
 
     setDiag('camera: <b>ok</b>');
@@ -163,9 +168,9 @@ async function initWebcamAndDetector() {
   }
 }
 
-function drawNoseDot(x, y) {
+function drawEyeDot(x, y) {
   octx.save();
-  octx.fillStyle = "rgba(50,205,50,0.9)";
+  octx.fillStyle = "rgba(30,144,255,0.95)"; // DodgerBlue for eyes
   octx.beginPath();
   octx.arc(x, y, 4, 0, Math.PI * 2);
   octx.fill();
@@ -183,27 +188,52 @@ async function detectPose() {
 
     const poses = await detector.estimatePoses(video);
     if (poses.length > 0) {
-      const nose = poses[0].keypoints.find(k => k.name === 'nose');
-      if (nose && nose.score > 0.5) {
-        // Smooth the y coordinate
-        smoothY = (smoothY == null) ? nose.y : (SMOOTH_ALPHA * nose.y + (1 - SMOOTH_ALPHA) * smoothY);
-        noseHistory.push(smoothY);
-        if (noseHistory.length > HISTORY_LENGTH) noseHistory.shift();
+      const kp = poses[0].keypoints;
 
-        // debug marker
-        drawNoseDot(nose.x, nose.y);
+      // Extract eyes (MoveNet returns 'left_eye' and 'right_eye')
+      const leftEye  = kp.find(k => k.name === 'left_eye');
+      const rightEye = kp.find(k => k.name === 'right_eye');
 
-        if (noseHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
-          const baselineAvg = noseHistory.slice(0, HISTORY_LENGTH - 2)
+      const MIN_EYE_SCORE = 0.5;
+      const leftOK  = leftEye  && leftEye.score  > MIN_EYE_SCORE;
+      const rightOK = rightEye && rightEye.score > MIN_EYE_SCORE;
+
+      let eye = null;
+      if (leftOK && rightOK) {
+        eye = {
+          x: (leftEye.x + rightEye.x) / 2,
+          y: (leftEye.y + rightEye.y) / 2,
+          score: Math.min(leftEye.score, rightEye.score)
+        };
+      } else if (leftOK) {
+        eye = leftEye;
+      } else if (rightOK) {
+        eye = rightEye;
+      }
+
+      if (eye) {
+        // Smooth y to reduce jitter
+        smoothY = (smoothY == null) ? eye.y : (SMOOTH_ALPHA * eye.y + (1 - SMOOTH_ALPHA) * smoothY);
+
+        // Keep short history
+        eyeHistory.push(smoothY);
+        if (eyeHistory.length > HISTORY_LENGTH) eyeHistory.shift();
+
+        // Visual debug marker
+        drawEyeDot(eye.x, eye.y);
+
+        // Upward-only trigger (canvas Y increases downward)
+        if (eyeHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
+          const baselineAvg = eyeHistory
+            .slice(0, HISTORY_LENGTH - 2)
             .reduce((a, b) => a + b, 0) / (HISTORY_LENGTH - 2);
 
-          // Canvas Y grows downward; head UP => delta positive
-          const delta = baselineAvg - smoothY;
+          const delta = baselineAvg - smoothY; // positive if moved up
           const thresholdPx = (overlay.height || 120) * GESTURE_THRESHOLD_RATIO;
 
           if (delta > thresholdPx) {
             jump();
-            jumpCooldown = 15;
+            jumpCooldown = 15; // debounce frames
           }
         }
       }
@@ -211,6 +241,7 @@ async function detectPose() {
   } catch (err) {
     errorMsg.textContent = "Pose detection error:\n" + (err.stack || err.message || err);
   }
+
   if (jumpCooldown > 0) jumpCooldown--;
   requestAnimationFrame(detectPose);
 }
@@ -358,7 +389,6 @@ function restart() {
 }
 
 function startApp() {
-  // Kick-off
   initWebcamAndDetector();
   restart();
   loop();
