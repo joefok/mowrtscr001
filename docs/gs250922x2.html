@@ -223,7 +223,7 @@ async function detectPose() {
           if (delta > thresholdPx) {
             // Any detected gesture triggers a "border jump"
             jumpToBorder();
-            jumpCooldown = 15;
+            jumpCooldown = 5;
           }
         }
       }
@@ -242,7 +242,7 @@ const CACTUS_WIDTH = 20, CACTUS_HEIGHT = 40;
 
 /* Slower fall + crisp launch: separate gravity */
 const GRAVITY_ASC  = 0.45;  // going up
-const GRAVITY_DESC = 0.15;  // falling down
+const GRAVITY_DESC = 0.18;  // falling down
 
 /* Enemies slower (tune to taste) */
 const ENEMY_SPEED = 2;
@@ -327,7 +327,7 @@ function update() {
       // Land on ground
       if (dino.y >= GROUND_Y - DINO_HEIGHT) {
         dino.y = GROUND_Y - DINO_HEIGHT;
-        dino.vy = 0; dino.jumping = true;
+        dino.vy = 0; dino.jumping = false;
       }
     }
 
