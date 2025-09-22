@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dino Jump — MoveNet Head-Gesture (Fixed TFJS Load Order)</title>
+  <title>Dino Jump — MoveNet Head-Gesture (with CDN Fallback & Diagnostics)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f7f7f7; color:#222; }
@@ -13,9 +13,15 @@
     #webcam { position:fixed; top:10px; right:10px; width:160px; border:2px solid #444; border-radius:4px; }
     #overlay { position:fixed; top:10px; right:10px; width:160px; pointer-events:auto; }
     #overlayTapHint { position:fixed; top:10px; right:10px; width:160px; text-align:center; color:#222; font-size:12px; pointer-events:none; }
+    /* Diagnostics banner */
+    #diag { position:fixed; left:10px; top:10px; background:#fff; border:1px solid #ccc; padding:6px 8px; font:12px monospace; border-radius:4px; z-index:9999; }
+    #diag b { color:#0a0; }
+    #diag i { color:#a00; }
   </style>
 </head>
 <body>
+
+<div id="diag">Loading…</div>
 
 <canvas id="game" width="600" height="200"></canvas>
 
@@ -29,14 +35,57 @@
 <canvas id="overlay"></canvas>
 <div id="overlayTapHint">Tip: tap the preview or press Space/↑ to jump</div>
 
-<!-- 1) Load TFJS (union bundle) -> exposes global `tf` -->
-https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js</script>
+<!-- ====== Load TFJS & Pose Detection with automatic fallback ====== -->
+<script>
+  (function loadLibs(){
+    const head = document.head;
 
-<!-- 2) Load Pose Detection (global `poseDetection`) -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3-- 3) Your app code (runs after TFJS + pose-detection are ready) -->
+    function add(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve(src);
+        s.onerror = () => reject(new Error('Failed: ' + src));
+        head.appendChild(s);
+      });
+    }
+
+    async function boot() {
+      const diag = (msg) => document.getElementById('diag').innerHTML = msg;
+
+      // Try jsDelivr first, then fall back to unpkg if blocked.
+      try {
+        await add("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js");
+      } catch {
+        await add("https://unpkg.com/@tensorflow/tfjs@4.18.0/dist/tf.min.js");
+      }
+
+      try {
+        await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js");
+      } catch {
+        await add("https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js");
+      }
+
+      // Quick diagnostics for library load
+      const tfOK  = !!(window.tf);
+      const pdOK  = !!(window.poseDetection);
+      diag(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • Pose-Detection: ${pdOK ? '<b>ok</b>' : '<i>missing</i>'}`);
+
+      if (tfOK && pdOK) {
+        // Continue to app after a tick so the banner is visible
+        setTimeout(startApp, 10);
+      } else {
+        console.error('Libraries not loaded:', { tfOK, pdOK });
+      }
+    }
+    boot();
+  })();
+</script>
+
+<!-- ====== App code ====== -->
 <script>
 /* ================================================================
-   Dino Jump with MoveNet (no bare imports; correct TFJS load order)
+   Dino Jump with MoveNet (no bare imports; CDN fallback + diagnostics)
    ================================================================ */
 
 const video = document.getElementById('webcam');
@@ -56,6 +105,14 @@ let jumpCooldown = 0;
 let smoothY = null;
 const SMOOTH_ALPHA = 0.25;
 
+function setDiag(extra) {
+  const tfOK  = !!(window.tf);
+  const pdOK  = !!(window.poseDetection);
+  document.getElementById('diag').innerHTML =
+    `TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • Pose-Detection: ${pdOK ? '<b>ok</b>' : '<i>missing</i>'}` +
+    (extra ? ' • ' + extra : '');
+}
+
 // ---------- Hi‑DPI canvas scaling ----------
 function fitCanvasToDPR(canvasEl) {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -74,7 +131,7 @@ function resizeOverlay() {
 // ---------- Webcam + Detector ----------
 async function initWebcamAndDetector() {
   try {
-    // Prefer WebGL backend for speed (falls back to CPU if needed)
+    // Prefer WebGL backend for speed, but fall back if needed
     try { await tf.setBackend('webgl'); } catch { await tf.setBackend('cpu'); }
     await tf.ready();
 
@@ -88,6 +145,8 @@ async function initWebcamAndDetector() {
     statusText.textContent = "Camera ready. Move head UP to jump!";
     video.onloadedmetadata = () => resizeOverlay();
 
+    setDiag('camera: <b>ok</b>');
+
     // Create MoveNet Lightning (fast single‑pose)
     detector = await poseDetection.createDetector(
       poseDetection.SupportedModels.MoveNet,
@@ -100,6 +159,7 @@ async function initWebcamAndDetector() {
     detectPose();
   } catch (e) {
     errorMsg.textContent = "Error initializing webcam or detector:\n" + (e.stack || e.message || e);
+    setDiag('<i>camera/detector error</i>');
   }
 }
 
@@ -297,31 +357,36 @@ function restart() {
   gameOver = false;
 }
 
-// Kick-off
-initWebcamAndDetector();
-restart();
-loop();
+function startApp() {
+  // Kick-off
+  initWebcamAndDetector();
+  restart();
+  loop();
 
-// Fallback controls
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' || e.code === 'ArrowUp') jump();
-});
-overlay.addEventListener('click', jump);
+  // Fallback controls
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'ArrowUp') jump();
+  });
+  overlay.addEventListener('click', jump);
 
-// Pause when tab hidden
-document.addEventListener('visibilitychange', () => {
-  paused = document.hidden;
-});
+  // Pause when tab hidden
+  document.addEventListener('visibilitychange', () => {
+    paused = document.hidden;
+  });
 
-// Cleanup
-window.addEventListener('beforeunload', async () => {
-  try { if (detector) await detector.dispose(); } catch {}
-  const tracks = video.srcObject && video.srcObject.getTracks ? video.srcObject.getTracks() : [];
-  tracks.forEach(t => t.stop());
-});
+  // Cleanup
+  window.addEventListener('beforeunload', async () => {
+    try { if (detector) await detector.dispose(); } catch {}
+    const tracks = video.srcObject && video.srcObject.getTracks ? video.srcObject.getTracks() : [];
+    tracks.forEach(t => t.stop());
+  });
 
-// Handle resizes
-window.addEventListener('resize', () => resizeOverlay());
+  // Handle resizes
+  window.addEventListener('resize', () => resizeOverlay());
+}
+
+// Expose for the loader above
+window.startApp = startApp;
 </script>
 
 </body>
