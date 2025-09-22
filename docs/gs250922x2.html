@@ -316,8 +316,8 @@ function update() {
       // Ascent vs descent gravity
       if (dino.vy < 0) dino.vy += GRAVITY_ASC;
       else             dino.vy += GRAVITY_DESC;
-      dino.y += dino.vy;
 dino.jumping = false;
+      dino.y += dino.vy;
 
       // ===== Ceiling clamp: never go beyond the top border =====
       if (dino.y < TOP_MARGIN) {
