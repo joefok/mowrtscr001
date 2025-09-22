@@ -322,6 +322,7 @@ function update() {
       if (dino.y < TOP_MARGIN) {
         dino.y = TOP_MARGIN;
         dino.vy = 0; // start descending next frame (GRAVITY_DESC)
+dino.jumping = false;
       }
 
       // Land on ground
