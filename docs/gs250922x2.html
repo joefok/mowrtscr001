@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dino Jump — MoveNet Head-Gesture (No MediaPipe Import)</title>
+  <title>Dino Jump — MoveNet Head-Gesture (No Bare Imports)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f7f7f7; color:#222; }
@@ -10,15 +10,9 @@
     #info  { text-align:center; margin-top:6px; }
     #status { display:inline-block; margin-bottom:6px; }
     #errorMsg { color:#c00; white-space:pre-wrap; max-width:800px; margin:6px auto; }
-    /* Webcam preview (top-right) */
     #webcam { position:fixed; top:10px; right:10px; width:160px; border:2px solid #444; border-radius:4px; }
-    /* Pose overlay on top of webcam preview */
     #overlay { position:fixed; top:10px; right:10px; width:160px; pointer-events:auto; }
-    /* Make the overlay tappable for jump fallback */
-    #overlayTapHint {
-      position:fixed; top:10px; right:10px; width:160px; height:auto;
-      text-align:center; color:#222; font-size:12px; pointer-events:none;
-    }
+    #overlayTapHint { position:fixed; top:10px; right:10px; width:160px; text-align:center; color:#222; font-size:12px; pointer-events:none; }
   </style>
 </head>
 <body>
@@ -30,23 +24,23 @@
   <div id="errorMsg"></div>
 </div>
 
-<!-- Webcam preview + overlay (kept visible so you can tune sensitivity) -->
+<!-- Webcam preview + overlay for debugging -->
 <video id="webcam" autoplay playsinline muted></video>
 <canvas id="overlay"></canvas>
 <div id="overlayTapHint">Tip: tap the preview or press Space/↑ to jump</div>
 
-<!-- Load TFJS as a global (no bare imports) -->
-<script/cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js</script>
+<!-- ====== Load TFJS + Pose Detection (global 'poseDetection') ======
+     This script-tag pattern is the one documented by the TFJS Pose Detection project. -->
+<script src="https://net/npm/@tensorflow/tfjs-core@4.18.0/dist/tf-core.min.js</script>
+<script src="https://cdn.jsdelivrsorflow/tfjs-converter@4.18.0/dist/tf-converter.min.js</script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.18.0/dist/tf-backend-webgl.min.jsps://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3</script>
+<!-- Docs show these script tags as the “via script” way to use pose-detection. -->
+<!-- Ref: MoveNet/pose-detection README usage via <script> tags. --> 
 
-<!-- App: ES module that imports pose-detection by full URL (no bare specifiers) -->
-<script type="module">
-import * as poseDetection from "https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.esm.js";
-
-/**
- * This file intentionally avoids any `import '@mediapipe/pose'` to prevent the
- * browser error "Failed to resolve module specifier '@mediapipe/pose'".
- * We use MoveNet (TFJS runtime) instead of BlazePose MediaPipe.  See refs below.
- */
+<script>
+/* ================================================================
+   Dino Jump with MoveNet (no ESM imports, no @mediapipe/pose needed)
+   ================================================================ */
 
 const video = document.getElementById('webcam');
 const overlay = document.getElementById('overlay');
@@ -55,31 +49,26 @@ const statusText = document.getElementById('status');
 const errorMsg = document.getElementById('errorMsg');
 
 let detector;
+// Gesture tracking
 const noseHistory = [];
 const HISTORY_LENGTH = 8;
-
-// Sensitivity ~8% of overlay height (tune: 0.06–0.10)
+// ~8% of video height; tune 0.06–0.10 for sensitivity
 const GESTURE_THRESHOLD_RATIO = 0.08;
 let jumpCooldown = 0;
-
-// Light smoothing to reduce jitter
+// Smoothing
 let smoothY = null;
 const SMOOTH_ALPHA = 0.25;
 
-// ---------- Overlay DPI scaling ----------
+// ---------- Hi‑DPI canvas scaling ----------
 function fitCanvasToDPR(canvasEl) {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const rect = canvasEl.getBoundingClientRect();
-  // Set backing store size
   canvasEl.width  = Math.round(rect.width  * dpr);
   canvasEl.height = Math.round(rect.height * dpr);
-  // Draw 1 CSS px == 1 unit
   const ctx = canvasEl.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-
 function resizeOverlay() {
-  // Match overlay CSS size to video CSS size
   overlay.style.width  = video.offsetWidth + "px";
   overlay.style.height = video.offsetHeight + "px";
   fitCanvasToDPR(overlay);
@@ -88,8 +77,8 @@ function resizeOverlay() {
 // ---------- Webcam + Detector ----------
 async function initWebcamAndDetector() {
   try {
-    // Prefer WebGL backend for MoveNet; fall back to CPU if not available.
-    try { await tf.setBackend('webgl'); } catch { await tf.setBackend('cpu'); }
+    // Prefer WebGL backend for speed
+    await tf.setBackend('webgl');
     await tf.ready();
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -98,12 +87,11 @@ async function initWebcamAndDetector() {
     });
     video.srcObject = stream;
 
-    await video.play(); // iOS requires muted+playsinline on the element (already set)
+    await video.play(); // iOS needs autoplay+muted+playsinline
     statusText.textContent = "Camera ready. Move head UP to jump!";
-
     video.onloadedmetadata = () => resizeOverlay();
 
-    // Explicit MoveNet Lightning config (fast single-pose)
+    // Create MoveNet Lightning (fast single‑pose)
     detector = await poseDetection.createDetector(
       poseDetection.SupportedModels.MoveNet,
       {
@@ -133,7 +121,6 @@ async function detectPose() {
       requestAnimationFrame(detectPose);
       return;
     }
-
     resizeOverlay();
     octx.clearRect(0, 0, overlay.width, overlay.height);
 
@@ -141,28 +128,25 @@ async function detectPose() {
     if (poses.length > 0) {
       const nose = poses[0].keypoints.find(k => k.name === 'nose');
       if (nose && nose.score > 0.5) {
-        // Smooth y
+        // Smooth the y coordinate
         smoothY = (smoothY == null) ? nose.y : (SMOOTH_ALPHA * nose.y + (1 - SMOOTH_ALPHA) * smoothY);
-
-        // History window
         noseHistory.push(smoothY);
         if (noseHistory.length > HISTORY_LENGTH) noseHistory.shift();
 
-        // Debug dot
+        // debug marker
         drawNoseDot(nose.x, nose.y);
 
-        // Enough history + no cooldown → compare to baseline
         if (noseHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
           const baselineAvg = noseHistory.slice(0, HISTORY_LENGTH - 2)
             .reduce((a, b) => a + b, 0) / (HISTORY_LENGTH - 2);
 
-          // Canvas Y increases downward; head UP → delta positive
+          // Canvas Y grows downward; head UP => delta positive
           const delta = baselineAvg - smoothY;
           const thresholdPx = (overlay.height || 120) * GESTURE_THRESHOLD_RATIO;
 
           if (delta > thresholdPx) {
             jump();
-            jumpCooldown = 15; // ~frames @ 60fps
+            jumpCooldown = 15;
           }
         }
       }
@@ -174,7 +158,7 @@ async function detectPose() {
   requestAnimationFrame(detectPose);
 }
 
-// ---------- Game (your original logic, lightly wrapped) ----------
+// ---------- Game ----------
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
@@ -325,15 +309,14 @@ loop();
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp') jump();
 });
-// Tap the overlay to jump
 overlay.addEventListener('click', jump);
 
-// Pause when tab hidden (perf/battery)
+// Pause when tab hidden
 document.addEventListener('visibilitychange', () => {
   paused = document.hidden;
 });
 
-// Cleanup camera & model on unload
+// Cleanup
 window.addEventListener('beforeunload', async () => {
   try { if (detector) await detector.dispose(); } catch {}
   const tracks = video.srcObject && video.srcObject.getTracks ? video.srcObject.getTracks() : [];
@@ -342,7 +325,7 @@ window.addEventListener('beforeunload', async () => {
 
 // Handle resizes
 window.addEventListener('resize', () => resizeOverlay());
-
 </script>
+
 </body>
 </html>
