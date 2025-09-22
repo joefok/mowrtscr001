@@ -231,7 +231,7 @@ async function detectPose() {
   } catch (err) {
     errorMsg.textContent = "Pose detection error:\n" + (err.stack || err.message || err);
   }
-  if (jumpCooldown > 0) jumpCooldown--;
+  if (jumpCooldown > 0) jumpCooldown-=5;
   requestAnimationFrame(detectPose);
 }
 
@@ -312,7 +312,8 @@ function update() {
   if (!gameOver) {
     dino.frame++; if (dino.frame % 14 === 0) dino.legSwap = !dino.legSwap;
 
-    if (dino.jumping) {
+if (dino.vy > 0){dino.jumping = false;}
+    if (true) {
       // Ascent vs descent gravity
       if (dino.vy < 0) dino.vy += GRAVITY_ASC;
       else             dino.vy += GRAVITY_DESC;
@@ -327,7 +328,7 @@ function update() {
       // Land on ground
       if (dino.y >= GROUND_Y - DINO_HEIGHT) {
         dino.y = GROUND_Y - DINO_HEIGHT;
-        dino.vy = 0; dino.jumping = false;
+        dino.vy = 0;
       }
     }
 
