@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dino Jump with Pose Detection (Working Fix)</title>
+  <title>Dino Jump with Modern TensorFlow.js</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
@@ -14,216 +14,212 @@
 <video id="webcam" autoplay playsinline muted style="position:fixed;top:10px;right:10px;width:160px;border:2px solid #444;"></video>
 <canvas id="overlay" style="position:fixed;top:10px;right:10px;width:160px;pointer-events:none;"></canvas>
 
-<!-- ✅ Load TensorFlow.js and Pose Detection from Google-hosted CDN -->
-https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js</script>
-https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@0.0.7/dist/pose-detection.min.js</script>
+<script type="module">
+import * as tf from "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js";
+import * as poseDetection from "https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.esm.js";
 
-<script>
-window.addEventListener('load', async function() {
-  const video = document.getElementById('webcam');
-  const overlay = document.getElementById('overlay');
-  const octx = overlay.getContext('2d');
-  const statusText = document.getElementById('status');
-  const errorMsg = document.getElementById('errorMsg');
+const video = document.getElementById('webcam');
+const overlay = document.getElementById('overlay');
+const octx = overlay.getContext('2d');
+const statusText = document.getElementById('status');
+const errorMsg = document.getElementById('errorMsg');
 
-  const noseHistory = [];
-  const HISTORY_LENGTH = 8;
-  const GESTURE_THRESHOLD = 22;
-  let jumpCooldown = 0;
-  let detector;
+let detector;
+const noseHistory = [];
+const HISTORY_LENGTH = 8;
+const GESTURE_THRESHOLD = 22;
+let jumpCooldown = 0;
 
-  function resizeOverlay() {
-    overlay.width = video.videoWidth || 160;
-    overlay.height = video.videoHeight || 120;
-    overlay.style.width = video.offsetWidth + "px";
-    overlay.style.height = video.offsetHeight + "px";
+function resizeOverlay() {
+  overlay.width = video.videoWidth || 160;
+  overlay.height = video.videoHeight || 120;
+  overlay.style.width = video.offsetWidth + "px";
+  overlay.style.height = video.offsetHeight + "px";
+}
+
+async function initWebcamAndDetector() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    video.srcObject = stream;
+    await video.play();
+    statusText.textContent = "Camera active. Move head up/down to jump!";
+    video.onloadedmetadata = () => { resizeOverlay(); };
+    detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet);
+    detectPose();
+  } catch (e) {
+    errorMsg.textContent = "Error initializing webcam or detector:\n" + (e.stack || e.message || e);
   }
+}
 
-  async function initWebcamAndDetector() {
-    try {
-      if (!window.poseDetection || !window.tf) throw new Error("poseDetection or tf is not defined. Libraries failed to load.");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-      video.srcObject = stream;
-      await video.play();
-      statusText.textContent = "Camera active. Move head up/down to jump!";
-      video.onloadedmetadata = () => { resizeOverlay(); };
-      detector = await window.poseDetection.createDetector(window.poseDetection.SupportedModels.MoveNet);
-      detectPose();
-    } catch (e) {
-      errorMsg.textContent = "Error initializing webcam or detector:\n" + (e.stack || e.message || e);
+async function detectPose() {
+  try {
+    if (!detector || video.videoWidth === 0 || video.videoHeight === 0) {
+      requestAnimationFrame(detectPose);
+      return;
     }
-  }
-
-  async function detectPose() {
-    try {
-      if (!detector || video.videoWidth === 0 || video.videoHeight === 0) {
-        requestAnimationFrame(detectPose);
-        return;
-      }
-      resizeOverlay();
-      const poses = await detector.estimatePoses(video);
-      octx.clearRect(0, 0, overlay.width, overlay.height);
-      if (poses.length > 0) {
-        const nose = poses[0].keypoints.find(k => k.name === 'nose');
-        if (nose && nose.score > 0.5) {
-          noseHistory.push(nose.y);
-          if (noseHistory.length > HISTORY_LENGTH) noseHistory.shift();
-          if (noseHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
-            const avgPrev = noseHistory.slice(0, HISTORY_LENGTH - 2).reduce((a, b) => a + b, 0) / (HISTORY_LENGTH - 2);
-            if (Math.abs(nose.y - avgPrev) > GESTURE_THRESHOLD) {
-              jump();
-              jumpCooldown = 15;
-            }
+    resizeOverlay();
+    const poses = await detector.estimatePoses(video);
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (poses.length > 0) {
+      const nose = poses[0].keypoints.find(k => k.name === 'nose');
+      if (nose && nose.score > 0.5) {
+        noseHistory.push(nose.y);
+        if (noseHistory.length > HISTORY_LENGTH) noseHistory.shift();
+        if (noseHistory.length === HISTORY_LENGTH && jumpCooldown === 0) {
+          const avgPrev = noseHistory.slice(0, HISTORY_LENGTH - 2).reduce((a, b) => a + b, 0) / (HISTORY_LENGTH - 2);
+          if (Math.abs(nose.y - avgPrev) > GESTURE_THRESHOLD) {
+            jump();
+            jumpCooldown = 15;
           }
         }
       }
-    } catch (err) {
-      errorMsg.textContent = "Pose detection error:\n" + (err.stack || err.message || err);
     }
-    if (jumpCooldown > 0) jumpCooldown--;
-    requestAnimationFrame(detectPose);
+  } catch (err) {
+    errorMsg.textContent = "Pose detection error:\n" + (err.stack || err.message || err);
   }
+  if (jumpCooldown > 0) jumpCooldown--;
+  requestAnimationFrame(detectPose);
+}
 
-  // Game logic
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const GROUND_Y = 170;
-  const DINO_WIDTH = 44, DINO_HEIGHT = 47;
-  const CACTUS_WIDTH = 20, CACTUS_HEIGHT = 40;
-  const GRAVITY = 0.35;
-  const JUMP_VELOCITY = -6;
-  const DINO_X = 50;
-  let dino = {}, cacti = [], cactusTimer = 0;
-  let score = 0, highScore = 0, gameOver = false;
-  let restartTimer = 0;
+// Game logic
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const GROUND_Y = 170;
+const DINO_WIDTH = 44, DINO_HEIGHT = 47;
+const CACTUS_WIDTH = 20, CACTUS_HEIGHT = 40;
+const GRAVITY = 0.35;
+const JUMP_VELOCITY = -6;
+const DINO_X = 50;
+let dino = {}, cacti = [], cactusTimer = 0;
+let score = 0, highScore = 0, gameOver = false;
+let restartTimer = 0;
 
-  function initDino() {
-    dino = { x: DINO_X, y: GROUND_Y - DINO_HEIGHT, vy: 0, jumping: false, alive: true, frame: 0, legSwap: false };
+function initDino() {
+  dino = { x: DINO_X, y: GROUND_Y - DINO_HEIGHT, vy: 0, jumping: false, alive: true, frame: 0, legSwap: false };
+}
+
+function drawDino() {
+  ctx.save();
+  ctx.translate(dino.x, dino.y);
+  ctx.fillStyle = "#666";
+  ctx.fillRect(0, 10, 34, 30);
+  ctx.fillRect(28, 0, 16, 18);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(39, 6, 3, 3);
+  ctx.fillStyle = "#222";
+  ctx.fillRect(40, 7, 1, 1);
+  ctx.fillStyle = "#444";
+  ctx.fillRect(10, 30, 8, 6);
+  ctx.fillRect(24, 30, 8, 6);
+  ctx.fillStyle = "#333";
+  if (dino.legSwap) {
+    ctx.fillRect(8, 40, 8, 7);
+    ctx.fillRect(24, 40, 8, 7);
+  } else {
+    ctx.fillRect(14, 40, 8, 7);
+    ctx.fillRect(18, 40, 8, 7);
   }
+  ctx.restore();
+}
 
-  function drawDino() {
-    ctx.save();
-    ctx.translate(dino.x, dino.y);
-    ctx.fillStyle = "#666";
-    ctx.fillRect(0, 10, 34, 30);
-    ctx.fillRect(28, 0, 16, 18);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(39, 6, 3, 3);
-    ctx.fillStyle = "#222";
-    ctx.fillRect(40, 7, 1, 1);
-    ctx.fillStyle = "#444";
-    ctx.fillRect(10, 30, 8, 6);
-    ctx.fillRect(24, 30, 8, 6);
-    ctx.fillStyle = "#333";
-    if (dino.legSwap) {
-      ctx.fillRect(8, 40, 8, 7);
-      ctx.fillRect(24, 40, 8, 7);
-    } else {
-      ctx.fillRect(14, 40, 8, 7);
-      ctx.fillRect(18, 40, 8, 7);
-    }
-    ctx.restore();
-  }
+function drawCactus(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.fillStyle = "#228B22";
+  ctx.fillRect(0, 0, CACTUS_WIDTH, CACTUS_HEIGHT);
+  ctx.fillRect(-5, 10, 5, 15);
+  ctx.fillRect(CACTUS_WIDTH, 20, 5, 10);
+  ctx.restore();
+}
 
-  function drawCactus(c) {
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.fillStyle = "#228B22";
-    ctx.fillRect(0, 0, CACTUS_WIDTH, CACTUS_HEIGHT);
-    ctx.fillRect(-5, 10, 5, 15);
-    ctx.fillRect(CACTUS_WIDTH, 20, 5, 10);
-    ctx.restore();
-  }
+function drawGround() {
+  ctx.strokeStyle = "#888";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y + 1);
+  ctx.lineTo(canvas.width, GROUND_Y + 1);
+  ctx.stroke();
+}
 
-  function drawGround() {
-    ctx.strokeStyle = "#888";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, GROUND_Y + 1);
-    ctx.lineTo(canvas.width, GROUND_Y + 1);
-    ctx.stroke();
-  }
+function drawScore() {
+  ctx.font = "20px monospace";
+  ctx.fillStyle = "#444";
+  ctx.fillText("Score: " + score, 10, 30);
+  ctx.fillText("High: " + highScore, 10, 55);
+}
 
-  function drawScore() {
-    ctx.font = "20px monospace";
-    ctx.fillStyle = "#444";
-    ctx.fillText("Score: " + score, 10, 30);
-    ctx.fillText("High: " + highScore, 10, 55);
-  }
-
-  function update() {
-    if (!gameOver) {
-      dino.frame++;
-      if (dino.frame % 14 === 0) dino.legSwap = !dino.legSwap;
-      if (dino.jumping) {
-        dino.vy += GRAVITY;
-        dino.y += dino.vy;
-        if (dino.y >= GROUND_Y - DINO_HEIGHT) {
-          dino.y = GROUND_Y - DINO_HEIGHT;
-          dino.vy = 0;
-          dino.jumping = false;
-        }
+function update() {
+  if (!gameOver) {
+    dino.frame++;
+    if (dino.frame % 14 === 0) dino.legSwap = !dino.legSwap;
+    if (dino.jumping) {
+      dino.vy += GRAVITY;
+      dino.y += dino.vy;
+      if (dino.y >= GROUND_Y - DINO_HEIGHT) {
+        dino.y = GROUND_Y - DINO_HEIGHT;
+        dino.vy = 0;
+        dino.jumping = false;
       }
-      cactusTimer--;
-      if (cactusTimer <= 0) {
-        cacti.push({ x: canvas.width, y: GROUND_Y - CACTUS_HEIGHT, width: CACTUS_WIDTH, height: CACTUS_HEIGHT });
-        cactusTimer = 120 + Math.floor(Math.random() * 60);
+    }
+    cactusTimer--;
+    if (cactusTimer <= 0) {
+      cacti.push({ x: canvas.width, y: GROUND_Y - CACTUS_HEIGHT, width: CACTUS_WIDTH, height: CACTUS_HEIGHT });
+      cactusTimer = 120 + Math.floor(Math.random() * 60);
+    }
+    for (let i = 0; i < cacti.length; i++) cacti[i].x -= 3;
+    cacti = cacti.filter(c => c.x + c.width > 0);
+    for (let c of cacti) {
+      if (dino.x + DINO_WIDTH > c.x && dino.x < c.x + c.width && dino.y + DINO_HEIGHT > c.y && dino.y < c.y + c.height) {
+        gameOver = true;
+        dino.alive = false;
+        if (score > highScore) highScore = score;
+        restartTimer = 60;
       }
-      for (let i = 0; i < cacti.length; i++) cacti[i].x -= 3;
-      cacti = cacti.filter(c => c.x + c.width > 0);
-      for (let c of cacti) {
-        if (dino.x + DINO_WIDTH > c.x && dino.x < c.x + c.width && dino.y + DINO_HEIGHT > c.y && dino.y < c.y + c.height) {
-          gameOver = true;
-          dino.alive = false;
-          if (score > highScore) highScore = score;
-          restartTimer = 60;
-        }
-      }
-      score++;
-    } else {
-      restartTimer--;
-      if (restartTimer <= 0) restart();
     }
+    score++;
+  } else {
+    restartTimer--;
+    if (restartTimer <= 0) restart();
   }
+}
 
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGround();
-    drawDino();
-    for (let c of cacti) drawCactus(c);
-    drawScore();
-    if (gameOver) {
-      ctx.font = "32px monospace";
-      ctx.fillStyle = "#c00";
-      ctx.fillText("GAME OVER", canvas.width/2-100, 100);
-    }
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGround();
+  drawDino();
+  for (let c of cacti) drawCactus(c);
+  drawScore();
+  if (gameOver) {
+    ctx.font = "32px monospace";
+    ctx.fillStyle = "#c00";
+    ctx.fillText("GAME OVER", canvas.width/2-100, 100);
   }
+}
 
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function jump() {
+  if (!gameOver && !dino.jumping) {
+    dino.vy = JUMP_VELOCITY;
+    dino.jumping = true;
   }
+}
 
-  function jump() {
-    if (!gameOver && !dino.jumping) {
-      dino.vy = JUMP_VELOCITY;
-      dino.jumping = true;
-    }
-  }
+function restart() {
+  initDino();
+  cacti = [];
+  cactusTimer = 0;
+  score = 0;
+  gameOver = false;
+}
 
-  function restart() {
-    initDino();
-    cacti = [];
-    cactusTimer = 0;
-    score = 0;
-    gameOver = false;
-  }
-
-  initWebcamAndDetector();
-  restart();
-  loop();
-});
+initWebcamAndDetector();
+restart();
+loop();
 </script>
 </body>
 </html>
