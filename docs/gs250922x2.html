@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dino Jump with Pose Detection (UMD Fixed)</title>
+  <title>Dino Jump with Pose Detection (Working Fix)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
@@ -14,12 +14,12 @@
 <video id="webcam" autoplay playsinline muted style="position:fixed;top:10px;right:10px;width:160px;border:2px solid #444;"></video>
 <canvas id="overlay" style="position:fixed;top:10px;right:10px;width:160px;pointer-events:none;"></canvas>
 
-<!-- ✅ Load UMD libraries (older version for compatibility) -->
-https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js</script>
+<!-- ✅ Load TensorFlow.js and Pose Detection from Google-hosted CDN -->
+https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js</script>
 https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@0.0.7/dist/pose-detection.min.js</script>
 
 <script>
-window.addEventListener('load', function() {
+window.addEventListener('load', async function() {
   const video = document.getElementById('webcam');
   const overlay = document.getElementById('overlay');
   const octx = overlay.getContext('2d');
@@ -193,7 +193,7 @@ window.addEventListener('load', function() {
     for (let c of cacti) drawCactus(c);
     drawScore();
     if (gameOver) {
-      ctx.font = "32px sans-serif";
+      ctx.font = "32px monospace";
       ctx.fillStyle = "#c00";
       ctx.fillText("GAME OVER", canvas.width/2-100, 100);
     }
