@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dino Jump — MoveNet Head-Gesture (No Bare Imports)</title>
+  <title>Dino Jump — MoveNet Head-Gesture (Fixed TFJS Load Order)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f7f7f7; color:#222; }
@@ -24,22 +24,19 @@
   <div id="errorMsg"></div>
 </div>
 
-<!-- Webcam preview + overlay for debugging -->
+<!-- Webcam preview + overlay -->
 <video id="webcam" autoplay playsinline muted></video>
 <canvas id="overlay"></canvas>
 <div id="overlayTapHint">Tip: tap the preview or press Space/↑ to jump</div>
 
-<!-- ====== Load TFJS + Pose Detection (global 'poseDetection') ======
-     This script-tag pattern is the one documented by the TFJS Pose Detection project. -->
-<script src="https://net/npm/@tensorflow/tfjs-core@4.18.0/dist/tf-core.min.js</script>
-<script src="https://cdn.jsdelivrsorflow/tfjs-converter@4.18.0/dist/tf-converter.min.js</script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.18.0/dist/tf-backend-webgl.min.jsps://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3</script>
-<!-- Docs show these script tags as the “via script” way to use pose-detection. -->
-<!-- Ref: MoveNet/pose-detection README usage via <script> tags. --> 
+<!-- 1) Load TFJS (union bundle) -> exposes global `tf` -->
+https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js</script>
 
+<!-- 2) Load Pose Detection (global `poseDetection`) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3-- 3) Your app code (runs after TFJS + pose-detection are ready) -->
 <script>
 /* ================================================================
-   Dino Jump with MoveNet (no ESM imports, no @mediapipe/pose needed)
+   Dino Jump with MoveNet (no bare imports; correct TFJS load order)
    ================================================================ */
 
 const video = document.getElementById('webcam');
@@ -52,7 +49,7 @@ let detector;
 // Gesture tracking
 const noseHistory = [];
 const HISTORY_LENGTH = 8;
-// ~8% of video height; tune 0.06–0.10 for sensitivity
+// ~8% of video height; tune 0.06–0.10
 const GESTURE_THRESHOLD_RATIO = 0.08;
 let jumpCooldown = 0;
 // Smoothing
@@ -77,8 +74,8 @@ function resizeOverlay() {
 // ---------- Webcam + Detector ----------
 async function initWebcamAndDetector() {
   try {
-    // Prefer WebGL backend for speed
-    await tf.setBackend('webgl');
+    // Prefer WebGL backend for speed (falls back to CPU if needed)
+    try { await tf.setBackend('webgl'); } catch { await tf.setBackend('cpu'); }
     await tf.ready();
 
     const stream = await navigator.mediaDevices.getUserMedia({
