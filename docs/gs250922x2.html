@@ -318,6 +318,7 @@ function update() {
       else             dino.vy += GRAVITY_DESC;
       dino.y += dino.vy;
 
+
       // ===== Ceiling clamp: never go beyond the top border =====
       if (dino.y < TOP_MARGIN) {
         dino.y = TOP_MARGIN;
