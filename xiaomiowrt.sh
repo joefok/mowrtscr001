@@ -50,14 +50,14 @@ else
 #reboot;
 fi
 
-[ $(date +%H) -eq 22 ] && [ $(date +%M) -gt 50 ] && wifi down; wifi up
-[ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi up; wifi down
+[ $(date +%H) -eq 22 ] && [ $(date +%M) -gt 50 ] && ifconfig wlan0 down; wifi down; wifi up; ifconfig wlan0 up;
+[ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi up; wifi down;ifconfig wlan0 down;
 #[ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 23 ] && wifi down || wifi up
 
 else
     echo "The system has been up for 30 minutes or less."
 
-if [[ ! -f /tmp/wifiup ]]; then wifi up;
+if [[ ! -f /tmp/wifiup ]]; then wifi up;ifconfig wlan0 up;
 touch /tmp/wifiup; fi;
 
 fi
