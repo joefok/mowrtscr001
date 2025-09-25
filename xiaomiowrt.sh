@@ -50,7 +50,7 @@ else
 #reboot;
 fi
 
-[ $(date +%H) -eq 22 ] && [ $(date +%M) -gt 35 ] && rm /tmp/wifiup;
+[ $(date +%H) -eq 22 ] && [ $(date +%M) -gt 48 ] && rm /tmp/wifiup;
 [ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 22 ] && wifi down && ifconfig wlan0 down;
 [ $(date +%H) -ge 7 ] && [ $(date +%H) -lt 22 ] && wifi down || if [[ ! -f /tmp/wifiup ]]; then ifconfig wlan0 up;touch /tmp/wifiup; wifi up; fi;
 
