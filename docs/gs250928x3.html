@@ -29,7 +29,13 @@
     }
 
     video {
-      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -106,8 +112,11 @@
       width: 640,
       height: 480
     });
-    camera.start();
+
+    // Start camera only after user interaction (required by some mobile browsers)
+    window.addEventListener('click', () => {
+      camera.start();
+    }, { once: true });
   </script>
 </body>
 </html>
- 
