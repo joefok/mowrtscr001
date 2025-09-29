@@ -3,14 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gesture Tetris</title>
+  <title>Gesture Tetris — Stacking & Slower</title>
 
   <!-- (Optional) Small perf win -->
   https://cdn.jsdelivr.net
-  https://unpkg.com
-
-  <style>
-    :root { --tile: 30px; }
+  <link rel="preconnect" href="https://un{ --tile: 30px; }
     body {
       margin: 0;
       overflow: hidden;
@@ -46,6 +43,19 @@
       max-width: 92vw;
       white-space: pre-wrap;
     }
+    #hud {
+      position: fixed;
+      left: 10px;
+      bottom: 10px;
+      z-index: 10;
+      background: rgba(0,0,0,.5);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px; padding: 8px 10px; font-size: 12px;
+      max-width: 60vw;
+    }
+    #hud h4 { margin: 0 0 6px 0; font-size: 13px; }
+    #hud .row { display: flex; gap: 12px; margin: 4px 0; }
+    #hud code { color: #9cf; }
     #camToggle {
       position: fixed;
       right: 10px;
@@ -61,14 +71,6 @@
       user-select: none;
     }
     #camToggle:hover { background: #0e4f5a; }
-    #legend {
-      position: fixed; left: 10px; bottom: 10px; z-index: 10;
-      background: rgba(0,0,0,.5);
-      border: 1px solid rgba(255,255,255,.2);
-      border-radius: 6px; padding: 6px 10px; font-size: 12px;
-      max-width: 60vw;
-    }
-    code { color: #9cf; }
   </style>
 </head>
 <body>
@@ -76,19 +78,34 @@
   <div id="diag">Booting...</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
-  <button id="camToggle" type="button">📷 Hide</button>
-  <div id="legend">
-    <div><b>Mode:</b> <span id="modeLabel">hand</span></div>
-    <div><b>Gestures:</b>
-      <ul style="margin:6px 0 0 18px;padding:0;">
-        <li><b>Move</b>: left/right offset</li>
-        <li><b>Rotate</b>: <span id="rotateHint">Pinch (thumb+index)</span></li>
-        <li><b>Soft drop</b>: <span id="dropHint">Index tip below wrist</span></li>
-      </ul>
+
+  <div id="hud">
+    <h4>Gesture Tetris</h4>
+    <div class="row">
+      <div><b>Mode:</b> <span id="modeLabel">hand</span></div>
+      <div><b>Score:</b> <span id="score">0</span></div>
+      <div><b>Lines:</b> <span id="lines">0</span></div>
+      <div><b>Pieces:</b> <span id="pieces">0</span></div>
     </div>
-    <div><b>Keys:</b> <code>C</code> camera toggle</div>
-    <div><b>Last gesture:</b> <span id="lastGesture">—</span></div>
+    <div class="row">
+      <div><b>Gestures:</b></div>
+      <div>
+        Move = left/right offset •
+        Rotate = <span id="rotateHint">Pinch (thumb+index)</span> •
+        Soft drop = <span id="dropHint">Index tip below wrist</span>
+      </div>
+    </div>
+    <div class="row">
+      <div><b>Keys:</b></div>
+      <div><code>C</code> toggle camera</div>
+    </div>
+    <div class="row">
+      <div><b>Last gesture:</b></div>
+      <div id="lastGesture">—</div>
+    </div>
   </div>
+
+  <button id="camToggle" type="button">📷 Hide</button>
 
   <script>
     // ==================== CONFIG ====================
@@ -101,8 +118,8 @@
     }
 
     // Movement tuning
-    const MOVE_COOLDOWN_MS   = 180; // throttle horizontal moves
-    const ROTATE_COOLDOWN_MS = 280; // rotation debounce
+    const MOVE_COOLDOWN_MS   = 200; // throttle horizontal moves
+    const ROTATE_COOLDOWN_MS = 320; // rotation debounce
     const HAND_DX_THRESHOLD  = 30;  // index tip to wrist (px) for left/right
     const HAND_PINCH_DIST    = 35;  // thumb tip ↔ index tip distance (px) for rotate
     const HAND_DROP_DY       = 40;  // index tip lower than wrist (px) => soft drop
@@ -111,7 +128,13 @@
     const POSE_ROTATE_DY     = -20; // wrist above nose by at least 20px -> rotate
     const POSE_DROP_DY       = 40;  // wrist below nose by at least 40px -> soft drop
 
-    // ==================== LOADER ====================
+    // Game speed (slower base)
+    let fallMsBase   = 900; // default gravity (slower than before)
+    let fallMsSoft   = 250; // while soft-dropping
+  </script>
+
+  <!-- ====== Loader with CDN fallback ====== -->
+  <script>
     (function loadLibs(){
       const head = document.head;
       const diagEl = document.getElementById('diag');
@@ -160,7 +183,6 @@
             catch { await add("https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js"); }
           }
 
-          // Sanity checks
           const tfOK  = !!window.tf;
           const libOK = MODE === 'hand'
             ? !!window.handPoseDetection
@@ -183,8 +205,8 @@
     })();
   </script>
 
+  <!-- ====== App: Stacking Tetris + Gestures ====== -->
   <script>
-    // ==================== APP ====================
     async function startApp() {
       const diag = document.getElementById('diag');
       const video = document.getElementById('camera');
@@ -192,83 +214,246 @@
       const ctx = canvas.getContext('2d');
       const lastGestureEl = document.getElementById('lastGesture');
       const camToggleBtn = document.getElementById('camToggle');
+      const scoreEl = document.getElementById('score');
+      const linesEl = document.getElementById('lines');
+      const piecesEl = document.getElementById('pieces');
 
       // Board setup
       const TILE = 30, COLS = 10, ROWS = 20;
       canvas.width = COLS * TILE;
       canvas.height = ROWS * TILE;
 
-      // Simple "T" piece and position
-      let piece = [
-        [1, 1, 1],
-        [0, 1, 0],
-      ];
-      let pos = { x: 3, y: 0 };
+      // Colors by piece id (1..7)
+      const COLORS = {
+        0: '#000000',
+        1: '#00f0f0', // I - cyan
+        2: '#0000f0', // J - blue
+        3: '#f0a000', // L - orange
+        4: '#f0f000', // O - yellow
+        5: '#00f000', // S - green
+        6: '#a000f0', // T - purple
+        7: '#f00000', // Z - red
+      };
 
-      // Gesture debouncing
-      let lastMove = 0;
-      let lastRotate = 0;
-      let pinchActive = false; // only rotate on pinch start
-      let softDropActive = false;
-
-      // Fall timing (switchable for soft drop)
-      let fallMs = 500; // default
-      let fallTimer = null;
-
-      function startFallTimer() {
-        if (fallTimer) clearInterval(fallTimer);
-        fallTimer = setInterval(tick, fallMs);
+      // Tetromino definitions (filled with their ID)
+      function shapeById(id) {
+        const map = {
+          1: [[1,1,1,1]],                    // I
+          2: [[2,0,0],[2,2,2]],              // J
+          3: [[0,0,3],[3,3,3]],              // L
+          4: [[4,4],[4,4]],                  // O
+          5: [[0,5,5],[5,5,0]],              // S
+          6: [[0,6,0],[6,6,6]],              // T
+          7: [[7,7,0],[0,7,7]],              // Z
+        };
+        // deep copy to avoid mutation
+        return map[id].map(row => row.slice());
       }
 
-      function setSoftDrop(active) {
-        if (active && !softDropActive) {
-          softDropActive = true; fallMs = 120; startFallTimer();
-          lastGestureEl.textContent = 'soft-drop';
-        } else if (!active && softDropActive) {
-          softDropActive = false; fallMs = 500; startFallTimer();
-          lastGestureEl.textContent = '—';
+      // Bag randomizer
+      let bag = [];
+      function refillBag() {
+        bag = [1,2,3,4,5,6,7];
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[j]] = [bag[j], bag[i]];
+        }
+      }
+      function nextId() {
+        if (bag.length === 0) refillBag();
+        return bag.pop();
+      }
+
+      // Active piece state
+      let active = null; // {id, matrix, x, y}
+      const board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+      let score = 0, lines = 0, pieces = 0;
+      function updateHUD() {
+        scoreEl.textContent = score;
+        linesEl.textContent = lines;
+        piecesEl.textContent = pieces;
+      }
+
+      // Collision detection
+      function collides(mat, offX, offY) {
+        for (let y = 0; y < mat.length; y++) {
+          for (let x = 0; x < mat[y].length; x++) {
+            const cell = mat[y][x];
+            if (!cell) continue;
+            const bx = offX + x;
+            const by = offY + y;
+            if (bx < 0 || bx >= COLS || by >= ROWS) return true;
+            if (by >= 0 && board[by][bx]) return true;
+          }
+        }
+        return false;
+      }
+
+      // Merge active into board
+      function merge() {
+        const mat = active.matrix;
+        for (let y = 0; y < mat.length; y++) {
+          for (let x = 0; x < mat[y].length; x++) {
+            const v = mat[y][x];
+            if (v && active.y + y >= 0) {
+              board[active.y + y][active.x + x] = v;
+            }
+          }
         }
       }
 
-      // Piece rotation (clockwise)
+      // Clear filled lines
+      function clearLines() {
+        let cleared = 0;
+        for (let y = ROWS - 1; y >= 0; ) {
+          if (board[y].every(v => v !== 0)) {
+            board.splice(y, 1);
+            board.unshift(Array(COLS).fill(0));
+            cleared++;
+            // stay on same y to check newly shifted row
+          } else {
+            y--;
+          }
+        }
+        if (cleared > 0) {
+          // Simple scoring
+          const table = {1:100, 2:300, 3:500, 4:800};
+          score += table[cleared] || (cleared * 200);
+          lines += cleared;
+          updateHUD();
+        }
+        return cleared;
+      }
+
+      // Spawn new piece
+      function spawn() {
+        const id = nextId();
+        const mat = shapeById(id);
+        const x = Math.floor(COLS / 2 - mat[0].length / 2);
+        const y = -2; // spawn slightly above visible area
+        active = { id, matrix: mat, x, y };
+        pieces++; updateHUD();
+        if (collides(active.matrix, active.x, active.y)) {
+          // Game over: reset board & score
+          for (let r = 0; r < ROWS; r++) board[r].fill(0);
+          score = 0; lines = 0; pieces = 0; updateHUD();
+          lastGestureEl.textContent = 'game-over (board reset)';
+        }
+      }
+
+      // Rotation with simple wall-kicks
       function rotateCW(mat) {
         const h = mat.length, w = mat[0].length;
         const out = Array.from({length: w}, _ => Array(h).fill(0));
         for (let y=0; y<h; y++) for (let x=0; x<w; x++) out[x][h-1-y] = mat[y][x];
         return out;
       }
-
-      function clampX() {
-        const maxX = COLS - piece[0].length;
-        if (pos.x < 0) pos.x = 0;
-        if (pos.x > maxX) pos.x = maxX;
+      function tryRotate() {
+        const rotated = rotateCW(active.matrix);
+        const kicks = [0, -1, 1, -2, 2]; // simple kicks
+        for (const k of kicks) {
+          if (!collides(rotated, active.x + k, active.y)) {
+            active.matrix = rotated;
+            active.x += k;
+            draw();
+            return true;
+          }
+        }
+        return false;
       }
-      function draw() {
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.fillStyle = 'cyan';
-        for (let y = 0; y < piece.length; ++y) {
-          for (let x = 0; x < piece[y].length; ++x) {
-            if (piece[y][x]) {
-              ctx.fillRect((pos.x + x) * TILE, (pos.y + y) * TILE, TILE, TILE);
+      // Movement helpers
+      function tryMove(dir) { // dir: -1 | +1
+        if (!collides(active.matrix, active.x + dir, active.y)) {
+          active.x += dir;
+          draw();
+        }
+      }
+      function hardDrop() { // not mapped to gesture, but useful if you add a key later
+        while (!collides(active.matrix, active.x, active.y + 1)) {
+          active.y++;
+        }
+        lock();
+      }
+      function lock() {
+        merge();
+        clearLines();
+        spawn();
+        draw();
+      }
+
+      // Draw board + active
+      function draw() {
+        // Clear
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Board blocks
+        for (let y = 0; y < ROWS; y++) {
+          for (let x = 0; x < COLS; x++) {
+            const v = board[y][x];
+            if (v) {
+              ctx.fillStyle = COLORS[v];
+              ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+              // block border
+              ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+              ctx.strokeRect(x*TILE+0.5, y*TILE+0.5, TILE-1, TILE-1);
             }
           }
         }
 
-        // faint grid
+        // Active piece
+        if (active) {
+          for (let y=0; y<active.matrix.length; y++) {
+            for (let x=0; x<active.matrix[y].length; x++) {
+              const v = active.matrix[y][x];
+              const by = active.y + y;
+              const bx = active.x + x;
+              if (v && by >= 0) {
+                ctx.fillStyle = COLORS[v];
+                ctx.fillRect(bx*TILE, by*TILE, TILE, TILE);
+                ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+                ctx.strokeRect(bx*TILE+0.5, by*TILE+0.5, TILE-1, TILE-1);
+              }
+            }
+          }
+        }
+
+        // Grid
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        for (let x = 1; x < COLS; x++) {
-          ctx.beginPath(); ctx.moveTo(x * TILE, 0); ctx.lineTo(x * TILE, canvas.height); ctx.stroke();
+        for (let gx=1; gx<COLS; gx++) {
+          ctx.beginPath(); ctx.moveTo(gx*TILE, 0); ctx.lineTo(gx*TILE, canvas.height); ctx.stroke();
         }
-        for (let y = 1; y < ROWS; y++) {
-          ctx.beginPath(); ctx.moveTo(0, y * TILE); ctx.lineTo(canvas.width, y * TILE); ctx.stroke();
+        for (let gy=1; gy<ROWS; gy++) {
+          ctx.beginPath(); ctx.moveTo(0, gy*TILE); ctx.lineTo(canvas.width, gy*TILE); ctx.stroke();
         }
       }
-      function tick() {
-        pos.y++;
-        if (pos.y > ROWS - piece.length) pos.y = 0;
-        draw();
+
+      // Gravity loop (time-based for adjustable speeds)
+      let lastFallAt = performance.now();
+      let softDropActive = false;
+      function setSoftDrop(active) {
+        softDropActive = !!active;
+        lastGestureEl.textContent = active ? 'soft-drop' : '—';
       }
+      function step(now) {
+        const interval = softDropActive ? fallMsSoft : fallMsBase;
+        if (now - lastFallAt >= interval) {
+          lastFallAt = now;
+          if (!collides(active.matrix, active.x, active.y + 1)) {
+            active.y++;
+          } else {
+            lock();
+          }
+          draw();
+        }
+        requestAnimationFrame(step);
+      }
+
+      // Gesture debouncing
+      let lastMove = 0;
+      let lastRotate = 0;
+      let pinchActive = false; // only rotate on pinch start
 
       // Camera setup
       diag.textContent = 'Requesting camera...';
@@ -291,7 +476,7 @@
         const model = handPoseDetection.SupportedModels.MediaPipeHands;
         detector = await handPoseDetection.createDetector(model, {
           runtime: 'mediapipe',
-          modelType: 'lite', // 'full'|'heavy' also available
+          modelType: 'lite',
           solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
         });
       } else {
@@ -303,9 +488,10 @@
         });
       }
 
-      // Start game loop
+      // Start game & render
+      spawn();
       draw();
-      startFallTimer();
+      requestAnimationFrame(step);
       diag.textContent = MODE === 'hand'
         ? 'Ready (hand): Move = index vs wrist X, Rotate = pinch, Soft drop = index below wrist. Press C to hide camera.'
         : 'Ready (pose): Move = wrist vs nose X, Rotate = wrist above nose, Soft drop = wrist below nose. Press C to hide camera.';
@@ -339,13 +525,15 @@
                 const dx = indexTip.x - wrist.x; // +right, -left (after flip)
                 const now = performance.now();
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > HAND_DX_THRESHOLD) { pos.x += 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-right'; }
-                  else if (dx < -HAND_DX_THRESHOLD) { pos.x -= 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-left'; }
+                  if (dx > HAND_DX_THRESHOLD) { tryMove(+1); lastMove = now; lastGestureEl.textContent = 'move-right'; }
+                  else if (dx < -HAND_DX_THRESHOLD) { tryMove(-1); lastMove = now; lastGestureEl.textContent = 'move-left'; }
                 }
 
                 // Soft drop (index below wrist)
                 const dy = indexTip.y - wrist.y;
                 setSoftDrop(dy > HAND_DROP_DY);
+              } else {
+                setSoftDrop(false);
               }
 
               // Rotate by pinch (thumb_tip ~ index_tip)
@@ -358,12 +546,10 @@
 
                 if (pinchNow && !pinchActive && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
                   pinchActive = true;
-                  piece = rotateCW(piece);
-                  clampX(); draw();
+                  if (tryRotate()) lastGestureEl.textContent = 'rotate';
                   lastRotate = now;
-                  lastGestureEl.textContent = 'rotate';
                 } else if (!pinchNow && pinchActive) {
-                  pinchActive = false; // reset so next pinch triggers again
+                  pinchActive = false; // reset
                 }
               }
             } else {
@@ -387,19 +573,17 @@
 
                 // Move
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > POSE_DX_THRESHOLD) { pos.x += 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-right'; }
-                  else if (dx < -POSE_DX_THRESHOLD) { pos.x -= 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-left'; }
+                  if (dx > POSE_DX_THRESHOLD) { tryMove(+1); lastMove = now; lastGestureEl.textContent = 'move-right'; }
+                  else if (dx < -POSE_DX_THRESHOLD) { tryMove(-1); lastMove = now; lastGestureEl.textContent = 'move-left'; }
                 }
 
-                // Rotate (wrist above nose) - dy negative and magnitude >= threshold
+                // Rotate (wrist above nose)
                 if (dy < POSE_ROTATE_DY && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                  piece = rotateCW(piece);
-                  clampX(); draw();
+                  if (tryRotate()) lastGestureEl.textContent = 'rotate';
                   lastRotate = now;
-                  lastGestureEl.textContent = 'rotate';
                 }
 
-                // Soft drop
+                // Soft drop (wrist below nose)
                 setSoftDrop(dy > POSE_DROP_DY);
               } else {
                 setSoftDrop(false);
