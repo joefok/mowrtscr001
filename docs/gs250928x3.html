@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gesture Tetris</title>
 
-  <!-- ✅ Load full TensorFlow.js bundle (defines `tf`) -->
+  <!-- ✅ Load full TensorFlow.js bundle -->
   https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.13.0/dist/tf.min.js</script>
 
   <!-- ✅ Hand Pose Detection Model -->
@@ -59,40 +59,41 @@
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
 
+  <!-- ✅ Place logic AFTER all scripts are loaded -->
   <script>
-    const canvas = document.getElementById('tetris');
-    const context = canvas.getContext('2d');
-    canvas.width = 300;
-    canvas.height = 600;
+    window.addEventListener('DOMContentLoaded', async () => {
+      const canvas = document.getElementById('tetris');
+      const context = canvas.getContext('2d');
+      canvas.width = 300;
+      canvas.height = 600;
 
-    const statusDiv = document.getElementById('status');
-    const videoElement = document.getElementById('camera');
+      const statusDiv = document.getElementById('status');
+      const videoElement = document.getElementById('camera');
 
-    let position = { x: 3, y: 0 };
-    let piece = [[1, 1, 1], [0, 1, 0]];
+      let position = { x: 3, y: 0 };
+      let piece = [[1, 1, 1], [0, 1, 0]];
 
-    function draw() {
-      context.fillStyle = '#000';
-      context.fillRect(0, 0, canvas.width, canvas.height);
+      function draw() {
+        context.fillStyle = '#000';
+        context.fillRect(0, 0, canvas.width, canvas.height);
 
-      context.fillStyle = 'cyan';
-      for (let y = 0; y < piece.length; ++y) {
-        for (let x = 0; x < piece[y].length; ++x) {
-          if (piece[y][x]) {
-            context.fillRect((position.x + x) * 30, (position.y + y) * 30, 30, 30);
+        context.fillStyle = 'cyan';
+        for (let y = 0; y < piece.length; ++y) {
+          for (let x = 0; x < piece[y].length; ++x) {
+            if (piece[y][x]) {
+              context.fillRect((position.x + x) * 30, (position.y + y) * 30, 30, 30);
+            }
           }
         }
       }
-    }
 
-    function update() {
-      position.y++;
-      if (position.y > 18) position.y = 0;
-      draw();
-      setTimeout(update, 500);
-    }
+      function update() {
+        position.y++;
+        if (position.y > 18) position.y = 0;
+        draw();
+        setTimeout(update, 500);
+      }
 
-    async function startGame() {
       try {
         statusDiv.textContent = "Setting up TensorFlow backend...";
         await tf.setBackend('webgl');
@@ -144,9 +145,7 @@
         statusDiv.textContent = "Camera access denied or error occurred:\n" + err.stack;
         console.error("Startup error:", err);
       }
-    }
-
-    window.addEventListener('DOMContentLoaded', startGame);
+    });
   </script>
 </body>
 </html>
