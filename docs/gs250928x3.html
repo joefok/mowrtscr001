@@ -46,6 +46,8 @@
       border-radius: 6px;
       font-size: 14px;
       z-index: 10;
+      max-width: 90vw;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -113,26 +115,31 @@
         update();
 
         async function detectHands() {
-          const hands = await detector.estimateHands(videoElement);
-          if (hands.length > 0) {
-            const keypoints = hands[0].keypoints;
-            const wrist = keypoints.find(k => k.name === 'wrist');
-            const index = keypoints.find(k => k.name === 'index_finger_tip');
+          try {
+            const hands = await detector.estimateHands(videoElement);
+            if (hands.length > 0) {
+              const keypoints = hands[0].keypoints;
+              const wrist = keypoints.find(k => k.name === 'wrist');
+              const index = keypoints.find(k => k.name === 'index_finger_tip');
 
-            if (wrist && index) {
-              const dx = index.x - wrist.x;
-              if (dx > 30) position.x += 1;
-              else if (dx < -30) position.x -= 1;
-              draw();
+              if (wrist && index) {
+                const dx = index.x - wrist.x;
+                if (dx > 30) position.x += 1;
+                else if (dx < -30) position.x -= 1;
+                draw();
+              }
             }
+          } catch (detectError) {
+            statusDiv.textContent = "Error during hand detection:\n" + detectError.stack;
+            console.error("Hand detection error:", detectError);
           }
           requestAnimationFrame(detectHands);
         }
 
         detectHands();
       } catch (err) {
-        statusDiv.textContent = "Camera access denied or error occurred.";
-        console.error(err);
+        statusDiv.textContent = "Camera access denied or error occurred:\n" + err.stack;
+        console.error("Startup error:", err);
       }
     }
 
