@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gesture Tetris — Stacking & Slower</title>
+  <title>Gesture Tetris — Stacking (CPU-safe)</title>
 
-  <!-- (Optional) Small perf win -->
+  <!-- Prevent favicon 404 -->
+  data:,
   https://cdn.jsdelivr.net
-  <link rel="preconnect" href="https://un{ --tile: 30px; }
+  https://unpkg.com
+
+  <style>
+    :root { --tile: 30px; }
     body {
       margin: 0;
       overflow: hidden;
@@ -54,7 +58,7 @@
       max-width: 60vw;
     }
     #hud h4 { margin: 0 0 6px 0; font-size: 13px; }
-    #hud .row { display: flex; gap: 12px; margin: 4px 0; }
+    #hud .row { display: flex; gap: 12px; margin: 4px 0; flex-wrap: wrap; }
     #hud code { color: #9cf; }
     #camToggle {
       position: fixed;
@@ -74,7 +78,7 @@
   </style>
 </head>
 <body>
-  <!-- UI elements -->
+  <!-- UI elements (if you remove any, the app will recreate them) -->
   <div id="diag">Booting...</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
@@ -111,49 +115,56 @@
     // ==================== CONFIG ====================
     // Choose control source: 'hand' (default) or 'pose'
     const MODE = 'hand'; // 'hand' | 'pose'
-    document.getElementById('modeLabel').textContent = MODE;
-    if (MODE === 'pose') {
-      document.getElementById('rotateHint').textContent = 'Wrist above nose';
-      document.getElementById('dropHint').textContent = 'Wrist below nose';
-    }
 
     // Movement tuning
     const MOVE_COOLDOWN_MS   = 200; // throttle horizontal moves
     const ROTATE_COOLDOWN_MS = 320; // rotation debounce
+
+    // Hand mode thresholds
     const HAND_DX_THRESHOLD  = 30;  // index tip to wrist (px) for left/right
     const HAND_PINCH_DIST    = 35;  // thumb tip ↔ index tip distance (px) for rotate
     const HAND_DROP_DY       = 40;  // index tip lower than wrist (px) => soft drop
 
+    // Pose mode thresholds
     const POSE_DX_THRESHOLD  = 30;  // wrist ↔ nose dx (px) for left/right
     const POSE_ROTATE_DY     = -20; // wrist above nose by at least 20px -> rotate
     const POSE_DROP_DY       = 40;  // wrist below nose by at least 40px -> soft drop
 
     // Game speed (slower base)
-    let fallMsBase   = 900; // default gravity (slower than before)
+    let fallMsBase   = 900; // default gravity (slower)
     let fallMsSoft   = 250; // while soft-dropping
+
+    // Update hints safely (in case HUD is altered)
+    window.addEventListener('DOMContentLoaded', () => {
+      const m = document.getElementById('modeLabel'); if (m) m.textContent = MODE;
+      const r = document.getElementById('rotateHint');
+      const d = document.getElementById('dropHint');
+      if (MODE === 'pose') {
+        if (r) r.textContent = 'Wrist above nose';
+        if (d) d.textContent = 'Wrist below nose';
+      }
+    });
   </script>
 
-  <!-- ====== Loader with CDN fallback ====== -->
+  <!-- ====== Loader with CDN fallback (CPU-safe) ====== -->
   <script>
     (function loadLibs(){
       const head = document.head;
       const diagEl = document.getElementById('diag');
-      function log(msg) {
-        if (diagEl) diagEl.innerHTML = msg;
-        else console.log(msg.replace(/<[^>]+>/g,''));
-      }
-      function add(src) {
-        return new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = src;
-          s.async = true;
-          s.crossOrigin = 'anonymous';
-          s.referrerPolicy = 'no-referrer';
-          s.onload = () => resolve(src);
-          s.onerror = () => reject(new Error('Failed: ' + src));
-          head.appendChild(s);
-        });
-      }
+      const log = (msg) => { if (diagEl) diagEl.innerHTML = msg; else console.log(msg.replace(/<[^>]+>/g,'')); };
+      const add = (src) => new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.async = true; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
+        s.onload = () => resolve(src);
+        s.onerror = () => reject(new Error('Failed: ' + src));
+        head.appendChild(s);
+      });
+      const webglSupported = () => {
+        try {
+          const c = document.createElement('canvas');
+          return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
+        } catch { return false; }
+      };
 
       async function boot() {
         try {
@@ -162,9 +173,12 @@
           try { await add("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"); }
           catch { await add("https://unpkg.com/@tensorflow/tfjs@4.18.0/dist/tf.min.js"); }
 
-          // Backend: WebGL → CPU fallback
-          try { await tf.setBackend('webgl'); }
-          catch { await tf.setBackend('cpu'); }
+          // Choose backend without spamming WebGL errors
+          if (webglSupported()) {
+            try { await tf.setBackend('webgl'); } catch { await tf.setBackend('cpu'); }
+          } else {
+            await tf.setBackend('cpu'); // skip webgl entirely if unsupported
+          }
           await tf.ready();
 
           // ---- Detection library per MODE ----
@@ -184,17 +198,11 @@
           }
 
           const tfOK  = !!window.tf;
-          const libOK = MODE === 'hand'
-            ? !!window.handPoseDetection
-            : !!window.poseDetection;
-
+          const libOK = MODE === 'hand' ? !!window.handPoseDetection : !!window.poseDetection;
           log(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • ${MODE === 'hand' ? 'Hand-Pose' : 'Pose-Detection'}: ${libOK ? '<b>ok</b>' : '<i>missing</i>'}`);
 
           if (tfOK && libOK) {
-            setTimeout(() => {
-              if (typeof startApp === 'function') startApp();
-              else log('Libraries loaded. Define <code>startApp()</code> to continue.');
-            }, 0);
+            setTimeout(() => { if (typeof startApp === 'function') startApp(); }, 0);
           }
         } catch (e) {
           log('Loader error:<br>' + (e?.message || e));
@@ -205,37 +213,81 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Gestures ====== -->
+  <!-- ====== App: Stacking Tetris + Gestures (safe DOM & CPU fallback) ====== -->
   <script>
     async function startApp() {
-      const diag = document.getElementById('diag');
-      const video = document.getElementById('camera');
-      const canvas = document.getElementById('tetris');
-      const ctx = canvas.getContext('2d');
-      const lastGestureEl = document.getElementById('lastGesture');
-      const camToggleBtn = document.getElementById('camToggle');
-      const scoreEl = document.getElementById('score');
-      const linesEl = document.getElementById('lines');
-      const piecesEl = document.getElementById('pieces');
+      // Safe DOM helpers
+      const $ = (id) => document.getElementById(id);
+      const setText = (el, text) => { if (el) el.textContent = text; };
+      const ensure = (tag, id, parent = document.body, attrs = {}) => {
+        let el = $(id);
+        if (!el) {
+          el = document.createElement(tag);
+          el.id = id;
+          Object.assign(el, attrs);
+          parent.appendChild(el);
+        }
+        return el;
+      };
+
+      // Ensure required elements exist (prevents null errors)
+      const diag = ensure('div', 'diag');
+      const canvas = ensure('canvas', 'tetris');
+      const video = ensure('video', 'camera', document.body, { autoplay: true, playsInline: true, muted: true });
+      const hud   = ensure('div', 'hud');
+      if (!$('#modeLabel')) {
+        hud.innerHTML = `
+          <h4>Gesture Tetris</h4>
+          <div class="row">
+            <div><b>Mode:</b> <span id="modeLabel">hand</span></div>
+            <div><b>Score:</b> <span id="score">0</span></div>
+            <div><b>Lines:</b> <span id="lines">0</span></div>
+            <div><b>Pieces:</b> <span id="pieces">0</span></div>
+          </div>
+          <div class="row">
+            <div><b>Gestures:</b></div>
+            <div>
+              Move = left/right offset •
+              Rotate = <span id="rotateHint">${MODE === 'hand' ? 'Pinch (thumb+index)' : 'Wrist above nose'}</span> •
+              Soft drop = <span id="dropHint">${MODE === 'hand' ? 'Index tip below wrist' : 'Wrist below nose'}</span>
+            </div>
+          </div>
+          <div class="row">
+            <div><b>Keys:</b></div>
+            <div><code>C</code> toggle camera</div>
+          </div>
+          <div class="row">
+            <div><b>Last gesture:</b></div>
+            <div id="lastGesture">—</div>
+          </div>
+        `;
+      }
+      const camToggleBtn = ensure('button', 'camToggle', document.body, { type: 'button' });
+      if (!camToggleBtn.textContent) camToggleBtn.textContent = '📷 Hide';
+
+      // HUD references
+      const lastGestureEl = $('#lastGesture');
+      const scoreEl = $('#score');
+      const linesEl = $('#lines');
+      const piecesEl = $('#pieces');
+      const modeLabelEl = $('#modeLabel');
+
+      // Mode label
+      setText(modeLabelEl, MODE);
 
       // Board setup
+      const ctx = canvas.getContext('2d');
       const TILE = 30, COLS = 10, ROWS = 20;
       canvas.width = COLS * TILE;
       canvas.height = ROWS * TILE;
 
       // Colors by piece id (1..7)
       const COLORS = {
-        0: '#000000',
-        1: '#00f0f0', // I - cyan
-        2: '#0000f0', // J - blue
-        3: '#f0a000', // L - orange
-        4: '#f0f000', // O - yellow
-        5: '#00f000', // S - green
-        6: '#a000f0', // T - purple
-        7: '#f00000', // Z - red
+        0: '#000000', 1: '#00f0f0', 2: '#0000f0', 3: '#f0a000',
+        4: '#f0f000', 5: '#00f000', 6: '#a000f0', 7: '#f00000',
       };
 
-      // Tetromino definitions (filled with their ID)
+      // Tetromino shapes
       function shapeById(id) {
         const map = {
           1: [[1,1,1,1]],                    // I
@@ -246,11 +298,10 @@
           6: [[0,6,0],[6,6,6]],              // T
           7: [[7,7,0],[0,7,7]],              // Z
         };
-        // deep copy to avoid mutation
-        return map[id].map(row => row.slice());
+        return map[id].map(r => r.slice());
       }
 
-      // Bag randomizer
+      // 7-bag randomizer
       let bag = [];
       function refillBag() {
         bag = [1,2,3,4,5,6,7];
@@ -259,50 +310,34 @@
           [bag[i], bag[j]] = [bag[j], bag[i]];
         }
       }
-      function nextId() {
-        if (bag.length === 0) refillBag();
-        return bag.pop();
-      }
+      function nextId() { if (!bag.length) refillBag(); return bag.pop(); }
 
-      // Active piece state
-      let active = null; // {id, matrix, x, y}
+      // Game state
       const board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+      let active = null; // {id, matrix, x, y}
       let score = 0, lines = 0, pieces = 0;
-      function updateHUD() {
-        scoreEl.textContent = score;
-        linesEl.textContent = lines;
-        piecesEl.textContent = pieces;
-      }
+      const updateHUD = () => { setText(scoreEl, score); setText(linesEl, lines); setText(piecesEl, pieces); };
 
-      // Collision detection
+      // Collisions
       function collides(mat, offX, offY) {
-        for (let y = 0; y < mat.length; y++) {
+        for (let y = 0; y < mat.length; y++)
           for (let x = 0; x < mat[y].length; x++) {
-            const cell = mat[y][x];
-            if (!cell) continue;
-            const bx = offX + x;
-            const by = offY + y;
+            const v = mat[y][x]; if (!v) continue;
+            const bx = offX + x, by = offY + y;
             if (bx < 0 || bx >= COLS || by >= ROWS) return true;
             if (by >= 0 && board[by][bx]) return true;
           }
-        }
         return false;
       }
 
-      // Merge active into board
+      // Merge & clear
       function merge() {
-        const mat = active.matrix;
-        for (let y = 0; y < mat.length; y++) {
-          for (let x = 0; x < mat[y].length; x++) {
-            const v = mat[y][x];
-            if (v && active.y + y >= 0) {
-              board[active.y + y][active.x + x] = v;
-            }
+        for (let y = 0; y < active.matrix.length; y++)
+          for (let x = 0; x < active.matrix[y].length; x++) {
+            const v = active.matrix[y][x];
+            if (v && active.y + y >= 0) board[active.y + y][active.x + x] = v;
           }
-        }
       }
-
-      // Clear filled lines
       function clearLines() {
         let cleared = 0;
         for (let y = ROWS - 1; y >= 0; ) {
@@ -310,141 +345,91 @@
             board.splice(y, 1);
             board.unshift(Array(COLS).fill(0));
             cleared++;
-            // stay on same y to check newly shifted row
-          } else {
-            y--;
-          }
+          } else y--;
         }
-        if (cleared > 0) {
-          // Simple scoring
+        if (cleared) {
           const table = {1:100, 2:300, 3:500, 4:800};
           score += table[cleared] || (cleared * 200);
-          lines += cleared;
-          updateHUD();
+          lines += cleared; updateHUD();
         }
-        return cleared;
       }
 
-      // Spawn new piece
+      // Spawn
       function spawn() {
         const id = nextId();
         const mat = shapeById(id);
         const x = Math.floor(COLS / 2 - mat[0].length / 2);
-        const y = -2; // spawn slightly above visible area
+        const y = -2;
         active = { id, matrix: mat, x, y };
         pieces++; updateHUD();
         if (collides(active.matrix, active.x, active.y)) {
-          // Game over: reset board & score
+          // Game over: reset
           for (let r = 0; r < ROWS; r++) board[r].fill(0);
           score = 0; lines = 0; pieces = 0; updateHUD();
-          lastGestureEl.textContent = 'game-over (board reset)';
+          setText(lastGestureEl, 'game-over (reset)');
         }
       }
 
-      // Rotation with simple wall-kicks
-      function rotateCW(mat) {
-        const h = mat.length, w = mat[0].length;
+      // Rotation + simple wall-kicks
+      const rotateCW = (m) => {
+        const h = m.length, w = m[0].length;
         const out = Array.from({length: w}, _ => Array(h).fill(0));
-        for (let y=0; y<h; y++) for (let x=0; x<w; x++) out[x][h-1-y] = mat[y][x];
+        for (let y=0;y<h;y++) for (let x=0;x<w;x++) out[x][h-1-y]=m[y][x];
         return out;
-      }
+      };
       function tryRotate() {
         const rotated = rotateCW(active.matrix);
-        const kicks = [0, -1, 1, -2, 2]; // simple kicks
+        const kicks = [0, -1, 1, -2, 2];
         for (const k of kicks) {
           if (!collides(rotated, active.x + k, active.y)) {
-            active.matrix = rotated;
-            active.x += k;
-            draw();
-            return true;
+            active.matrix = rotated; active.x += k; draw(); return true;
           }
         }
         return false;
       }
 
-      // Movement helpers
-      function tryMove(dir) { // dir: -1 | +1
-        if (!collides(active.matrix, active.x + dir, active.y)) {
-          active.x += dir;
-          draw();
-        }
+      // Movement
+      function tryMove(dir) {
+        if (!collides(active.matrix, active.x + dir, active.y)) { active.x += dir; draw(); }
       }
-      function hardDrop() { // not mapped to gesture, but useful if you add a key later
-        while (!collides(active.matrix, active.x, active.y + 1)) {
-          active.y++;
-        }
-        lock();
-      }
-      function lock() {
-        merge();
-        clearLines();
-        spawn();
-        draw();
-      }
+      function lock() { merge(); clearLines(); spawn(); draw(); }
 
-      // Draw board + active
+      // Draw
       function draw() {
-        // Clear
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Board blocks
-        for (let y = 0; y < ROWS; y++) {
-          for (let x = 0; x < COLS; x++) {
-            const v = board[y][x];
-            if (v) {
-              ctx.fillStyle = COLORS[v];
-              ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
-              // block border
-              ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-              ctx.strokeRect(x*TILE+0.5, y*TILE+0.5, TILE-1, TILE-1);
-            }
-          }
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Board
+        for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) {
+          const v = board[y][x]; if (!v) continue;
+          ctx.fillStyle = COLORS[v];
+          ctx.fillRect(x*30, y*30, 30, 30);
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+          ctx.strokeRect(x*30+0.5, y*30+0.5, 29, 29);
         }
-
-        // Active piece
-        if (active) {
-          for (let y=0; y<active.matrix.length; y++) {
-            for (let x=0; x<active.matrix[y].length; x++) {
-              const v = active.matrix[y][x];
-              const by = active.y + y;
-              const bx = active.x + x;
-              if (v && by >= 0) {
-                ctx.fillStyle = COLORS[v];
-                ctx.fillRect(bx*TILE, by*TILE, TILE, TILE);
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-                ctx.strokeRect(bx*TILE+0.5, by*TILE+0.5, TILE-1, TILE-1);
-              }
-            }
-          }
+        // Active
+        if (active) for (let y=0;y<active.matrix.length;y++) for (let x=0;x<active.matrix[y].length;x++) {
+          const v = active.matrix[y][x]; if (!v) continue;
+          const by = active.y + y, bx = active.x + x; if (by < 0) continue;
+          ctx.fillStyle = COLORS[v];
+          ctx.fillRect(bx*30, by*30, 30, 30);
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+          ctx.strokeRect(bx*30+0.5, by*30+0.5, 29, 29);
         }
-
         // Grid
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-        for (let gx=1; gx<COLS; gx++) {
-          ctx.beginPath(); ctx.moveTo(gx*TILE, 0); ctx.lineTo(gx*TILE, canvas.height); ctx.stroke();
-        }
-        for (let gy=1; gy<ROWS; gy++) {
-          ctx.beginPath(); ctx.moveTo(0, gy*TILE); ctx.lineTo(canvas.width, gy*TILE); ctx.stroke();
-        }
+        for (let gx=1; gx<COLS; gx++) { ctx.beginPath(); ctx.moveTo(gx*30, 0); ctx.lineTo(gx*30, canvas.height); ctx.stroke(); }
+        for (let gy=1; gy<ROWS; gy++) { ctx.beginPath(); ctx.moveTo(0, gy*30); ctx.lineTo(canvas.width, gy*30); ctx.stroke(); }
       }
 
-      // Gravity loop (time-based for adjustable speeds)
+      // Gravity (time-based)
       let lastFallAt = performance.now();
       let softDropActive = false;
-      function setSoftDrop(active) {
-        softDropActive = !!active;
-        lastGestureEl.textContent = active ? 'soft-drop' : '—';
-      }
+      function setSoftDrop(active) { softDropActive = !!active; setText(lastGestureEl, active ? 'soft-drop' : '—'); }
       function step(now) {
         const interval = softDropActive ? fallMsSoft : fallMsBase;
         if (now - lastFallAt >= interval) {
           lastFallAt = now;
-          if (!collides(active.matrix, active.x, active.y + 1)) {
-            active.y++;
-          } else {
-            lock();
-          }
+          if (!collides(active.matrix, active.x, active.y + 1)) active.y++;
+          else lock();
           draw();
         }
         requestAnimationFrame(step);
@@ -453,26 +438,23 @@
       // Gesture debouncing
       let lastMove = 0;
       let lastRotate = 0;
-      let pinchActive = false; // only rotate on pinch start
+      let pinchActive = false;
 
-      // Camera setup
-      diag.textContent = 'Requesting camera...';
+      // Camera
+      setText(diag, 'Requesting camera...');
       if (!navigator.mediaDevices?.getUserMedia) {
-        diag.textContent = 'getUserMedia not supported. Use HTTPS / modern browser.';
+        setText(diag, 'getUserMedia not supported. Use HTTPS / modern browser.');
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       video.srcObject = stream;
-      await new Promise(r => {
-        if (video.readyState >= 2) return r();
-        video.onloadeddata = () => r();
-      });
+      await new Promise(r => { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
       try { await video.play(); } catch {}
 
-      // Detector setup
+      // Detector
       let detector;
       if (MODE === 'hand') {
-        diag.textContent = 'Creating MediaPipe Hands detector...';
+        setText(diag, 'Creating MediaPipe Hands detector...');
         const model = handPoseDetection.SupportedModels.MediaPipeHands;
         detector = await handPoseDetection.createDetector(model, {
           runtime: 'mediapipe',
@@ -480,7 +462,7 @@
           solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
         });
       } else {
-        diag.textContent = 'Creating MoveNet detector...';
+        setText(diag, 'Creating MoveNet detector...');
         const model = poseDetection.SupportedModels.MoveNet;
         detector = await poseDetection.createDetector(model, {
           modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
@@ -488,32 +470,29 @@
         });
       }
 
-      // Start game & render
-      spawn();
-      draw();
+      // Start game
+      spawn(); draw();
       requestAnimationFrame(step);
-      diag.textContent = MODE === 'hand'
-        ? 'Ready (hand): Move = index vs wrist X, Rotate = pinch, Soft drop = index below wrist. Press C to hide camera.'
-        : 'Ready (pose): Move = wrist vs nose X, Rotate = wrist above nose, Soft drop = wrist below nose. Press C to hide camera.';
+      setText(diag, MODE === 'hand'
+        ? 'Ready (hand): Move=index vs wrist X, Rotate=pinch, Soft drop=index below wrist. Press C to hide camera.'
+        : 'Ready (pose): Move=wrist vs nose X, Rotate=wrist above nose, Soft drop=wrist below nose. Press C to hide camera.'
+      );
 
-      // Camera toggle
+      // Camera toggle (safe)
       function setCamVisible(show) {
         video.style.display = show ? 'block' : 'none';
         camToggleBtn.textContent = show ? '📷 Hide' : '📷 Show';
       }
-      let camVisible = true;
-      setCamVisible(camVisible);
+      let camVisible = true; setCamVisible(camVisible);
       camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
-      window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); }
-      });
+      window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); } });
 
       // Detection loop
       async function detect() {
         try {
           if (MODE === 'hand') {
             const hands = await detector.estimateHands(video, { flipHorizontal: true });
-            if (hands.length > 0) {
+            if (hands.length) {
               const kps = hands[0].keypoints || [];
               const byName = Object.fromEntries(kps.map(k => [k.name, k]));
               const wrist = byName['wrist'];
@@ -521,40 +500,31 @@
               const thumbTip = byName['thumb_tip'];
 
               if (wrist && indexTip) {
-                // Horizontal move
-                const dx = indexTip.x - wrist.x; // +right, -left (after flip)
+                // Move
+                const dx = indexTip.x - wrist.x;
                 const now = performance.now();
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > HAND_DX_THRESHOLD) { tryMove(+1); lastMove = now; lastGestureEl.textContent = 'move-right'; }
-                  else if (dx < -HAND_DX_THRESHOLD) { tryMove(-1); lastMove = now; lastGestureEl.textContent = 'move-left'; }
+                  if (dx > HAND_DX_THRESHOLD) { tryMove(+1); lastMove = now; setText(lastGestureEl, 'move-right'); }
+                  else if (dx < -HAND_DX_THRESHOLD) { tryMove(-1); lastMove = now; setText(lastGestureEl, 'move-left'); }
                 }
-
-                // Soft drop (index below wrist)
+                // Soft drop
                 const dy = indexTip.y - wrist.y;
                 setSoftDrop(dy > HAND_DROP_DY);
-              } else {
-                setSoftDrop(false);
-              }
+              } else setSoftDrop(false);
 
-              // Rotate by pinch (thumb_tip ~ index_tip)
+              // Rotate on pinch
               if (thumbTip && indexTip) {
-                const ddx = thumbTip.x - indexTip.x;
-                const ddy = thumbTip.y - indexTip.y;
+                const ddx = thumbTip.x - indexTip.x, ddy = thumbTip.y - indexTip.y;
                 const dist = Math.hypot(ddx, ddy);
                 const pinchNow = dist < HAND_PINCH_DIST;
                 const now = performance.now();
-
                 if (pinchNow && !pinchActive && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
                   pinchActive = true;
-                  if (tryRotate()) lastGestureEl.textContent = 'rotate';
+                  if (tryRotate()) setText(lastGestureEl, 'rotate');
                   lastRotate = now;
-                } else if (!pinchNow && pinchActive) {
-                  pinchActive = false; // reset
-                }
+                } else if (!pinchNow && pinchActive) pinchActive = false;
               }
-            } else {
-              setSoftDrop(false);
-            }
+            } else setSoftDrop(false);
           } else {
             const poses = await detector.estimatePoses(video, { flipHorizontal: true });
             if (poses.length) {
@@ -571,29 +541,19 @@
                 const dy = wrist.y - nose.y;
                 const now = performance.now();
 
-                // Move
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > POSE_DX_THRESHOLD) { tryMove(+1); lastMove = now; lastGestureEl.textContent = 'move-right'; }
-                  else if (dx < -POSE_DX_THRESHOLD) { tryMove(-1); lastMove = now; lastGestureEl.textContent = 'move-left'; }
+                  if (dx > POSE_DX_THRESHOLD) { tryMove(+1); lastMove = now; setText(lastGestureEl, 'move-right'); }
+                  else if (dx < -POSE_DX_THRESHOLD) { tryMove(-1); lastMove = now; setText(lastGestureEl, 'move-left'); }
                 }
-
-                // Rotate (wrist above nose)
                 if (dy < POSE_ROTATE_DY && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                  if (tryRotate()) lastGestureEl.textContent = 'rotate';
-                  lastRotate = now;
+                  if (tryRotate()) setText(lastGestureEl, 'rotate'); lastRotate = now;
                 }
-
-                // Soft drop (wrist below nose)
                 setSoftDrop(dy > POSE_DROP_DY);
-              } else {
-                setSoftDrop(false);
-              }
-            } else {
-              setSoftDrop(false);
-            }
+              } else setSoftDrop(false);
+            } else setSoftDrop(false);
           }
         } catch (e) {
-          diag.innerHTML = 'Detection error:<br>' + (e?.message || e);
+          setText(diag, 'Detection error: ' + (e?.message || e));
           console.error(e);
         }
         requestAnimationFrame(detect);
