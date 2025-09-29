@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gesture Tetris — Stacking (CPU-safe)</title>
+  <title>Gesture Tetris — Easier Controls (CPU‑safe)</title>
 
   <!-- Prevent favicon 404 -->
   data:,
@@ -27,10 +27,10 @@
     }
     video {
       position: fixed;
-      bottom: 46px; /* leave room for controls button */
+      bottom: 72px; /* leave room for controls */
       right: 10px;
-      width: 112px;
-      height: 84px;
+      width: 128px;
+      height: 96px;
       border: 2px solid #0ff;
       z-index: 10;
       transform: scaleX(-1); /* mirror for natural control */
@@ -55,15 +55,15 @@
       background: rgba(0,0,0,.5);
       border: 1px solid rgba(255,255,255,.2);
       border-radius: 6px; padding: 8px 10px; font-size: 12px;
-      max-width: 60vw;
+      max-width: 66vw;
     }
     #hud h4 { margin: 0 0 6px 0; font-size: 13px; }
-    #hud .row { display: flex; gap: 12px; margin: 4px 0; flex-wrap: wrap; }
+    #hud .row { display: flex; gap: 12px; margin: 4px 0; flex-wrap: wrap; align-items: center; }
     #hud code { color: #9cf; }
-    #camToggle {
-      position: fixed;
-      right: 10px;
-      bottom: 10px;
+    #controls { display: flex; gap: 10px; align-items: center; }
+    #controls .label { opacity: .85; font-size: 12px; }
+    #controls input[type="range"] { width: 140px; }
+    #camToggle, #calibBtn {
       z-index: 11;
       background: #0b3d46;
       border: 1px solid #0ff;
@@ -74,11 +74,12 @@
       cursor: pointer;
       user-select: none;
     }
-    #camToggle:hover { background: #0e4f5a; }
+    #camToggle:hover, #calibBtn:hover { background: #0e4f5a; }
+    #camToggle { position: fixed; right: 10px; bottom: 10px; }
   </style>
 </head>
 <body>
-  <!-- UI elements (if you remove any, the app will recreate them) -->
+  <!-- UI -->
   <div id="diag">Booting...</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
@@ -91,17 +92,20 @@
       <div><b>Lines:</b> <span id="lines">0</span></div>
       <div><b>Pieces:</b> <span id="pieces">0</span></div>
     </div>
+    <div class="row" id="controls">
+      <div class="label"><b>Sensitivity</b></div>
+      <input id="sens" type="range" min="0.2" max="0.8" step="0.05" value="0.35" />
+      <span id="sensVal">0.35</span>
+      <button id="calibBtn" type="button">🎯 Calibrate</button>
+      <div class="label"><b>Keys:</b> <code>C</code> camera • <code>N</code> calibrate</div>
+    </div>
     <div class="row">
       <div><b>Gestures:</b></div>
       <div>
-        Move = left/right offset •
+        Move = left/right hold with auto‑repeat •
         Rotate = <span id="rotateHint">Pinch (thumb+index)</span> •
         Soft drop = <span id="dropHint">Index tip below wrist</span>
       </div>
-    </div>
-    <div class="row">
-      <div><b>Keys:</b></div>
-      <div><code>C</code> toggle camera</div>
     </div>
     <div class="row">
       <div><b>Last gesture:</b></div>
@@ -113,26 +117,19 @@
 
   <script>
     // ==================== CONFIG ====================
-    // Choose control source: 'hand' (default) or 'pose'
     const MODE = 'hand'; // 'hand' | 'pose'
 
-    // Movement tuning
-    const MOVE_COOLDOWN_MS   = 200; // throttle horizontal moves
-    const ROTATE_COOLDOWN_MS = 320; // rotation debounce
+    // Tetris movement feel (DAS/ARR like modern games)
+    const DAS_MS = 220;  // initial delay before auto-repeat
+    const ARR_MS = 70;   // auto-repeat rate while held
+    const ROTATE_COOLDOWN_MS = 260; // rotate debounce
 
-    // Hand mode thresholds
-    const HAND_DX_THRESHOLD  = 30;  // index tip to wrist (px) for left/right
-    const HAND_PINCH_DIST    = 35;  // thumb tip ↔ index tip distance (px) for rotate
-    const HAND_DROP_DY       = 40;  // index tip lower than wrist (px) => soft drop
+    // Smoothing
+    const SMOOTH_FRAMES = 5; // moving average window
 
-    // Pose mode thresholds
-    const POSE_DX_THRESHOLD  = 30;  // wrist ↔ nose dx (px) for left/right
-    const POSE_ROTATE_DY     = -20; // wrist above nose by at least 20px -> rotate
-    const POSE_DROP_DY       = 40;  // wrist below nose by at least 40px -> soft drop
-
-    // Game speed (slower base)
-    let fallMsBase   = 900; // default gravity (slower)
-    let fallMsSoft   = 250; // while soft-dropping
+    // Soft-drop speed (base gravity is set later)
+    const fallMsBase = 900;  // slow default gravity
+    const fallMsSoft = 250;  // while soft-dropping
 
     // Update hints safely (in case HUD is altered)
     window.addEventListener('DOMContentLoaded', () => {
@@ -213,7 +210,7 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Gestures (auto-hide camera after 5s) ====== -->
+  <!-- ====== App: Stacking Tetris + Easier Gestures ====== -->
   <script>
     async function startApp() {
       // Safe DOM helpers
@@ -230,7 +227,7 @@
         return el;
       };
 
-      // Ensure required elements exist
+      // Ensure required elements
       const diag = ensure('div', 'diag');
       const canvas = ensure('canvas', 'tetris');
       const video = ensure('video', 'camera', document.body, { autoplay: true, playsInline: true, muted: true });
@@ -244,17 +241,20 @@
             <div><b>Lines:</b> <span id="lines">0</span></div>
             <div><b>Pieces:</b> <span id="pieces">0</span></div>
           </div>
+          <div class="row" id="controls">
+            <div class="label"><b>Sensitivity</b></div>
+            <input id="sens" type="range" min="0.2" max="0.8" step="0.05" value="0.35" />
+            <span id="sensVal">0.35</span>
+            <button id="calibBtn" type="button">🎯 Calibrate</button>
+            <div class="label"><b>Keys:</b> <code>C</code> camera • <code>N</code> calibrate</div>
+          </div>
           <div class="row">
             <div><b>Gestures:</b></div>
             <div>
-              Move = left/right offset •
+              Move = left/right hold with auto‑repeat •
               Rotate = <span id="rotateHint">${MODE === 'hand' ? 'Pinch (thumb+index)' : 'Wrist above nose'}</span> •
               Soft drop = <span id="dropHint">${MODE === 'hand' ? 'Index tip below wrist' : 'Wrist below nose'}</span>
             </div>
-          </div>
-          <div class="row">
-            <div><b>Keys:</b></div>
-            <div><code>C</code> toggle camera</div>
           </div>
           <div class="row">
             <div><b>Last gesture:</b></div>
@@ -271,6 +271,9 @@
       const linesEl = $('#lines');
       const piecesEl = $('#pieces');
       const modeLabelEl = $('#modeLabel');
+      const sensRange = $('#sens');
+      const sensVal = $('#sensVal');
+      const calibBtn = $('#calibBtn');
       setText(modeLabelEl, MODE);
 
       // Board setup
@@ -432,10 +435,33 @@
         requestAnimationFrame(step);
       }
 
-      // Gesture debouncing
-      let lastMove = 0;
+      // ====== Easier movement: smoothing + deadzone + DAS/ARR ======
+      let dxHistory = [];
+      let neutralDx = 0;          // calibrated neutral offset
+      let heldDir = 0;            // -1, 0, +1
+      let nextMoveAt = 0;         // timestamp for next auto-repeat
       let lastRotate = 0;
       let pinchActive = false;
+
+      // Sensitivity (UI)
+      let sensitivity = parseFloat(sensRange?.value || '0.35');
+      const updateSensitivityLabel = () => { if (sensVal) sensVal.textContent = sensitivity.toFixed(2); };
+      updateSensitivityLabel();
+      sensRange?.addEventListener('input', () => { sensitivity = parseFloat(sensRange.value); updateSensitivityLabel(); });
+
+      function calibrateNeutral(currentDxAvg = 0) {
+        neutralDx = currentDxAvg;
+        setText(lastGestureEl, 'calibrated');
+        // brief visual hint in diag
+        const old = diag.textContent;
+        diag.textContent = 'Neutral calibrated.';
+        setTimeout(() => { diag.textContent = old; }, 800);
+      }
+      calibBtn?.addEventListener('click', () => calibrateNeutral(dxHistory.length ? dxHistory.reduce((a,b)=>a+b,0)/dxHistory.length : 0));
+      window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        if (k === 'n') calibrateNeutral(dxHistory.length ? dxHistory.reduce((a,b)=>a+b,0)/dxHistory.length : 0);
+      });
 
       // Camera
       setText(diag, 'Requesting camera...');
@@ -471,31 +497,30 @@
       spawn(); draw();
       requestAnimationFrame(step);
       setText(diag, MODE === 'hand'
-        ? 'Ready (hand): Move=index vs wrist X, Rotate=pinch, Soft drop=index below wrist. Press C to hide camera.'
-        : 'Ready (pose): Move=wrist vs nose X, Rotate=wrist above nose, Soft drop=wrist below nose. Press C to hide camera.'
+        ? 'Ready (hand): Move=hold left/right (auto‑repeat), Rotate=pinch, Soft drop=index below wrist. Press C to hide camera, N to calibrate.'
+        : 'Ready (pose): Move=hold wrist left/right vs nose (auto‑repeat), Rotate=wrist above nose, Soft drop=wrist below nose. Press C to hide camera, N to calibrate.'
       );
 
-      // Camera toggle (with auto-hide after 5s)
+      // Camera toggle (+ auto-hide after 5s)
       function setCamVisible(show) {
         video.style.display = show ? 'block' : 'none';
         camToggleBtn.textContent = show ? '📷 Hide' : '📷 Show';
       }
-      let camVisible = true; 
+      let camVisible = true;
       setCamVisible(camVisible);
-
-      // --- Auto-hide camera after 5 seconds (one-shot) ---
-      setTimeout(() => {
-        if (camVisible) { camVisible = false; setCamVisible(camVisible); }
-      }, 5000);
-
+      setTimeout(() => { if (camVisible) { camVisible = false; setCamVisible(camVisible); } }, 5000);
       camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
       window.addEventListener('keydown', (e) => {
         if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); }
       });
 
-      // Detection loop
+      // ====== Detection loop with improved movement ======
       async function detect() {
         try {
+          let dir = 0;  // -1, 0, +1 (desired direction)
+          let dropActive = false;
+          let rotateIntent = false;
+
           if (MODE === 'hand') {
             const hands = await detector.estimateHands(video, { flipHorizontal: true });
             if (hands.length) {
@@ -504,60 +529,100 @@
               const wrist = byName['wrist'];
               const indexTip = byName['index_finger_tip'];
               const thumbTip = byName['thumb_tip'];
+              const idxMcp = byName['index_finger_mcp'];
+              const pnkMcp = byName['pinky_finger_mcp'];
 
               if (wrist && indexTip) {
-                // Move
-                const dx = indexTip.x - wrist.x;
-                const now = performance.now();
-                if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > HAND_DX_THRESHOLD) { tryMove(+1); lastMove = now; setText(lastGestureEl, 'move-right'); }
-                  else if (dx < -HAND_DX_THRESHOLD) { tryMove(-1); lastMove = now; setText(lastGestureEl, 'move-left'); }
-                }
-                // Soft drop
-                const dy = indexTip.y - wrist.y;
-                setSoftDrop(dy > HAND_DROP_DY);
-              } else setSoftDrop(false);
+                // dx in px (index vs wrist), smoothed & calibrated
+                let dx = (indexTip.x - wrist.x);
+                dxHistory.push(dx);
+                if (dxHistory.length > SMOOTH_FRAMES) dxHistory.shift();
+                const dxAvg = dxHistory.reduce((a,b)=>a+b,0) / dxHistory.length;
+                const adj = dxAvg - neutralDx;
 
-              // Rotate on pinch
+                // Adaptive move threshold based on palm width (fallback if missing)
+                let palmWidth = (idxMcp && pnkMcp) ? Math.hypot(idxMcp.x - pnkMcp.x, idxMcp.y - pnkMcp.y) : 100;
+                const MOVE_THRESHOLD = palmWidth * sensitivity; // lower = more sensitive
+
+                // Decide direction with deadzone
+                if (adj > MOVE_THRESHOLD) dir = +1;
+                else if (adj < -MOVE_THRESHOLD) dir = -1;
+                else dir = 0;
+
+                // Soft drop: index below wrist
+                const dy = indexTip.y - wrist.y;
+                dropActive = dy > (palmWidth * 0.6); // tie to hand size for robustness
+              }
+
+              // Rotate on pinch (thumb_tip ~ index_tip) with debounce
               if (thumbTip && indexTip) {
                 const ddx = thumbTip.x - indexTip.x, ddy = thumbTip.y - indexTip.y;
                 const dist = Math.hypot(ddx, ddy);
-                const pinchNow = dist < HAND_PINCH_DIST;
-                const now = performance.now();
-                if (pinchNow && !pinchActive && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                  pinchActive = true;
-                  if (tryRotate()) setText(lastGestureEl, 'rotate');
-                  lastRotate = now;
-                } else if (!pinchNow && pinchActive) pinchActive = false;
+                const pinchNow = dist < (idxMcp && pnkMcp ? Math.max(18, Math.hypot(idxMcp.x - pnkMcp.x, idxMcp.y - pnkMcp.y) * 0.22) : 28);
+                rotateIntent = pinchNow;
               }
-            } else setSoftDrop(false);
+            }
           } else {
             const poses = await detector.estimatePoses(video, { flipHorizontal: true });
             if (poses.length) {
               const kps = poses[0].keypoints || [];
               const byName = Object.fromEntries(kps.map(k => [k.name, k]));
-              const nose = byName['nose'];
-              const rw = byName['right_wrist'];
-              const lw = byName['left_wrist'];
               const conf = k => (k?.score ?? 0) > 0.5;
+              const nose = byName['nose'];
+              const lw = byName['left_wrist'], rw = byName['right_wrist'];
+              const ls = byName['left_shoulder'], rs = byName['right_shoulder'];
+
               const wrist = conf(rw) ? rw : (conf(lw) ? lw : null);
-
               if (nose && conf(nose) && wrist) {
-                const dx = wrist.x - nose.x;
-                const dy = wrist.y - nose.y;
-                const now = performance.now();
+                // Adaptive threshold by shoulder width
+                const shoulderWidth = (conf(ls) && conf(rs)) ? Math.hypot(rs.x - ls.x, rs.y - ls.y) : 120;
+                // dx (wrist vs nose), smoothed & calibrated
+                let dx = wrist.x - nose.x;
+                dxHistory.push(dx);
+                if (dxHistory.length > SMOOTH_FRAMES) dxHistory.shift();
+                const dxAvg = dxHistory.reduce((a,b)=>a+b,0) / dxHistory.length;
+                const adj = dxAvg - neutralDx;
 
-                if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > POSE_DX_THRESHOLD) { tryMove(+1); lastMove = now; setText(lastGestureEl, 'move-right'); }
-                  else if (dx < -POSE_DX_THRESHOLD) { tryMove(-1); lastMove = now; setText(lastGestureEl, 'move-left'); }
-                }
-                if (dy < POSE_ROTATE_DY && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                  if (tryRotate()) setText(lastGestureEl, 'rotate'); lastRotate = now;
-                }
-                setSoftDrop(dy > POSE_DROP_DY);
-              } else setSoftDrop(false);
-            } else setSoftDrop(false);
+                const MOVE_THRESHOLD = shoulderWidth * sensitivity;
+                if (adj > MOVE_THRESHOLD) dir = +1;
+                else if (adj < -MOVE_THRESHOLD) dir = -1;
+                else dir = 0;
+
+                // Soft drop / Rotate using vertical relation to nose
+                const dy = wrist.y - nose.y;
+                dropActive = dy > (shoulderWidth * 0.35);
+                rotateIntent = dy < -(shoulderWidth * 0.18); // above nose
+              }
+            }
           }
+
+          // ====== Apply DAS/ARR auto-repeat ======
+          const now = performance.now();
+          if (dir === 0) {
+            heldDir = 0;
+            nextMoveAt = 0;
+          } else if (dir !== heldDir) {
+            // New direction: move immediately and start DAS
+            tryMove(dir);
+            heldDir = dir;
+            nextMoveAt = now + DAS_MS;
+            setText(lastGestureEl, dir > 0 ? 'move-right' : 'move-left');
+          } else if (now >= nextMoveAt) {
+            // Holding: auto-repeat
+            tryMove(heldDir);
+            nextMoveAt = now + ARR_MS;
+            setText(lastGestureEl, heldDir > 0 ? 'move-right' : 'move-left');
+          }
+
+          // Soft drop
+          setSoftDrop(!!dropActive);
+
+          // Rotate (edge-triggered)
+          if (rotateIntent && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+            if (tryRotate()) setText(lastGestureEl, 'rotate');
+            lastRotate = now;
+          }
+
         } catch (e) {
           setText(diag, 'Detection error: ' + (e?.message || e));
           console.error(e);
