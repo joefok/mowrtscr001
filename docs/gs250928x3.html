@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Gesture Tetris — Head Move, Fist Rotate, Swipe Down Drop</title>
+<title>Gesture Tetris — Hands Only: Open→Fist Rotate, Long Down Drop, Horizontal Move</title>
 
 data:,
 <style>
@@ -25,11 +25,10 @@ data:,
 
   <div id="controls">
     <button id="startBtn" type="button" style="display:none">Start Camera</button>
-    <button id="retryBtn" type="button" style="display:none">Retry Detectors</button>
     <button id="camToggle" type="button">📷 Hide</button>
   </div>
 
-  <!-- Robust loader (loads libs in order, then starts app) -->
+  <!-- Loader: TFJS + Hand Pose Detection only (no pose/MoveNet) -->
   <script>
     (function loader(){
       const diag = document.getElementById('diag');
@@ -55,15 +54,11 @@ data:,
           } catch { await tf.setBackend('cpu'); }
           await tf.ready();
 
-          log('Loading detectors…');
-          // Pose-detection (for MoveNet) – TFJS runtime
-          await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js');
-          // Hand-pose-detection (for MediaPipe Hands)
+          log('Loading Hand Pose Detection…');
           await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js');
-          // Mediapipe runtimes (for Hands only). NOTE: Pose uses MoveNet TFJS -> no MP assets here
-          await add('https://cdn.jsdelivr.net/npm/@mediapipe/hands');
+          await add('https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest');
 
-          if (!window.poseDetection || !window.handPoseDetection) throw new Error('Detectors failed to load');
+          if (!window.handPoseDetection) throw new Error('Hand-Pose failed to load');
 
           log('Libraries ready. Initializing app…');
           setTimeout(()=>{ if (typeof startApp === 'function') startApp(); }, 0);
@@ -82,9 +77,8 @@ data:,
       const video = document.getElementById('camera');
       const camToggle = document.getElementById('camToggle');
       const startBtn = document.getElementById('startBtn');
-      const retryBtn = document.getElementById('retryBtn');
 
-      // ===== Tetris core =====
+      // ====== TETRIS CORE (stacking) ======
       const canvas = document.getElementById('tetris');
       const ctx = canvas.getContext('2d');
       const TILE=30,COLS=10,ROWS=20;
@@ -187,7 +181,7 @@ data:,
         requestAnimationFrame(step);
       }
 
-      // ===== Camera boot with fallback =====
+      // ===== Camera boot (with Start fallback) =====
       async function startCamera(){
         try {
           diag.textContent = 'Requesting camera…';
@@ -201,7 +195,7 @@ data:,
             else video.onloadedmetadata = res;
           });
           try { await video.play(); } catch {}
-          diag.textContent = 'Camera ready. Starting detectors…';
+          diag.textContent = 'Camera ready. Starting hand detector…';
           return true;
         } catch(e) {
           diag.textContent = 'Camera error:\n' + (e?.name || '') + ' ' + (e?.message || e);
@@ -214,145 +208,211 @@ data:,
         video.style.display = show ? 'block' : 'none';
         camToggle.textContent = show ? '📷 Hide' : '📷 Show';
       }
-      let camVisible = true;
-      setCamVisible(camVisible);
+      let camVisible = true; setCamVisible(camVisible);
       camToggle.addEventListener('click', ()=>{ camVisible = !camVisible; setCamVisible(camVisible); });
       setTimeout(()=>{ camVisible=false; setCamVisible(camVisible); }, 5000);
 
-      // ===== Detectors with timeouts & fallback =====
-      let poseDetector=null, handDetector=null;
-      function withTimeout(promise, ms, label){
-        return Promise.race([
-          promise,
-          new Promise((_,reject)=> setTimeout(()=>reject(new Error(label+' timeout after '+ms+'ms')), ms))
-        ]);
-      }
-      async function createPoseDetector(){
-        // Use MoveNet TFJS (no Mediapipe assets)
-        diag.textContent = 'Starting detectors… (Pose: MoveNet TFJS)';
-        poseDetector = await withTimeout(
-          poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
-            modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-            enableSmoothing: true,
-          }),
-          8000, 'Pose detector'
-        );
-      }
+      // ===== Hands detector (MediaPipe runtime) =====
+      let handDetector=null;
       async function createHandDetector(){
-        // Use MediaPipe Hands runtime (best landmarks)
-        diag.textContent = 'Starting detectors… (Hands: MediaPipe)';
-        handDetector = await withTimeout(
-          handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
-            runtime: 'mediapipe',
-            modelType: 'lite',
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands',
-          }),
-          8000, 'Hands detector'
+        handDetector = await handPoseDetection.createDetector(
+          handPoseDetection.SupportedModels.MediaPipeHands,
+          { runtime:'mediapipe', modelType:'lite', solutionPath:'https://cdn.jsdelivr.net/npm/@mediapipe/hands' }
         );
       }
 
-      async function startDetectors(){
-        try {
-          await createPoseDetector();
-        } catch(e){
-          diag.textContent = 'Pose init error:\n' + (e?.message || e) + '\nFalling back to head-only via MoveNet failed.';
-          console.error(e);
-          throw e; // pose is required (for head left/right); bail so user can retry
-        }
+      // ===== Gesture spec (hands-only) =====
+      // Utilities
+      const vsub = (a,b)=>({x:(a?.x||0)-(b?.x||0), y:(a?.y||0)-(b?.y||0)});
+      const vlen = (u)=>Math.hypot(u.x,u.y);
+      const vnorm = (u)=>{ const n=vlen(u)||1; return {x:u.x/n,y:u.y/n}; };
+      const vdot = (u,v)=>u.x*v.x+u.y*v.y;
+      const dist = (a,b)=>Math.hypot((a?.x||0)-(b?.x||0),(a?.y||0)-(b?.y||0));
+      const scoreOK = (k,t=0.4)=> !k || k.score==null || k.score>=t;
 
-        try {
-          await createHandDetector();
-          retryBtn.style.display = 'none';
-        } catch(e){
-          // Proceed head-only; show retry button
-          diag.textContent = 'Hands init error:\n' + (e?.message || e) + '\nContinuing with head-only controls. You can retry loading Hands.';
-          console.warn(e);
-          retryBtn.style.display = 'inline-block';
-          handDetector = null;
-        }
+      // Curl measures
+      function fingerCurl(byName, prefix){
+        const mcp = byName[`${prefix}_mcp`];
+        const pip = byName[`${prefix}_pip`];
+        const dip = byName[`${prefix}_dip`];
+        const tip = byName[`${prefix}_tip`];
+        if (!mcp||!pip||!dip||!tip) return 0;
+        const u1=vnorm(vsub(pip,mcp)), u2=vnorm(vsub(dip,pip)), u3=vnorm(vsub(tip,dip));
+        return (vdot(u1,u2)+vdot(u2,u3))/2; // 1=straight, -1=bent
+      }
+      function thumbCurl(byName){
+        const mcp = byName['thumb_mcp'], ip=byName['thumb_ip'], tip=byName['thumb_tip'];
+        if (!mcp||!ip||!tip) return 0;
+        const u1=vnorm(vsub(ip,mcp)), u2=vnorm(vsub(tip,ip));
+        return vdot(u1,u2);
       }
 
-      // ===== Gesture logic =====
-      // Head → left/right (nose drift against short-term average) with DAS/ARR feel
-      let noseHistory = []; const NOSE_FRAMES = 5; const MOVE_THRESH_PX = 18;
-      let heldDir = 0, nextMoveAt = 0; const DAS_MS = 220, ARR_MS = 70;
+      // Thresholds (tuned)
+      const CURL_EXTENDED_COS = 0.80;  // open: straight fingers
+      const CURL_CLOSED_COS   = 0.30;  // closed: curled fingers
+      const SPLAY_K_ADJ       = 0.20;  // open: adjacent fingertip spacing vs handSize
+      const SPLAY_K_THUMB     = 0.22;  // open: thumb-index spacing vs handSize
+      const THUMB_PINCH_K     = 0.22;  // closed: thumb near hand (vs handSize)
 
-      // Hand → fist = rotate (cooldown), swipe down = hard drop (short time window)
-      let lastRotate = 0; const ROTATE_COOLDOWN_MS = 350;
-      const SWIPE_WINDOW_MS = 180; const SWIPE_THRESH_PX = 80;
-      let yHistory = []; // {t,y}
+      const H_SMOOTH_FRAMES = 3;  // motion smoothing window
 
-      function smooth(values){ if(!values.length) return 0; return values.reduce((a,b)=>a+b,0)/values.length; }
+      // Rotate: Open → immediate Fist
+      const OPEN_CLOSE_WINDOW_MS = 700;
+      const ROTATE_COOLDOWN_MS = 350;
 
+      // Drop: Open hand, then move down a **longer** offset
+      const DROP_LONG_K = 1.0;  // required downward displacement = handSize * K  (increase if you want even longer)
+      const DROP_MAX_WINDOW_MS = 1200;
+
+      // Move L/R: Open hand horizontal displacement with DAS/ARR feel
+      const MOVE_K = 0.35;      // threshold = handSize * MOVE_K
+      const DAS_MS = 220, ARR_MS = 70;
+      const MOVE_HOLD_MS = 800;
+
+      // State
+      let lastOpenAt = -1;
+      let lastRotate = 0;
+
+      let openAnchor = null;    // anchor for measuring displacement while open
+      let decideUntil = 0;
+
+      let dxQ=[], dyQ=[], prevCenter=null;
+
+      let heldDir = 0, nextMoveAt = 0, moveHoldUntil = 0;
+      let dropArmedAt = 0, dropAnchorY = null;
+
+      // Detection loop
       async function detect(){
         try {
-          // Pose (head move)
-          if (poseDetector){
-            const poses = await poseDetector.estimatePoses(video,{flipHorizontal:true});
-            if (poses.length){
-              const nose = poses[0].keypoints.find(k=>k.name==='nose');
-              if (nose && nose.x != null){
-                noseHistory.push(nose.x);
-                if (noseHistory.length > NOSE_FRAMES) noseHistory.shift();
-                if (noseHistory.length >= 2){
-                  const avg = smooth(noseHistory.slice(0,-1));
-                  const dx = noseHistory[noseHistory.length-1] - avg;
-                  const now = performance.now();
-                  let dir = 0;
-                  if (dx >  MOVE_THRESH_PX) dir = +1;
-                  if (dx < -MOVE_THRESH_PX) dir = -1;
+          if (!handDetector){ requestAnimationFrame(detect); return; }
+          const hands = await handDetector.estimateHands(video,{flipHorizontal:true});
+          if (hands.length){
+            // Use the most confident hand
+            const hand = hands[0];
+            const kps = hand.keypoints || [];
+            const by = Object.fromEntries(kps.map(k=>[k.name,k]));
+            const wrist  = by['wrist'];
+            const idxMcp = by['index_finger_mcp'];
+            const midMcp = by['middle_finger_mcp'];
+            const rngMcp = by['ring_finger_mcp'];
+            const pnkMcp = by['pinky_finger_mcp'];
+            const idxTip = by['index_finger_tip'];
+            const midTip = by['middle_finger_tip'];
+            const rngTip = by['ring_finger_tip'];
+            const pnkTip = by['pinky_finger_tip'];
+            const thTip  = by['thumb_tip'];
 
-                  if (dir === 0){
-                    heldDir = 0; nextMoveAt = 0;
-                  } else if (dir !== heldDir){
-                    tryMove(dir);
-                    heldDir = dir; nextMoveAt = now + DAS_MS;
-                  } else if (now >= nextMoveAt){
-                    tryMove(heldDir); nextMoveAt = now + ARR_MS;
-                  }
-                }
+            if (scoreOK(wrist) && scoreOK(idxMcp) && scoreOK(pnkMcp)){
+              const palmWidth = dist(idxMcp, pnkMcp);
+              const handLen   = midMcp ? dist(wrist, midMcp) : palmWidth;
+              const handSize  = Math.max(60, (palmWidth + handLen)*0.5);
+
+              const center = {
+                x:(wrist.x+idxMcp.x+midMcp.x+rngMcp.x+pnkMcp.x)/5,
+                y:(wrist.y+idxMcp.y+midMcp.y+rngMcp.y+pnkMcp.y)/5
+              };
+
+              // Motion smoothing (frame-to-frame)
+              if (prevCenter){
+                const dx = center.x - prevCenter.x;
+                const dy = center.y - prevCenter.y;
+                dxQ.push(dx); if (dxQ.length>H_SMOOTH_FRAMES) dxQ.shift();
+                dyQ.push(dy); if (dyQ.length>H_SMOOTH_FRAMES) dyQ.shift();
               }
-            }
-          }
+              prevCenter = center;
+              const avgDx = dxQ.length ? dxQ.reduce((a,b)=>a+b,0)/dxQ.length : 0;
+              const avgDy = dyQ.length ? dyQ.reduce((a,b)=>a+b,0)/dyQ.length : 0;
 
-          // Hands (rotate/drop) — optional if handDetector available
-          if (handDetector){
-            const hands = await handDetector.estimateHands(video,{flipHorizontal:true});
-            if (hands.length){
-              const kps = hands[0].keypoints || [];
-              const by = Object.fromEntries(kps.map(k=>[k.name,k]));
-              const idxTip = by['index_finger_tip'];
-              const midTip = by['middle_finger_tip'];
-              const rngTip = by['ring_finger_tip'];
-              const pnkTip = by['pinky_finger_tip'];
-              const thTip  = by['thumb_tip'];
+              // Open / Closed checks
+              const cIndex  = fingerCurl(by,'index_finger');
+              const cMiddle = fingerCurl(by,'middle_finger');
+              const cRing   = fingerCurl(by,'ring_finger');
+              const cPinky  = fingerCurl(by,'pinky_finger');
+              const cThumb  = thumbCurl(by);
 
-              if (idxTip && midTip && rngTip && pnkTip && thTip){
-                // Fist: thumb-index small + other fingertips clustered
-                const thumbIndex = Math.hypot(thTip.x-idxTip.x, thTip.y-idxTip.y);
-                const cluster = (Math.hypot(midTip.x-rngTip.x, midTip.y-rngTip.y) + Math.hypot(rngTip.x-pnkTip.x, rngTip.y-pnkTip.y))/2;
-                const fistLikely = thumbIndex < 40 && cluster < 35;
+              const splayOK = idxTip&&midTip&&rngTip&&pnkTip&&thTip &&
+                dist(idxTip,midTip) > handSize*SPLAY_K_ADJ &&
+                dist(midTip,rngTip) > handSize*SPLAY_K_ADJ &&
+                dist(rngTip,pnkTip) > handSize*(SPLAY_K_ADJ-0.02) &&
+                dist(thTip,idxTip)  > handSize*SPLAY_K_THUMB;
 
-                const now = performance.now();
-                if (fistLikely && (now - lastRotate > ROTATE_COOLDOWN_MS)){
+              const openHand = (
+                cIndex >CURL_EXTENDED_COS &&
+                cMiddle>CURL_EXTENDED_COS &&
+                cRing  >CURL_EXTENDED_COS &&
+                cPinky >CURL_EXTENDED_COS &&
+                cThumb >CURL_EXTENDED_COS &&
+                splayOK
+              );
+
+              const thumbNearIndexBase = thTip && idxMcp && (dist(thTip,idxMcp) < handSize*THUMB_PINCH_K);
+              const closedHand = (
+                cIndex  <CURL_CLOSED_COS &&
+                cMiddle <CURL_CLOSED_COS &&
+                cRing   <CURL_CLOSED_COS &&
+                cPinky  <CURL_CLOSED_COS &&
+                cThumb  <CURL_CLOSED_COS &&
+                thumbNearIndexBase
+              );
+
+              const now = performance.now();
+
+              // --- ROTATE: Open → (within 700ms) Closed (fist)
+              if (openHand) lastOpenAt = now;
+              if (closedHand && lastOpenAt>0 && (now-lastOpenAt)<=OPEN_CLOSE_WINDOW_MS){
+                if (now - lastRotate > ROTATE_COOLDOWN_MS){
                   tryRotate();
                   lastRotate = now;
                 }
-
-                // Swipe down on index fingertip
-                const t = performance.now();
-                yHistory.push({t, y: idxTip.y});
-                while (yHistory.length && (t - yHistory[0].t) > SWIPE_WINDOW_MS) yHistory.shift();
-                const minY = yHistory.reduce((m,p)=>Math.min(m,p.y), Infinity);
-                if (idxTip.y - minY > SWIPE_THRESH_PX){
-                  hardDrop();
-                  yHistory.length = 0;
-                }
+                // prevent double-trigger; require a new open again
+                lastOpenAt = -1;
               }
-            } else {
-              // no hands → decay swipe window
-              const now = performance.now();
-              yHistory = yHistory.filter(p => now - p.t <= SWIPE_WINDOW_MS);
+
+              // Maintain anchors while open for move/drop
+              if (openHand){
+                if (!openAnchor){
+                  openAnchor = { ...center };
+                  dropAnchorY = center.y;
+                  dropArmedAt = now;
+                }
+                // --- DROP: Open hand moves DOWN a **long** distance
+                const downDisp = center.y - dropAnchorY;
+                const longNeeded = handSize * DROP_LONG_K; // e.g., ~hand height
+                if (downDisp > longNeeded && (now - dropArmedAt) <= DROP_MAX_WINDOW_MS){
+                  hardDrop();
+                  // reset anchors to avoid re-trigger
+                  openAnchor = { ...center };
+                  dropAnchorY = center.y;
+                  dropArmedAt = now;
+                }
+
+                // --- MOVE L/R: Open hand horizontal displacement with DAS/ARR
+                const moveThresh = handSize * MOVE_K;
+                const dispX = center.x - openAnchor.x;
+
+                let dir = 0;
+                if (dispX >  moveThresh) dir = +1;
+                if (dispX < -moveThresh) dir = -1;
+
+                if (dir===0){
+                  // If displacement returns near neutral, release hold
+                  // (keeps a smoother feel; you can comment out if you prefer sticky)
+                } else {
+                  if (heldDir !== dir){
+                    tryMove(dir);
+                    heldDir = dir;
+                    nextMoveAt = now + DAS_MS;
+                    moveHoldUntil = now + MOVE_HOLD_MS;
+                  } else if (now >= nextMoveAt && now < moveHoldUntil){
+                    tryMove(heldDir);
+                    nextMoveAt = now + ARR_MS;
+                  }
+                }
+              } else {
+                // Not open: release move hold gradually
+                if (now >= moveHoldUntil) { heldDir=0; nextMoveAt=0; }
+                openAnchor = null;
+              }
             }
           }
         } catch(e){
@@ -367,47 +427,33 @@ data:,
         refillBag(); spawn(); draw();
         requestAnimationFrame(step);
         detect();
-        diag.textContent = handDetector
-          ? 'Ready. Head: move L/R • Fist: rotate • Swipe down: drop'
-          : 'Ready (head-only). Fist/drop disabled (click “Retry Detectors”).';
+        diag.textContent = 'Ready. Gestures: Open→Fist=Rotate • Open+Long Down=Drop • Open+Horizontal=Move';
       }
 
       async function startPipeline(){
         const ok = await startCamera();
         if (!ok) return;
         try {
-          await startDetectors();
+          await createHandDetector();
           ready();
         } catch(e){
-          // Pose failed (critical)
-          document.getElementById('retryBtn').style.display = 'inline-block';
-          diag.textContent = 'Detectors failed:\n' + (e?.message || e);
+          diag.textContent = 'Hands init error:\n' + (e?.message || e);
+          console.error(e);
         }
       }
 
       // Try to auto-start; if blocked, show Start button
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
         diag.textContent = 'getUserMedia not supported.\nUse HTTPS and a modern browser.';
-        document.getElementById('startBtn').style.display = 'inline-block';
+        startBtn.style.display = 'inline-block';
       } else {
         startPipeline().then(()=>{
           if (video.readyState < 2) document.getElementById('startBtn').style.display='inline-block';
         });
       }
-
-      document.getElementById('startBtn').addEventListener('click', ()=> {
-        document.getElementById('startBtn').style.display='none';
+      startBtn.addEventListener('click', ()=> {
+        startBtn.style.display='none';
         startPipeline();
-      });
-      document.getElementById('retryBtn').addEventListener('click', async ()=>{
-        diag.textContent = 'Retrying Hands detector…';
-        try {
-          await createHandDetector();
-          document.getElementById('retryBtn').style.display = 'none';
-          diag.textContent = 'Hands ready.';
-        } catch(e){
-          diag.textContent = 'Retry failed:\n' + (e?.message || e);
-        }
       });
     }
   </script>
