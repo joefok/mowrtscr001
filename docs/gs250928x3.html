@@ -177,7 +177,7 @@
           if (webglSupported()) {
             try { await tf.setBackend('webgl'); } catch { await tf.setBackend('cpu'); }
           } else {
-            await tf.setBackend('cpu'); // skip webgl entirely if unsupported
+            await tf.setBackend('cpu');
           }
           await tf.ready();
 
@@ -213,7 +213,7 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Gestures (safe DOM & CPU fallback) ====== -->
+  <!-- ====== App: Stacking Tetris + Gestures (auto-hide camera after 5s) ====== -->
   <script>
     async function startApp() {
       // Safe DOM helpers
@@ -230,7 +230,7 @@
         return el;
       };
 
-      // Ensure required elements exist (prevents null errors)
+      // Ensure required elements exist
       const diag = ensure('div', 'diag');
       const canvas = ensure('canvas', 'tetris');
       const video = ensure('video', 'camera', document.body, { autoplay: true, playsInline: true, muted: true });
@@ -265,14 +265,12 @@
       const camToggleBtn = ensure('button', 'camToggle', document.body, { type: 'button' });
       if (!camToggleBtn.textContent) camToggleBtn.textContent = '📷 Hide';
 
-      // HUD references
+      // HUD refs
       const lastGestureEl = $('#lastGesture');
       const scoreEl = $('#score');
       const linesEl = $('#lines');
       const piecesEl = $('#pieces');
       const modeLabelEl = $('#modeLabel');
-
-      // Mode label
       setText(modeLabelEl, MODE);
 
       // Board setup
@@ -281,27 +279,27 @@
       canvas.width = COLS * TILE;
       canvas.height = ROWS * TILE;
 
-      // Colors by piece id (1..7)
+      // Colors
       const COLORS = {
         0: '#000000', 1: '#00f0f0', 2: '#0000f0', 3: '#f0a000',
         4: '#f0f000', 5: '#00f000', 6: '#a000f0', 7: '#f00000',
       };
 
-      // Tetromino shapes
+      // Shapes
       function shapeById(id) {
         const map = {
-          1: [[1,1,1,1]],                    // I
-          2: [[2,0,0],[2,2,2]],              // J
-          3: [[0,0,3],[3,3,3]],              // L
-          4: [[4,4],[4,4]],                  // O
-          5: [[0,5,5],[5,5,0]],              // S
-          6: [[0,6,0],[6,6,6]],              // T
-          7: [[7,7,0],[0,7,7]],              // Z
+          1: [[1,1,1,1]],
+          2: [[2,0,0],[2,2,2]],
+          3: [[0,0,3],[3,3,3]],
+          4: [[4,4],[4,4]],
+          5: [[0,5,5],[5,5,0]],
+          6: [[0,6,0],[6,6,6]],
+          7: [[7,7,0],[0,7,7]],
         };
         return map[id].map(r => r.slice());
       }
 
-      // 7-bag randomizer
+      // 7-bag RNG
       let bag = [];
       function refillBag() {
         bag = [1,2,3,4,5,6,7];
@@ -314,7 +312,7 @@
 
       // Game state
       const board = Array.from({length: ROWS}, () => Array(COLS).fill(0));
-      let active = null; // {id, matrix, x, y}
+      let active = null;
       let score = 0, lines = 0, pieces = 0;
       const updateHUD = () => { setText(scoreEl, score); setText(linesEl, lines); setText(piecesEl, pieces); };
 
@@ -363,7 +361,6 @@
         active = { id, matrix: mat, x, y };
         pieces++; updateHUD();
         if (collides(active.matrix, active.x, active.y)) {
-          // Game over: reset
           for (let r = 0; r < ROWS; r++) board[r].fill(0);
           score = 0; lines = 0; pieces = 0; updateHUD();
           setText(lastGestureEl, 'game-over (reset)');
@@ -420,7 +417,7 @@
         for (let gy=1; gy<ROWS; gy++) { ctx.beginPath(); ctx.moveTo(0, gy*30); ctx.lineTo(canvas.width, gy*30); ctx.stroke(); }
       }
 
-      // Gravity (time-based)
+      // Gravity
       let lastFallAt = performance.now();
       let softDropActive = false;
       function setSoftDrop(active) { softDropActive = !!active; setText(lastGestureEl, active ? 'soft-drop' : '—'); }
@@ -478,14 +475,23 @@
         : 'Ready (pose): Move=wrist vs nose X, Rotate=wrist above nose, Soft drop=wrist below nose. Press C to hide camera.'
       );
 
-      // Camera toggle (safe)
+      // Camera toggle (with auto-hide after 5s)
       function setCamVisible(show) {
         video.style.display = show ? 'block' : 'none';
         camToggleBtn.textContent = show ? '📷 Hide' : '📷 Show';
       }
-      let camVisible = true; setCamVisible(camVisible);
+      let camVisible = true; 
+      setCamVisible(camVisible);
+
+      // --- Auto-hide camera after 5 seconds (one-shot) ---
+      setTimeout(() => {
+        if (camVisible) { camVisible = false; setCamVisible(camVisible); }
+      }, 5000);
+
       camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
-      window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); } });
+      window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); }
+      });
 
       // Detection loop
       async function detect() {
