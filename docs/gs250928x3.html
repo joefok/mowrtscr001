@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gesture Tetris — SVG Gesture Icons (Top‑Out Auto‑Restart)</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>Gesture Tetris — SVG Gesture Icons (Robust Rotate)</title>
 
   <!-- Prevent favicon 404 -->
   data:,
@@ -176,6 +179,15 @@
     const fallMsBase = 900;  // slow default gravity
     const fallMsSoft = 250;  // while soft-dropping
 
+    // Robust rotate thresholds & timing
+    const PINCH_ON_NORM   = 0.18;  // thumb-index / handSize to START pinch
+    const PINCH_OFF_NORM  = 0.26;  // ...to END pinch (hysteresis)
+    const PINCH_HOLD_MS   = 120;   // pinch must persist this long to rotate
+
+    const ROTATE_ON_K        = -0.18; // POSE: wrist above nose by 18% shoulder width to START
+    const ROTATE_OFF_K       = -0.10; // POSE: ...10% for END (hysteresis)
+    const ROTATE_HOLD_MS_POSE = 120;
+
     window.addEventListener('DOMContentLoaded', () => {
       const m = document.getElementById('modeLabel');
       if (m) m.textContent = MODE;
@@ -244,12 +256,13 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Easier Gestures + SVG Icons ====== -->
+  <!-- ====== App: Stacking Tetris + Easier Gestures + Robust Rotate + SVG Icons ====== -->
   <script>
     async function startApp() {
       // Safe DOM helpers
       const $ = (id) => document.getElementById(id);
       const setText = (el, text) => { if (el) el.textContent = text; };
+      const dist = (a, b) => Math.hypot((a?.x || 0) - (b?.x || 0), (a?.y || 0) - (b?.y || 0));
 
       const diag = $('diag');
       const canvas = $('tetris');
@@ -402,14 +415,12 @@
         return false;
       }
 
-      // Movement + lock
+      // Movement + lock (with top-out detection)
       function tryMove(dir) {
         if (!collides(active.matrix, active.x + dir, active.y)) {
           active.x += dir; draw();
         }
       }
-
-      // >>> TOP-OUT FIX HERE <<<
       function lock() {
         const topOut = active.y < 0;  // if piece locks above visible area -> Game Over
         merge();
@@ -474,7 +485,12 @@
       let heldDir = 0;            // -1, 0, +1
       let nextMoveAt = 0;         // timestamp for next auto-repeat
       let lastRotate = 0;
-      let pinchActive = false;
+
+      // Robust rotate states
+      let pinchState = false;   // hand mode pinch state
+      let pinchSince = 0;
+      let poseRotateState = false;
+      let poseRotateSince = 0;
 
       // Sensitivity UI
       let sensitivity = parseFloat(sensRange?.value || '0.35');
@@ -540,12 +556,11 @@
       camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
       window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); } });
 
-      // ====== Detection loop with improved movement & icon feedback ======
+      // ====== Detection loop with improved movement & robust rotate ======
       async function detect() {
         try {
           let dir = 0;  // -1, 0, +1
           let dropActive = false;
-          let rotateIntent = false;
 
           if (MODE === 'hand') {
             const hands = await detector.estimateHands(video, { flipHorizontal: true });
@@ -557,6 +572,7 @@
               const thumbTip = byName['thumb_tip'];
               const idxMcp = byName['index_finger_mcp'];
               const pnkMcp = byName['pinky_finger_mcp'];
+              const midMcp = byName['middle_finger_mcp'];
 
               if (wrist && indexTip) {
                 // Smoothed calibrated dx
@@ -567,7 +583,7 @@
                 const adj = dxAvg - neutralDx;
 
                 // Adaptive threshold (palm width)
-                let palmWidth = (idxMcp && pnkMcp) ? Math.hypot(idxMcp.x - pnkMcp.x, idxMcp.y - pnkMcp.y) : 100;
+                let palmWidth = (idxMcp && pnkMcp) ? dist(idxMcp, pnkMcp) : 100;
                 const MOVE_THRESHOLD = palmWidth * sensitivity;
 
                 if (adj > MOVE_THRESHOLD) dir = +1;
@@ -579,16 +595,34 @@
                 dropActive = dy > (palmWidth * 0.6);
               }
 
-              // Rotate on pinch
+              // -------- Robust pinch -> rotate (normalized + hysteresis + hold) --------
               if (thumbTip && indexTip) {
-                const ddx = thumbTip.x - indexTip.x, ddy = thumbTip.y - indexTip.y;
-                const dist = Math.hypot(ddx, ddy);
-                const pinchThreshold = (idxMcp && pnkMcp)
-                  ? Math.max(18, Math.hypot(idxMcp.x - pnkMcp.x, idxMcp.y - pnkMcp.y) * 0.22)
-                  : 28;
-                const pinchNow = dist < pinchThreshold;
-                rotateIntent = pinchNow;
+                const palmWidth = (idxMcp && pnkMcp) ? dist(idxMcp, pnkMcp) : 100;
+                const handLen = (wrist && midMcp) ? dist(wrist, midMcp) : palmWidth;
+                const handSize = Math.max(60, (palmWidth + handLen) * 0.5);
+
+                const d = dist(thumbTip, indexTip);
+                const dNorm = d / handSize;
+
+                const now = performance.now();
+
+                if (!pinchState && dNorm <= PINCH_ON_NORM) {
+                  pinchState = true;
+                  pinchSince = now;
+                } else if (pinchState && dNorm >= PINCH_OFF_NORM) {
+                  pinchState = false;
+                  pinchSince = 0;
+                }
+
+                if (pinchState && (now - pinchSince >= PINCH_HOLD_MS) && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+                  if (tryRotate()) flashIcon('rotate', 180);
+                  lastRotate = now;
+                }
               }
+            } else {
+              // No hand detected
+              dropActive = false;
+              heldDir = 0; nextMoveAt = 0;
             }
           } else {
             const poses = await detector.estimatePoses(video, { flipHorizontal: true });
@@ -602,7 +636,7 @@
 
               const wrist = conf(rw) ? rw : (conf(lw) ? lw : null);
               if (nose && conf(nose) && wrist) {
-                const shoulderWidth = (conf(ls) && conf(rs)) ? Math.hypot(rs.x - ls.x, rs.y - ls.y) : 120;
+                const shoulderWidth = (conf(ls) && conf(rs)) ? dist(ls, rs) : 120;
 
                 let dx = wrist.x - nose.x;
                 dxHistory.push(dx);
@@ -617,8 +651,28 @@
 
                 const dy = wrist.y - nose.y;
                 dropActive = dy > (shoulderWidth * 0.35);
-                rotateIntent = dy < -(shoulderWidth * 0.18);
+
+                // -------- Robust pose rotate (hysteresis + hold) --------
+                const now = performance.now();
+                const onY  = ROTATE_ON_K  * shoulderWidth;  // negative
+                const offY = ROTATE_OFF_K * shoulderWidth;  // less negative (closer to zero)
+
+                if (!poseRotateState && dy <= onY) {
+                  poseRotateState = true;
+                  poseRotateSince = now;
+                } else if (poseRotateState && dy >= offY) {
+                  poseRotateState = false;
+                  poseRotateSince = 0;
+                }
+
+                if (poseRotateState && (now - poseRotateSince >= ROTATE_HOLD_MS_POSE) && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+                  if (tryRotate()) flashIcon('rotate', 180);
+                  lastRotate = now;
+                }
               }
+            } else {
+              dropActive = false;
+              heldDir = 0; nextMoveAt = 0;
             }
           }
 
@@ -639,12 +693,6 @@
           // Soft drop icon (latched while active)
           setSoftDrop(!!dropActive);
 
-          // Rotate icon pulse
-          if (rotateIntent && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-            if (tryRotate()) flashIcon('rotate', 180);
-            lastRotate = now;
-          }
-
         } catch (e) {
           setText(diag, 'Detection error: ' + (e?.message || e));
           console.error(e);
@@ -655,4 +703,3 @@
     }
   </script>
 </body>
-</html>
