@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gesture Tetris</title>
 
-  <!-- MediaPipe Hands -->
-  https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js</script>
+  <!-- Latest TensorFlow & MediaPipe CDN -->
+  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core</script>
+  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl</script>
+  https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection</script>
+  https://cdn.jsdelivr.net/npm/@mediapipe/hands</script>
 
   <style>
     body {
@@ -65,6 +66,7 @@
     canvas.height = 600;
 
     const statusDiv = document.getElementById('status');
+    const videoElement = document.getElementById('camera');
 
     let position = { x: 3, y: 0 };
     let piece = [[1, 1, 1], [0, 1, 0]];
@@ -90,61 +92,56 @@
       setTimeout(update, 500);
     }
 
-    // Gesture Detection
-    const videoElement = document.getElementById('camera');
-    const hands = new Hands({
-      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7
-    });
-
-    hands.onResults(results => {
-      if (results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        const wrist = landmarks[0];
-        const index = landmarks[8];
-
-        const dx = index.x - wrist.x;
-
-        if (dx > 0.15) {
-          position.x += 1;
-        } else if (dx < -0.15) {
-          position.x -= 1;
-        }
-
-        draw();
-      }
-    });
-
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      },
-      width: 640,
-      height: 480
-    });
-
     async function startGame() {
       try {
-        statusDiv.textContent = "Starting camera...";
-        await camera.start();
+        statusDiv.textContent = "Setting up TensorFlow backend...";
+        await tf.setBackend('webgl');
+        await tf.ready();
+
+        statusDiv.textContent = "Creating hand detector...";
+        const model = handPoseDetection.SupportedModels.MediaPipeHands;
+        const detectorConfig = {
+          runtime: 'mediapipe',
+          modelType: 'lite',
+          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
+        };
+        const detector = await handPoseDetection.createDetector(model, detectorConfig);
+
+        statusDiv.textContent = "Accessing camera...";
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false
+        });
+        videoElement.srcObject = stream;
+
         statusDiv.textContent = "Camera permission granted. Gesture module active.";
         update();
+
+        async function detectHands() {
+          const hands = await detector.estimateHands(videoElement);
+          if (hands.length > 0) {
+            const keypoints = hands[0].keypoints;
+            const wrist = keypoints.find(k => k.name === 'wrist');
+            const index = keypoints.find(k => k.name === 'index_finger_tip');
+
+            if (wrist && index) {
+              const dx = index.x - wrist.x;
+              if (dx > 30) position.x += 1;
+              else if (dx < -30) position.x -= 1;
+              draw();
+            }
+          }
+          requestAnimationFrame(detectHands);
+        }
+
+        detectHands();
       } catch (err) {
-        statusDiv.textContent = "Camera access denied or failed.";
+        statusDiv.textContent = "Camera access denied or error occurred.";
         console.error(err);
       }
     }
 
-    // Auto-start after DOM is ready
-    window.addEventListener('DOMContentLoaded', () => {
-      startGame();
-    });
+    window.addEventListener('DOMContentLoaded', startGame);
   </script>
 </body>
 </html>
