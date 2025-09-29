@@ -2,11 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-  <title>Gesture Tetris — SVG Gesture Icons</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gesture Tetris — SVG Gesture Icons (Top‑Out Auto‑Restart)</title>
 
   <!-- Prevent favicon 404 -->
   data:,
@@ -381,7 +378,7 @@
         active = { id, matrix: mat, x, y };
         pieces++; updateHUD();
         if (collides(active.matrix, active.x, active.y)) {
-          // Game over → auto restart
+          // Game over (blocked spawn) → auto restart
           gameOverRestart();
           return;
         }
@@ -411,7 +408,20 @@
           active.x += dir; draw();
         }
       }
-      function lock() { merge(); clearLines(); spawn(); draw(); }
+
+      // >>> TOP-OUT FIX HERE <<<
+      function lock() {
+        const topOut = active.y < 0;  // if piece locks above visible area -> Game Over
+        merge();
+        if (topOut) {                 // restart and skip clears/spawn
+          draw();
+          gameOverRestart();
+          return;
+        }
+        clearLines();
+        spawn();
+        draw();
+      }
 
       // Draw
       function draw() {
