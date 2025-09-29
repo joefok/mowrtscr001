@@ -26,7 +26,7 @@
     }
     video {
       position: fixed;
-      bottom: 10px;
+      bottom: 46px; /* leave room for controls button */
       right: 10px;
       width: 112px;
       height: 84px;
@@ -46,6 +46,29 @@
       max-width: 92vw;
       white-space: pre-wrap;
     }
+    #camToggle {
+      position: fixed;
+      right: 10px;
+      bottom: 10px;
+      z-index: 11;
+      background: #0b3d46;
+      border: 1px solid #0ff;
+      color: #0ff;
+      border-radius: 6px;
+      font-size: 12px;
+      padding: 6px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    #camToggle:hover { background: #0e4f5a; }
+    #legend {
+      position: fixed; left: 10px; bottom: 10px; z-index: 10;
+      background: rgba(0,0,0,.5);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 6px; padding: 6px 10px; font-size: 12px;
+      max-width: 60vw;
+    }
+    code { color: #9cf; }
   </style>
 </head>
 <body>
@@ -53,16 +76,40 @@
   <div id="diag">Booting...</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
+  <button id="camToggle" type="button">📷 Hide</button>
+  <div id="legend">
+    <div><b>Mode:</b> <span id="modeLabel">hand</span></div>
+    <div><b>Gestures:</b>
+      <ul style="margin:6px 0 0 18px;padding:0;">
+        <li><b>Move</b>: left/right offset</li>
+        <li><b>Rotate</b>: <span id="rotateHint">Pinch (thumb+index)</span></li>
+        <li><b>Soft drop</b>: <span id="dropHint">Index tip below wrist</span></li>
+      </ul>
+    </div>
+    <div><b>Keys:</b> <code>C</code> camera toggle</div>
+    <div><b>Last gesture:</b> <span id="lastGesture">—</span></div>
+  </div>
 
   <script>
     // ==================== CONFIG ====================
     // Choose control source: 'hand' (default) or 'pose'
     const MODE = 'hand'; // 'hand' | 'pose'
+    document.getElementById('modeLabel').textContent = MODE;
+    if (MODE === 'pose') {
+      document.getElementById('rotateHint').textContent = 'Wrist above nose';
+      document.getElementById('dropHint').textContent = 'Wrist below nose';
+    }
 
     // Movement tuning
-    const MOVE_COOLDOWN_MS = 180;  // throttle horizontal moves
-    const HAND_DX_THRESHOLD = 30;  // index tip to wrist (px)
-    const POSE_DX_THRESHOLD = 30;  // wrist to nose (px)
+    const MOVE_COOLDOWN_MS   = 180; // throttle horizontal moves
+    const ROTATE_COOLDOWN_MS = 280; // rotation debounce
+    const HAND_DX_THRESHOLD  = 30;  // index tip to wrist (px) for left/right
+    const HAND_PINCH_DIST    = 35;  // thumb tip ↔ index tip distance (px) for rotate
+    const HAND_DROP_DY       = 40;  // index tip lower than wrist (px) => soft drop
+
+    const POSE_DX_THRESHOLD  = 30;  // wrist ↔ nose dx (px) for left/right
+    const POSE_ROTATE_DY     = -20; // wrist above nose by at least 20px -> rotate
+    const POSE_DROP_DY       = 40;  // wrist below nose by at least 40px -> soft drop
 
     // ==================== LOADER ====================
     (function loadLibs(){
@@ -143,6 +190,8 @@
       const video = document.getElementById('camera');
       const canvas = document.getElementById('tetris');
       const ctx = canvas.getContext('2d');
+      const lastGestureEl = document.getElementById('lastGesture');
+      const camToggleBtn = document.getElementById('camToggle');
 
       // Board setup
       const TILE = 30, COLS = 10, ROWS = 20;
@@ -155,7 +204,39 @@
         [0, 1, 0],
       ];
       let pos = { x: 3, y: 0 };
+
+      // Gesture debouncing
       let lastMove = 0;
+      let lastRotate = 0;
+      let pinchActive = false; // only rotate on pinch start
+      let softDropActive = false;
+
+      // Fall timing (switchable for soft drop)
+      let fallMs = 500; // default
+      let fallTimer = null;
+
+      function startFallTimer() {
+        if (fallTimer) clearInterval(fallTimer);
+        fallTimer = setInterval(tick, fallMs);
+      }
+
+      function setSoftDrop(active) {
+        if (active && !softDropActive) {
+          softDropActive = true; fallMs = 120; startFallTimer();
+          lastGestureEl.textContent = 'soft-drop';
+        } else if (!active && softDropActive) {
+          softDropActive = false; fallMs = 500; startFallTimer();
+          lastGestureEl.textContent = '—';
+        }
+      }
+
+      // Piece rotation (clockwise)
+      function rotateCW(mat) {
+        const h = mat.length, w = mat[0].length;
+        const out = Array.from({length: w}, _ => Array(h).fill(0));
+        for (let y=0; y<h; y++) for (let x=0; x<w; x++) out[x][h-1-y] = mat[y][x];
+        return out;
+      }
 
       function clampX() {
         const maxX = COLS - piece[0].length;
@@ -224,10 +305,22 @@
 
       // Start game loop
       draw();
-      const fall = setInterval(tick, 500);
+      startFallTimer();
       diag.textContent = MODE === 'hand'
-        ? 'Ready: move your index fingertip left/right relative to your wrist.'
-        : 'Ready: move your wrist left/right relative to your nose.';
+        ? 'Ready (hand): Move = index vs wrist X, Rotate = pinch, Soft drop = index below wrist. Press C to hide camera.'
+        : 'Ready (pose): Move = wrist vs nose X, Rotate = wrist above nose, Soft drop = wrist below nose. Press C to hide camera.';
+
+      // Camera toggle
+      function setCamVisible(show) {
+        video.style.display = show ? 'block' : 'none';
+        camToggleBtn.textContent = show ? '📷 Hide' : '📷 Show';
+      }
+      let camVisible = true;
+      setCamVisible(camVisible);
+      camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
+      window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); }
+      });
 
       // Detection loop
       async function detect() {
@@ -235,18 +328,46 @@
           if (MODE === 'hand') {
             const hands = await detector.estimateHands(video, { flipHorizontal: true });
             if (hands.length > 0) {
-              const keypoints = hands[0].keypoints || [];
-              const wrist = keypoints.find(k => k.name === 'wrist');
-              const indexTip = keypoints.find(k => k.name === 'index_finger_tip');
+              const kps = hands[0].keypoints || [];
+              const byName = Object.fromEntries(kps.map(k => [k.name, k]));
+              const wrist = byName['wrist'];
+              const indexTip = byName['index_finger_tip'];
+              const thumbTip = byName['thumb_tip'];
+
               if (wrist && indexTip) {
+                // Horizontal move
                 const dx = indexTip.x - wrist.x; // +right, -left (after flip)
                 const now = performance.now();
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > HAND_DX_THRESHOLD) { pos.x += 1; lastMove = now; }
-                  else if (dx < -HAND_DX_THRESHOLD) { pos.x -= 1; lastMove = now; }
+                  if (dx > HAND_DX_THRESHOLD) { pos.x += 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-right'; }
+                  else if (dx < -HAND_DX_THRESHOLD) { pos.x -= 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-left'; }
+                }
+
+                // Soft drop (index below wrist)
+                const dy = indexTip.y - wrist.y;
+                setSoftDrop(dy > HAND_DROP_DY);
+              }
+
+              // Rotate by pinch (thumb_tip ~ index_tip)
+              if (thumbTip && indexTip) {
+                const ddx = thumbTip.x - indexTip.x;
+                const ddy = thumbTip.y - indexTip.y;
+                const dist = Math.hypot(ddx, ddy);
+                const pinchNow = dist < HAND_PINCH_DIST;
+                const now = performance.now();
+
+                if (pinchNow && !pinchActive && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+                  pinchActive = true;
+                  piece = rotateCW(piece);
                   clampX(); draw();
+                  lastRotate = now;
+                  lastGestureEl.textContent = 'rotate';
+                } else if (!pinchNow && pinchActive) {
+                  pinchActive = false; // reset so next pinch triggers again
                 }
               }
+            } else {
+              setSoftDrop(false);
             }
           } else {
             const poses = await detector.estimatePoses(video, { flipHorizontal: true });
@@ -258,15 +379,33 @@
               const lw = byName['left_wrist'];
               const conf = k => (k?.score ?? 0) > 0.5;
               const wrist = conf(rw) ? rw : (conf(lw) ? lw : null);
+
               if (nose && conf(nose) && wrist) {
-                const dx = wrist.x - nose.x; // +right, -left (after flip)
+                const dx = wrist.x - nose.x;
+                const dy = wrist.y - nose.y;
                 const now = performance.now();
+
+                // Move
                 if (now - lastMove > MOVE_COOLDOWN_MS) {
-                  if (dx > POSE_DX_THRESHOLD) { pos.x += 1; lastMove = now; }
-                  else if (dx < -POSE_DX_THRESHOLD) { pos.x -= 1; lastMove = now; }
-                  clampX(); draw();
+                  if (dx > POSE_DX_THRESHOLD) { pos.x += 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-right'; }
+                  else if (dx < -POSE_DX_THRESHOLD) { pos.x -= 1; lastMove = now; clampX(); draw(); lastGestureEl.textContent = 'move-left'; }
                 }
+
+                // Rotate (wrist above nose) - dy negative and magnitude >= threshold
+                if (dy < POSE_ROTATE_DY && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+                  piece = rotateCW(piece);
+                  clampX(); draw();
+                  lastRotate = now;
+                  lastGestureEl.textContent = 'rotate';
+                }
+
+                // Soft drop
+                setSoftDrop(dy > POSE_DROP_DY);
+              } else {
+                setSoftDrop(false);
               }
+            } else {
+              setSoftDrop(false);
             }
           }
         } catch (e) {
