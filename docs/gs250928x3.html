@@ -2,137 +2,163 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Gesture Tetris — Head Pose + OK Rotate + Victory Drop</title>
+  <title>Gesture Tetris — Head Pose Move, OK Rotate, ✌️ Drop</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, Arial, sans-serif; background:#0b0f14; color:#e9f1fb; margin:0; }
-    header { padding: 12px 16px; background:#111824; border-bottom:1px solid #1f2a3a; }
-    header h1 { font-size: 18px; margin:0 0 6px 0; }
-    header .sub { font-size: 13px; color:#9fb0c3; }
-    main { display:flex; gap:16px; padding:16px; }
-    .left { flex: 0 0 420px; display:flex; flex-direction:column; gap:8px; }
-    .right { flex: 1; min-height: 480px; border:1px dashed #203046; border-radius:10px; padding:12px; }
-    video, canvas { width: 100%; border-radius:10px; background:#000; }
-    .row { display:flex; gap:8px; align-items:center; }
-    button { background:#1b283a; color:#e9f1fb; border:1px solid #2b3c56; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+           background:#0b0f14; color:#e9f1fb; }
+    .panel { position: fixed; right: 12px; bottom: 12px; background: #0f1624cc; backdrop-filter: blur(6px);
+             border:1px solid #203046; border-radius: 12px; padding: 10px; width: 320px; z-index: 99999; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    button { background:#1b283a; color:#e9f1fb; border:1px solid #2b3c56; padding:6px 10px; border-radius:8px; cursor:pointer; }
     button:hover { background:#22324a; }
-    .pill { font-size:12px; opacity:.85; padding:4px 8px; border-radius:999px; background:#142034; border:1px solid #24344c; }
-    .log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; background:#0a0f18; border:1px solid #1f2a3a; border-radius:8px; padding:8px; height:160px; overflow:auto; }
-    .kbd { font-size: 11px; border:1px solid #2b3c56; padding:2px 6px; border-radius:4px; background:#121c2b; }
-    .hud { position:absolute; top:8px; left:8px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.45); font-size:12px; }
-    .status { font-size:12px; color:#9fb0c3; }
+    .sub { font-size:12px; color:#9fb0c3; }
+    .log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:12px; background:#0a0f18;
+           border:1px solid #1f2a3a; border-radius:8px; padding:6px; height:110px; overflow:auto; margin-top:8px;}
+    .hud { position: fixed; left: 12px; top: 12px; z-index: 99998; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.45); font-size:12px; }
+    .pill { font-size:11px; opacity:.85; padding:2px 6px; border-radius:999px; background:#142034; border:1px solid #24344c; }
+    video, canvas { display:none; } /* keep video/canvas off-screen; we only need the camera feed */
     .ok { color:#6ee7b7; } .v { color:#93c5fd; } .warn { color:#fca5a5; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Gesture Tetris — Head Pose Move, OK Rotate, ✌️ Drop</h1>
-    <div class="sub">
-      <strong>Controls:</strong>
-      <span class="pill">Head → Move ◀ ▶</span>
-      <span class="pill">OK → Rotate ⟳</span>
-      <span class="pill">Victory ✌️ → Hard Drop ⬇⬇</span>
-      &nbsp;|&nbsp; <span class="pill">C → Calibrate</span>
+  <!-- Minimal UI panel (can be hidden after testing) -->
+  <div class="panel" id="panel">
+    <div class="row" style="justify-content: space-between;">
+      <strong>Gesture Controls</strong>
+      <button id="btnHide">Hide</button>
     </div>
-  </header>
-
-  <main>
-    <div class="left">
-      <video id="video" playsinline></video>
-      <div style="position:relative">
-        <canvas id="overlay" width="640" height="480"></canvas>
-        <div class="hud" id="hud"></div>
-      </div>
-      <div class="row">
-        <button id="btnStart">Start Camera 📷</button>
-        <button id="btnCalib">Calibrate (C)</button>
-        <div class="status" id="status">Idle</div>
-      </div>
-      <div class="log" id="log"></div>
+    <div class="sub" style="margin:6px 0 10px 0;">
+      <span class="pill">Head → ◀ ▶</span>
+      <span class="pill">OK → Rotate</span>
+      <span class="pill">✌ → Hard Drop</span>
+      &nbsp; <span class="pill">C to calibrate</span>
     </div>
-
-    <div class="right" id="gamePanel">
-      <h3 style="margin-top:0">Game Wiring</h3>
-      <p>
-        Hook these functions into your Tetris engine:
-        <code>moveLeft()</code>, <code>moveRight()</code>,
-        <code>rotatePiece()</code>, <code>hardDrop()</code>.
-      </p>
-      <p>
-        For now, they log actions here so you can verify detections.
-      </p>
-      <div id="gameLog" class="log"></div>
+    <div class="row">
+      <button id="btnStart">Start Camera 📷</button>
+      <button id="btnCalib">Calibrate (C)</button>
+      <span id="status" class="sub">Idle</span>
     </div>
-  </main>
+    <div id="log" class="log"></div>
+  </div>
 
-  <!-- MediaPipe (legacy solutions) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils.js</script>
-  <script src="https://cdn.jsdelivr.net/npm/@medi_utils/drawing_utils.js</script>
-  <script src="https://cdn.jsdelivr.net/npm/@medish/face_mesh.js</script>
+  <!-- Heads-up text (yaw & last gesture) -->
+  <div id="hud" class="hud"></div>
+
+  <!-- Offscreen camera/overlay (kept hidden by CSS) -->
+  <video id="video" playsinline></video>
+  <canvas id="overlay" width="640" height="480"></canvas>
+
+  <!-- MediaPipe (legacy solutions) from CDN -->
+  https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js</script>
+  https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js</script>
+  https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js</script>
   https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js</script>
 
   <script>
-    /************
-     * UI helpers
-     ************/
+    /********************************************************************
+     * 1) CONFIG — map to your engine, or use keyboard fallback.
+     ********************************************************************/
+    const GESTURE_TETRIS_CONFIG = {
+      // A) Try direct calls (preferred for accuracy). Fill any methods you have:
+      directCalls: {
+        // Examples:
+        // left:   () => window.game.moveLeft(),
+        // right:  () => window.game.moveRight(),
+        // rotate: () => window.game.rotate() || window.game.rotatePiece(),
+        // drop:   () => window.game.hardDrop() || window.game.drop(),
+        left:   null,
+        right:  null,
+        rotate: null,
+        drop:   null
+      },
+
+      // B) Keyboard fallback: if your engine listens to keys, set the right ones here:
+      keyMap: {
+        left:   "ArrowLeft",
+        right:  "ArrowRight",
+        rotate: "ArrowUp",   // change to "KeyX" or "KeyZ" if your engine rotates with X/Z
+        drop:   "Space"      // hard drop is often Space; change if needed
+      },
+
+      // C) Head-move repeat feel
+      head: {
+        deadZone: 0.08,    // no move inside ±deadZone
+        trigger:  0.15,    // threshold to start moving
+        firstDelay: 260,   // ms before auto-repeat
+        repeatEvery: 110,  // ms between repeats
+        yawSmoothing: 0.30 // 0..1 EMA smoothing
+      },
+
+      // D) UI: auto-start camera on load?
+      autoStart: false
+    };
+
+    /********************************************************************
+     * 2) UNIVERSAL ADAPTER — sendAction() uses directCalls or key events.
+     ********************************************************************/
+    function dispatchKey(code) {
+      const e = new KeyboardEvent("keydown", { key: code, code, bubbles: true, cancelable: true });
+      window.dispatchEvent(e);
+      document.dispatchEvent(e);
+    }
+    const sendAction = {
+      left()   { if (GESTURE_TETRIS_CONFIG.directCalls.left)   return GESTURE_TETRIS_CONFIG.directCalls.left();   dispatchKey(GESTURE_TETRIS_CONFIG.keyMap.left);   },
+      right()  { if (GESTURE_TETRIS_CONFIG.directCalls.right)  return GESTURE_TETRIS_CONFIG.directCalls.right();  dispatchKey(GESTURE_TETRIS_CONFIG.keyMap.right);  },
+      rotate() { if (GESTURE_TETRIS_CONFIG.directCalls.rotate) return GESTURE_TETRIS_CONFIG.directCalls.rotate(); dispatchKey(GESTURE_TETRIS_CONFIG.keyMap.rotate); },
+      drop()   { if (GESTURE_TETRIS_CONFIG.directCalls.drop)   return GESTURE_TETRIS_CONFIG.directCalls.drop();   dispatchKey(GESTURE_TETRIS_CONFIG.keyMap.drop);   }
+    };
+
+    // OPTIONAL: naive auto-detect common engines (you can delete if not needed)
+    setTimeout(() => {
+      const g = window.game || window.tetris || window.engine || window.Game || null;
+      try {
+        if (g) {
+          if (!GESTURE_TETRIS_CONFIG.directCalls.left   && typeof g.moveLeft   === "function") GESTURE_TETRIS_CONFIG.directCalls.left   = () => g.moveLeft();
+          if (!GESTURE_TETRIS_CONFIG.directCalls.right  && typeof g.moveRight  === "function") GESTURE_TETRIS_CONFIG.directCalls.right  = () => g.moveRight();
+          if (!GESTURE_TETRIS_CONFIG.directCalls.rotate && typeof g.rotate     === "function") GESTURE_TETRIS_CONFIG.directCalls.rotate = () => g.rotate();
+          if (!GESTURE_TETRIS_CONFIG.directCalls.rotate && typeof g.rotatePiece=== "function") GESTURE_TETRIS_CONFIG.directCalls.rotate = () => g.rotatePiece();
+          if (!GESTURE_TETRIS_CONFIG.directCalls.drop   && typeof g.hardDrop   === "function") GESTURE_TETRIS_CONFIG.directCalls.drop   = () => g.hardDrop();
+          if (!GESTURE_TETRIS_CONFIG.directCalls.drop   && typeof g.drop       === "function") GESTURE_TETRIS_CONFIG.directCalls.drop   = () => g.drop();
+          console.log("[GestureTetris] autodetect:", GESTURE_TETRIS_CONFIG.directCalls);
+        }
+      } catch (e) {}
+    }, 0);
+
+    /********************************************************************
+     * 3) UI helpers
+     ********************************************************************/
     const $ = (q) => document.querySelector(q);
     const logEl = $("#log");
-    const gameLogEl = $("#gameLog");
     const statusEl = $("#status");
     const hudEl = $("#hud");
-
-    function log(msg) {
-      const t = new Date().toLocaleTimeString();
-      logEl.textContent = `[${t}] ${msg}\n` + logEl.textContent;
-    }
-    function gameLog(msg) {
-      const t = new Date().toLocaleTimeString();
-      gameLogEl.textContent = `[${t}] ${msg}\n` + gameLogEl.textContent;
-    }
-
-    /*****************************
-     * Game control integration
-     *****************************/
-    function moveLeft()  { gameLog("MOVE LEFT");  /* TODO: game.moveLeft() */ }
-    function moveRight() { gameLog("MOVE RIGHT"); /* TODO: game.moveRight() */ }
-    function rotatePiece(){ gameLog("ROTATE");    /* TODO: game.rotate() */ }
-    function hardDrop()  { gameLog("HARD DROP");  /* TODO: game.hardDrop() */ }
-
-    /*****************************
-     * Camera + canvases
-     *****************************/
     const videoEl = $("#video");
     const canvasEl = $("#overlay");
     const ctx = canvasEl.getContext("2d");
+
+    function log(msg) {
+      const t = new Date().toLocaleTimeString();
+      if (logEl) logEl.textContent = `[${t}] ${msg}\n` + logEl.textContent;
+      console.log("[GestureTetris]", msg);
+    }
+    function setStatus(s) { if (statusEl) statusEl.textContent = s; }
+
+    /********************************************************************
+     * 4) MediaPipe setup (FaceMesh + Hands)
+     ********************************************************************/
     let camera = null;
 
-    /*****************************
-     * Detection state/params
-     *****************************/
-    // Head pose (yaw) control
+    // Face pose state
     let calib = { centerX: 0.5, faceWidth: 0.25, has: false };
-    let yawEMA = 0; // smoothed yaw (-1..+1)
-    const yawAlpha = 0.3;           // smoothing factor
-    let lastDir = 0;
-    let lastDirChangeAt = 0;
-    let lastRepeatAt = 0;
-    const deadZone = 0.08;          // yaw dead zone (relative)
-    const trigger = 0.15;           // beyond this, start moving
-    const firstDelay = 260;         // ms before auto-repeat
-    const repeatEvery = 110;        // ms between repeats when held
+    let yawEMA = 0;
+    let lastDir = 0, lastDirChangeAt = 0, lastRepeatAt = 0;
 
     // Gesture state
-    let okArmed = true;
-    let vArmed  = true;
-    const okCooldown = 280;     // ms
-    const vCooldown  = 450;     // ms
+    let okArmed = true, vArmed = true;
+    const okCooldown = 280, vCooldown = 450;
     let lastOkAt = 0, lastVAt = 0;
 
-    function setStatus(s) { statusEl.textContent = s; }
-
-    /*****************************
-     * MediaPipe: FaceMesh
-     *****************************/
     const faceMesh = new FaceMesh.FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -144,9 +170,6 @@
     });
     faceMesh.onResults(onFaceResults);
 
-    /*****************************
-     * MediaPipe: Hands
-     *****************************/
     const hands = new Hands.Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
@@ -158,23 +181,15 @@
     });
     hands.onResults(onHandResults);
 
-    /*****************************
-     * Camera start/stop
-     *****************************/
     async function startCamera() {
       if (camera) return;
       setStatus("Starting camera…");
       camera = new Camera(videoEl, {
         onFrame: async () => {
-          // send same frame to both models
           await faceMesh.send({ image: videoEl });
           await hands.send({ image: videoEl });
-
-          // draw the raw frame beneath overlays
-          ctx.save();
+          // Keep canvas fresh for any debug drawing (not shown by default)
           ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-          ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-          ctx.restore();
         },
         width: 640, height: 480
       });
@@ -183,28 +198,29 @@
       log("Camera started");
     }
 
-    document.getElementById("btnStart").addEventListener("click", startCamera);
-    document.getElementById("btnCalib").addEventListener("click", () => requestCalibration());
+    document.getElementById("btnStart")?.addEventListener("click", startCamera);
+    document.getElementById("btnCalib")?.addEventListener("click", () => requestCalibration());
+    document.getElementById("btnHide")?.addEventListener("click", () => document.getElementById("panel").style.display = "none");
     document.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "c") requestCalibration(); });
 
-    /*****************************
-     * Head pose helpers
-     *****************************/
+    if (GESTURE_TETRIS_CONFIG.autoStart) window.addEventListener("load", startCamera);
+
+    /********************************************************************
+     * 5) Head pose → left/right with repeat
+     ********************************************************************/
     function requestCalibration() {
       calib.has = false;
       calibSamples = [];
-      calibUntil = performance.now() + 900; // 0.9s
+      calibUntil = performance.now() + 900;
       log("Calibration started — hold head neutral for ~1s");
     }
-    let calibSamples = [];
-    let calibUntil = 0;
+    let calibSamples = [], calibUntil = 0;
 
     function maybeDoCalibration(centerX, faceW) {
       const now = performance.now();
       if (calibUntil > 0) {
         calibSamples.push({ cx:centerX, fw:faceW });
         if (now > calibUntil) {
-          // median-ish
           const cx = calibSamples.map(s=>s.cx).sort((a,b)=>a-b)[Math.floor(calibSamples.length/2)];
           const fw = calibSamples.map(s=>s.fw).sort((a,b)=>a-b)[Math.floor(calibSamples.length/2)];
           calib.centerX = cx;
@@ -223,7 +239,6 @@
         return;
       }
       const lm = faces[0];
-      // Landmarks of interest (MediaPipe FaceMesh indexes)
       const NOSE_TIP = 1, LEFT_EAR = 234, RIGHT_EAR = 454;
 
       const noseX = lm[NOSE_TIP].x;
@@ -232,82 +247,48 @@
       const faceW = Math.max(1e-4, Math.abs(rightX - leftX));
       const centerX = (leftX + rightX) / 2;
 
-      // Calibrate neutral pose if requested
       maybeDoCalibration(centerX, faceW);
 
+      const cfg = GESTURE_TETRIS_CONFIG.head;
       const cx = calib.has ? calib.centerX : 0.5;
       const fw = calib.has ? calib.faceWidth : faceW;
-
-      // Relative yaw proxy: nose offset from center normalized by face width
       let yaw = (noseX - cx) / Math.max(1e-4, fw);
-      // Clamp and smooth
       yaw = Math.max(-0.8, Math.min(0.8, yaw));
-      yawEMA = yawAlpha * yaw + (1 - yawAlpha) * yawEMA;
+      yawEMA = cfg.yawSmoothing * yaw + (1 - cfg.yawSmoothing) * yawEMA;
 
-      drawFaceDebug(lm, yawEMA);
+      hudEl.innerHTML = `Yaw: ${yawEMA.toFixed(2)} ${Math.abs(yawEMA) < cfg.deadZone ? "(dead zone)" : (yawEMA>0?"→":"←")}`;
 
       handleHeadMove(yawEMA);
     }
 
     function handleHeadMove(yawVal) {
+      const cfg = GESTURE_TETRIS_CONFIG.head;
       const now = performance.now();
-      if (Math.abs(yawVal) < deadZone) {
-        lastDir = 0;
-        lastDirChangeAt = 0;
+      if (Math.abs(yawVal) < cfg.deadZone) {
+        lastDir = 0; lastDirChangeAt = 0;
         return;
       }
-      const dir = yawVal > 0 ? 1 : -1; // + = right, - = left
-
-      if (Math.abs(yawVal) >= trigger) {
+      const dir = yawVal > 0 ? 1 : -1;
+      if (Math.abs(yawVal) >= cfg.trigger) {
         if (dir !== lastDir) {
-          // Direction changed: immediate step
-          if (dir > 0) moveRight(); else moveLeft();
-          lastDir = dir;
-          lastDirChangeAt = now;
-          lastRepeatAt = now;
+          if (dir > 0) sendAction.right(); else sendAction.left();
+          lastDir = dir; lastDirChangeAt = now; lastRepeatAt = now;
         } else {
-          // Held beyond first delay → auto-repeat
           const heldFor = now - lastDirChangeAt;
-          if (heldFor > firstDelay && now - lastRepeatAt > repeatEvery) {
-            if (dir > 0) moveRight(); else moveLeft();
+          if (heldFor > cfg.firstDelay && now - lastRepeatAt > cfg.repeatEvery) {
+            if (dir > 0) sendAction.right(); else sendAction.left();
             lastRepeatAt = now;
           }
         }
-      } else {
-        // In active zone but not over trigger → no move
       }
     }
 
-    function drawFaceDebug(lm, yaw) {
-      const w = canvasEl.width, h = canvasEl.height;
-      const pts = [1, 234, 454]; // nose tip, left ear, right ear
-      ctx.save();
-      ctx.lineWidth = 2;
-      pts.forEach(i => {
-        const x = (1 - lm[i].x) * w; // flip for camera mirror feel
-        const y = lm[i].y * h;
-        ctx.fillStyle = i === 1 ? "#6ee7b7" : "#93c5fd";
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
-      });
-
-      // HUD
-      hudEl.innerHTML = `Yaw: ${yaw.toFixed(2)} &nbsp; ${Math.abs(yaw) < deadZone ? "(dead zone)" :
-                        (yaw>0?"→":"←")}`;
-      ctx.restore();
-    }
-
-    /*****************************
-     * Hand gesture rules
-     *****************************/
+    /********************************************************************
+     * 6) Hands → OK rotate, Victory hard drop
+     ********************************************************************/
     function onHandResults(results) {
       const handsLm = results.multiHandLandmarks || [];
       const handedness = results.multiHandedness || [];
-
-      // Draw landmarks
-      handsLm.forEach((lm, idx) => {
-        drawConnectors(ctx, lm, Hands.HAND_CONNECTIONS, { color: "#36587a", lineWidth: 2 });
-        drawLandmarks(ctx, lm, { color: "#e9f1fb", lineWidth: 1, radius: 2 });
-      });
 
       for (let i = 0; i < handsLm.length; i++) {
         const lm = handsLm[i];
@@ -315,53 +296,46 @@
       }
     }
 
-    // Utility distances in normalized coordinates
-    function dist(a, b) {
-      const dx = a.x - b.x, dy = a.y - b.y; return Math.hypot(dx, dy);
-    }
-    function isExtended(lm, tipIdx, pipIdx, slack = 0.015) {
-      // In video coords, smaller y = higher (more extended)
-      return lm[tipIdx].y < lm[pipIdx].y - slack;
-    }
+    // helpers
+    function dist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.hypot(dx, dy); }
+    function isExtended(lm, tipIdx, pipIdx, slack = 0.015) { return lm[tipIdx].y < lm[pipIdx].y - slack; }
 
     function handleGestures(lm, whichHand) {
-      // Landmark indices (MediaPipe Hands)
       const THUMB_TIP = 4, INDEX_TIP = 8, MIDDLE_TIP = 12, RING_TIP = 16, PINKY_TIP = 20;
       const INDEX_PIP = 6, MIDDLE_PIP = 10, RING_PIP = 14, PINKY_PIP = 18;
       const INDEX_MCP = 5, PINKY_MCP = 17;
 
       const palmW = Math.max(1e-4, dist(lm[INDEX_MCP], lm[PINKY_MCP]));
 
-      // --- OK gesture: thumb-index pinch + other three extended
-      const pinch = dist(lm[THUMB_TIP], lm[INDEX_TIP]) / palmW < 0.35; // tweak 0.28–0.42
+      // OK: thumb-index pinch + other three extended
+      const pinch = dist(lm[THUMB_TIP], lm[INDEX_TIP]) / palmW < 0.35;
       const midExt = isExtended(lm, MIDDLE_TIP, MIDDLE_PIP);
       const ringExt = isExtended(lm, RING_TIP, RING_PIP);
       const pinkExt = isExtended(lm, PINKY_TIP, PINKY_PIP);
       const isOK = pinch && midExt && ringExt && pinkExt;
 
-      // --- Victory: index & middle extended and separated; ring & pinky folded
+      // Victory: index & middle extended and separated; ring & pinky folded
       const idxExt = isExtended(lm, INDEX_TIP, INDEX_PIP);
-      const sepIM = dist(lm[INDEX_TIP], lm[MIDDLE_TIP]) / palmW > 0.25; // V opening
+      const sepIM = dist(lm[INDEX_TIP], lm[MIDDLE_TIP]) / palmW > 0.25;
       const ringFold = !isExtended(lm, RING_TIP, RING_PIP);
       const pinkFold = !isExtended(lm, PINKY_TIP, PINKY_PIP);
       const isV = idxExt && midExt && sepIM && ringFold && pinkFold;
 
-      // Debounced triggers (rising edges)
       const now = performance.now();
       if (isOK && okArmed && now - lastOkAt > okCooldown) {
-        rotatePiece();
-        okArmed = false;
-        lastOkAt = now;
+        sendAction.rotate();
+        okArmed = false; lastOkAt = now;
         hudEl.innerHTML += ` &nbsp; <span class="ok">OK→Rotate</span>`;
+        log("Gesture: OK (rotate)");
       } else if (!isOK && now - lastOkAt > okCooldown) {
-        okArmed = true; // rearm when released
+        okArmed = true;
       }
 
       if (isV && vArmed && now - lastVAt > vCooldown) {
-        hardDrop();
-        vArmed = false;
-        lastVAt = now;
-        hudEl.innerHTML += ` &nbsp; <span class="v">✌️→Drop</span>`;
+        sendAction.drop();
+        vArmed = false; lastVAt = now;
+        hudEl.innerHTML += ` &nbsp; <span class="v">✌→Drop</span>`;
+        log("Gesture: Victory (hard drop)");
       } else if (!isV && now - lastVAt > vCooldown) {
         vArmed = true;
       }
