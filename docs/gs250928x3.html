@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gesture Tetris</title>
 
-  <!-- Latest TensorFlow.js & MediaPipe Hands -->
-  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core</script>
-  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl</script>
-  https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/hands</script>
+  <!-- ✅ Load TensorFlow.js Core + WebGL Backend -->
+  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.13.0/dist/tf.min.js</script>
+  https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js</script>
+  https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js</script>
 
   <style>
     body {
@@ -100,7 +99,7 @@
         const detectorConfig = {
           runtime: 'mediapipe',
           modelType: 'lite',
-          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
+          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915'
         };
         const detector = await handPoseDetection.createDetector(model, detectorConfig);
 
