@@ -19,6 +19,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      height: 100vh;
     }
 
     canvas {
@@ -26,6 +27,22 @@
       height: 80vh;
       background: #000;
       display: block;
+    }
+
+    #startOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      z-index: 10;
+      cursor: pointer;
     }
 
     video {
@@ -40,6 +57,7 @@
   </style>
 </head>
 <body>
+  <div id="startOverlay">Tap to Start Game & Enable Camera</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline></video>
 
@@ -72,7 +90,6 @@
       draw();
       setTimeout(update, 500);
     }
-    update();
 
     // Gesture Detection
     const videoElement = document.getElementById('camera');
@@ -113,10 +130,12 @@
       height: 480
     });
 
-    // Start camera only after user interaction (required by some mobile browsers)
-    window.addEventListener('click', () => {
+    // Start camera after user interaction
+    document.getElementById('startOverlay').addEventListener('click', () => {
+      document.getElementById('startOverlay').style.display = 'none';
       camera.start();
-    }, { once: true });
+      update();
+    });
   </script>
 </body>
 </html>
