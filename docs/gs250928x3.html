@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   />
-  <title>Gesture Tetris — Open Hand + Directional Movement</title>
+  <title>Gesture Tetris — Open→Close then Direction</title>
 
   <!-- Prevent favicon 404 -->
   data:,
@@ -95,7 +95,7 @@
     #gestureIcons { display: flex; gap: 10px; align-items: center; }
     #gestureIcons .icon {
       width: 28px; height: 28px;
-      opacity: 0.3;
+      opacity: 0.28;
       transition: transform .12s ease, opacity .12s ease, filter .12s ease;
     }
     #gestureIcons .icon.active {
@@ -109,6 +109,14 @@
     .icon path, .icon line, .icon polyline, .icon circle {
       stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round;
     }
+
+    /* Small "armed" LED */
+    #armedLED {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.4);
+      background: rgba(255,255,255,.2);
+    }
+    #armedLED.armed { background: #0f0; box-shadow: 0 0 10px #0f0; }
   </style>
 </head>
 <body>
@@ -124,6 +132,9 @@
       <div><b>Score:</b> <span id="score">0</span></div>
       <div><b>Lines:</b> <span id="lines">0</span></div>
       <div><b>Pieces:</b> <span id="pieces">0</span></div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span>Armed:</span><span id="armedLED" title="Open→Close detected; waiting for direction"></span>
+      </div>
     </div>
 
     <!-- Gesture icons (no help text, just visuals) -->
@@ -164,32 +175,36 @@
 
   <script>
     // ==================== CONFIG ====================
-    const MODE = 'hand'; // hand only (open-hand requirement)
+    const MODE = 'hand'; // hand-only
 
-    // Movement feel (DAS/ARR) for left/right
-    const DAS_MS = 220;  // initial delay before auto-repeat
+    // Timing windows for gesture grammar
+    const OPEN_CLOSE_WINDOW_MS = 600;  // must close within 600ms after open
+    const DECIDE_WINDOW_MS     = 900;  // after arming, time to move and decide
+
+    // Movement feel (DAS/ARR) for left/right after a successful gesture
+    const DAS_MS = 200;  // initial delay before auto-repeat
     const ARR_MS = 70;   // auto-repeat rate while held
-
-    // Smoothing windows
-    const SMOOTH_FRAMES = 5; // moving average for dx baseline
-    const MOTION_FRAMES = 3; // moving average for motion dx/dy
+    const MOVE_HOLD_MS = 800; // keep auto-repeat alive for this many ms after trigger
 
     // Gravity
     const fallMsBase = 900;  // default gravity
     const fallMsSoft = 250;  // while soft-dropping
+    const DROP_HOLD_MS = 1200; // how long soft drop stays active after "down" trigger
 
     // Rotation event timing
     const ROTATE_COOLDOWN_MS = 260; // minimum time between rotations
-    const SUPPRESS_AFTER_ROTATE_MS = 250; // suppress other gestures briefly after rotate
-    const ACTION_SWITCH_MIN_MS = 100;     // minimal dwell before switching actions
+    const SUPPRESS_AFTER_ROTATE_MS = 250; // suppress other triggers right after rotate
 
-    // High-certainty gating
-    const FRAMES_CONFIRM = 4; // frames to confirm an action
+    // Open/Closed hand thresholds
+    const CURL_EXTENDED_COS = 0.80;  // finger straight if average cosine > this
+    const CURL_CLOSED_COS   = 0.30;  // finger closed if average cosine < this
+    const SPLAY_K_ADJACENT  = 0.20;  // adjacent fingertips spacing (% handSize) for "open"
+    const SPLAY_K_THUMB     = 0.22;  // thumb-index spacing (% handSize) for "open"
+    const THUMB_PINCH_K     = 0.22;  // thumb-index spacing < this => thumb folded toward fist (for "closed")
 
-    // Open-hand checks
-    const CURL_EXTENDED_COS = 0.80;  // finger is "straight" if average cosine > this
-    const SPLAY_K_ADJACENT = 0.22;   // min adjacent fingertip spacing (% of hand size)
-    const SPLAY_K_THUMB    = 0.25;   // min thumb-index spacing (% of hand size)
+    // Motion thresholds
+    const SMOOTH_FRAMES = 3;  // smoothing for motion dx/dy
+    // Sensitivity slider scales the displacement threshold: threshold = handSize * sensitivity
 
     window.addEventListener('DOMContentLoaded', () => {
       const m = document.getElementById('modeLabel');
@@ -252,7 +267,7 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Open-hand Directional Gestures ====== -->
+  <!-- ====== App: Stacking Tetris + Open→Close+Direction Gestures ====== -->
   <script>
     async function startApp() {
       // Helpers
@@ -264,16 +279,22 @@
       const vdot = (u, v) => u.x*v.x + u.y*v.y;
       const dist = (a, b) => Math.hypot((a?.x||0)-(b?.x||0), (a?.y||0)-(b?.y||0));
       const scoreOK = (k, t=0.5) => !k || k.score == null || k.score >= t; // if score absent, accept
+      const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
       const diag = $('diag');
       const canvas = $('tetris');
       const ctx = canvas.getContext('2d');
       const video = $('camera');
       const camToggleBtn = $('camToggle');
+      const armedLED = $('armedLED');
 
       // HUD refs
       const scoreEl = $('score'), linesEl = $('lines'), piecesEl = $('pieces');
       const sensRange = $('sens'), sensVal = $('sensVal'), calibBtn = $('calibBtn');
+      let sensitivity = parseFloat(sensRange?.value || '0.35');
+      const updateSensitivityLabel = () => { if (sensVal) sensVal.textContent = sensitivity.toFixed(2); };
+      updateSensitivityLabel();
+      sensRange?.addEventListener('input', () => { sensitivity = parseFloat(sensRange.value); updateSensitivityLabel(); });
 
       // SVG Icons
       const iconLeft = $('iconLeft');
@@ -283,7 +304,6 @@
       const icons = { left: iconLeft, right: iconRight, rotate: iconRotate, drop: iconDrop };
       const setIcon = (name, active) => { const el = icons[name]; if (el) el.classList.toggle('active', !!active); };
       const setOnlyIcon = (name) => { Object.keys(icons).forEach(n => setIcon(n, n === name)); };
-      const flashIcon = (name, ms=140) => { setOnlyIcon(name); setTimeout(() => setOnlyIcon(null), ms); };
 
       // Board setup
       const TILE = 30, COLS = 10, ROWS = 20;
@@ -363,10 +383,11 @@
         if (restarting) return;
         restarting = true;
 
-        // Stop soft drop & movement and reset gesture states
-        softDropActive = false; heldDir = 0; nextMoveAt = 0; dxHistory.length = 0;
-        leftCnt = rightCnt = upCnt = downCnt = 0;
-        currentAction = null; suppressUntil = 0;
+        // Reset gesture states
+        disarm();
+        moveHoldUntil = 0;
+        dropHoldUntil = 0;
+        heldDir = 0; nextMoveAt = 0;
         dxQ.length = dyQ.length = 0; prevCenter = null;
 
         // Clear board & stats
@@ -477,42 +498,57 @@
         requestAnimationFrame(step);
       }
 
-      // ====== Exclusive, Open-hand Directional Gesture Engine ======
-      let dxHistory = [];
-      let neutralDx = 0;          // not essential here; kept for completeness
-      let heldDir = 0;            // -1, 0, +1 for DAS/ARR
-      let nextMoveAt = 0;         // timestamp for next auto-repeat
-      let lastRotate = 0;
+      // ====== Gesture engine: Open → Close (arm) → First Direction decides action ======
+      // Finger curl (index/middle/ring/pinky)
+      function fingerCurl(byName, prefix) {
+        const mcp = byName[`${prefix}_mcp`];
+        const pip = byName[`${prefix}_pip`];
+        const dip = byName[`${prefix}_dip`];
+        const tip = byName[`${prefix}_tip`];
+        if (!mcp || !pip || !dip || !tip) return 0;
+        const u1 = vnorm(vsub(pip, mcp));
+        const u2 = vnorm(vsub(dip, pip));
+        const u3 = vnorm(vsub(tip, dip));
+        const c12 = vdot(u1, u2);
+        const c23 = vdot(u2, u3);
+        return (c12 + c23) / 2; // closer to 1 = straight; closer to -1 = fully bent
+      }
+      function thumbCurl(byName) {
+        const mcp = byName['thumb_mcp'];
+        const ip  = byName['thumb_ip'];
+        const tip = byName['thumb_tip'];
+        if (!mcp || !ip || !tip) return 0;
+        const u1 = vnorm(vsub(ip, mcp));
+        const u2 = vnorm(vsub(tip, ip));
+        return vdot(u1, u2);
+      }
 
-      // Multi-frame confirmation counters
-      let leftCnt = 0, rightCnt = 0, upCnt = 0, downCnt = 0;
-
-      // Exclusivity state
-      let currentAction = null;   // 'rotate' | 'drop' | 'moveLeft' | 'moveRight' | null
-      let actionSince = 0;
+      // Arming state
+      let lastOpenAt = -1;
+      let armed = false;
+      let anchorCenter = null;
+      let decideUntil = 0;
       let suppressUntil = 0;
+
+      function setArmedUI(on) {
+        armed = on;
+        armedLED.classList.toggle('armed', !!on);
+      }
+      function disarm() {
+        setArmedUI(false);
+        anchorCenter = null;
+        decideUntil = 0;
+      }
+
+      // Movement hold and drop hold
+      let heldDir = 0;        // -1 or +1
+      let nextMoveAt = 0;
+      let moveHoldUntil = 0;
+      let dropHoldUntil = 0;
 
       // Motion smoothing queues
       const dxQ = [], dyQ = [];
       let prevCenter = null;
-
-      // Sensitivity UI (affects movement thresholds)
-      let sensitivity = parseFloat(sensRange?.value || '0.35');
-      const updateSensitivityLabel = () => { if (sensVal) sensVal.textContent = sensitivity.toFixed(2); };
-      updateSensitivityLabel();
-      sensRange?.addEventListener('input', () => { sensitivity = parseFloat(sensRange.value); updateSensitivityLabel(); });
-
-      function calibrateNeutral(currentDxAvg = 0) {
-        neutralDx = currentDxAvg;
-        const old = diag.textContent;
-        diag.textContent = 'Neutral calibrated.';
-        setTimeout(() => { diag.textContent = old; }, 800);
-      }
-      calibBtn?.addEventListener('click', () => calibrateNeutral(dxHistory.length ? dxHistory.reduce((a,b)=>a+b,0)/dxHistory.length : 0));
-      window.addEventListener('keydown', (e) => {
-        const k = e.key.toLowerCase();
-        if (k === 'n') calibrateNeutral(dxHistory.length ? dxHistory.reduce((a,b)=>a+b,0)/dxHistory.length : 0);
-      });
 
       // Camera
       setText(diag, 'Requesting camera...');
@@ -553,51 +589,34 @@
       camToggleBtn.addEventListener('click', () => { camVisible = !camVisible; setCamVisible(camVisible); });
       window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'c') { camVisible = !camVisible; setCamVisible(camVisible); } });
 
-      // Counter update with decay
-      const upd = (cnt, cond) => {
-        if (cond) return Math.min(8, cnt + 1);
-        return Math.max(0, cnt - 1);
-      };
-
-      // Finger curl (index/middle/ring/pinky)
-      function fingerCurl(byName, prefix) {
-        const mcp = byName[`${prefix}_mcp`];
-        const pip = byName[`${prefix}_pip`];
-        const dip = byName[`${prefix}_dip`];
-        const tip = byName[`${prefix}_tip`];
-        if (!mcp || !pip || !dip || !tip) return 0;
-        const u1 = vnorm(vsub(pip, mcp));
-        const u2 = vnorm(vsub(dip, pip));
-        const u3 = vnorm(vsub(tip, dip));
-        const c12 = vdot(u1, u2);
-        const c23 = vdot(u2, u3);
-        return (c12 + c23) / 2; // closer to 1 = straight
-      }
-      function thumbCurl(byName) {
-        const mcp = byName['thumb_mcp'];
-        const ip  = byName['thumb_ip'];
-        const tip = byName['thumb_tip'];
-        if (!mcp || !ip || !tip) return 0;
-        const u1 = vnorm(vsub(ip, mcp));
-        const u2 = vnorm(vsub(tip, ip));
-        return vdot(u1, u2);
-      }
-
-      // ====== Detection loop (open-hand + directional motion) ======
+      // ====== Detection loop ======
       async function detect() {
         try {
-          let now = performance.now();
+          const now = performance.now();
 
-          // Defaults (no action)
-          let newAction = currentAction;
-          const inSuppress = now < suppressUntil;
+          // Apply latched behaviors even if not detecting a new gesture
+          if (now < dropHoldUntil) setSoftDrop(true); else setSoftDrop(false);
+
+          if (heldDir !== 0 && now < moveHoldUntil) {
+            if (now >= nextMoveAt) {
+              tryMove(heldDir);
+              nextMoveAt = now + ARR_MS;
+              setOnlyIcon(heldDir > 0 ? 'right' : 'left');
+            }
+          } else {
+            heldDir = 0;
+            setOnlyIcon(null);
+          }
+
+          // Suppression: ignore new arming inside this window
+          const canArm = now >= suppressUntil;
 
           const hands = await detector.estimateHands(video, { flipHorizontal: true });
           if (hands.length) {
             const kps = hands[0].keypoints || [];
             const byName = Object.fromEntries(kps.map(k => [k.name, k]));
 
-            // Confidence gate basic joints
+            // Essential joints
             const wrist  = byName['wrist'];
             const idxMcp = byName['index_finger_mcp'];
             const midMcp = byName['middle_finger_mcp'];
@@ -615,20 +634,19 @@
               const handLen   = midMcp ? dist(wrist, midMcp) : palmWidth;
               const handSize  = Math.max(60, (palmWidth + handLen) * 0.5);
 
-              // --- OPEN HAND CHECK (all five extended + splay) ---
+              const center = {
+                x: (wrist.x + idxMcp.x + midMcp.x + rngMcp.x + pnkMcp.x) / 5,
+                y: (wrist.y + idxMcp.y + midMcp.y + rngMcp.y + pnkMcp.y) / 5,
+              };
+
+              // Finger curls
               const cIndex  = fingerCurl(byName, 'index_finger');
               const cMiddle = fingerCurl(byName, 'middle_finger');
               const cRing   = fingerCurl(byName, 'ring_finger');
               const cPinky  = fingerCurl(byName, 'pinky_finger');
               const cThumb  = thumbCurl(byName);
-              const allExtended = (
-                cIndex  > CURL_EXTENDED_COS &&
-                cMiddle > CURL_EXTENDED_COS &&
-                cRing   > CURL_EXTENDED_COS &&
-                cPinky  > CURL_EXTENDED_COS &&
-                cThumb  > CURL_EXTENDED_COS
-              );
 
+              // Open: straight + splay
               const splayOK =
                 idxTip && midTip && rngTip && pnkTip && thTip &&
                 dist(idxTip, midTip) > handSize * SPLAY_K_ADJACENT &&
@@ -636,126 +654,110 @@
                 dist(rngTip, pnkTip) > handSize * (SPLAY_K_ADJACENT - 0.02) &&
                 dist(thTip, idxTip)  > handSize * SPLAY_K_THUMB;
 
-              const openHandOK = allExtended && splayOK;
+              const openHandOK = (
+                cIndex  > CURL_EXTENDED_COS &&
+                cMiddle > CURL_EXTENDED_COS &&
+                cRing   > CURL_EXTENDED_COS &&
+                cPinky  > CURL_EXTENDED_COS &&
+                cThumb  > CURL_EXTENDED_COS &&
+                splayOK
+              );
 
-              // Hand center (palm center approx.)
-              const center = {
-                x: (wrist.x + idxMcp.x + midMcp.x + rngMcp.x + pnkMcp.x) / 5,
-                y: (wrist.y + idxMcp.y + midMcp.y + rngMcp.y + pnkMcp.y) / 5,
-              };
+              // Closed: fingers curled + thumb near index (pinch toward fist)
+              const thumbNearIndex = thTip && idxMcp && (dist(thTip, idxMcp) < handSize * THUMB_PINCH_K);
+              const closedHandOK = (
+                cIndex  < CURL_CLOSED_COS &&
+                cMiddle < CURL_CLOSED_COS &&
+                cRing   < CURL_CLOSED_COS &&
+                cPinky  < CURL_CLOSED_COS &&
+                cThumb  < CURL_CLOSED_COS &&
+                thumbNearIndex
+              );
 
-              // Motion (only when open-hand gate is satisfied)
-              if (openHandOK) {
-                if (prevCenter) {
-                  const dx = center.x - prevCenter.x;
-                  const dy = center.y - prevCenter.y;
-                  dxQ.push(dx); if (dxQ.length > MOTION_FRAMES) dxQ.shift();
-                  dyQ.push(dy); if (dyQ.length > MOTION_FRAMES) dyQ.shift();
-                  const avgDx = dxQ.reduce((a,b)=>a+b,0) / dxQ.length;
-                  const avgDy = dyQ.reduce((a,b)=>a+b,0) / dyQ.length;
+              // Update motion smoothing
+              if (prevCenter) {
+                const dx = center.x - prevCenter.x;
+                const dy = center.y - prevCenter.y;
+                dxQ.push(dx); if (dxQ.length > SMOOTH_FRAMES) dxQ.shift();
+                dyQ.push(dy); if (dyQ.length > SMOOTH_FRAMES) dyQ.shift();
+              }
+              prevCenter = center;
 
-                  // Adaptive movement thresholds (smaller value = more sensitive)
-                  const moveThresh = handSize * sensitivity;
+              // --- Arming logic: Open → (within window) Close => ARMED ---
+              if (!armed && canArm) {
+                if (openHandOK) {
+                  lastOpenAt = now;
+                }
+                if (closedHandOK && lastOpenAt > 0 && (now - lastOpenAt) <= OPEN_CLOSE_WINDOW_MS) {
+                  // Arm
+                  anchorCenter = { ...center };
+                  decideUntil = now + DECIDE_WINDOW_MS;
+                  setArmedUI(true);
+                }
+              }
 
-                  const leftCond  = avgDx < -moveThresh;
-                  const rightCond = avgDx >  moveThresh;
-                  const upCond    = avgDy < -moveThresh; // up is negative Y
-                  const downCond  = avgDy >  moveThresh;
+              // --- Decide action when ARMED by first clear direction of movement ---
+              if (armed) {
+                const thresh = handSize * sensitivity; // px
+                let resolved = false;
 
-                  // Update counters with decay
-                  leftCnt  = upd(leftCnt,  leftCond);
-                  rightCnt = upd(rightCnt, rightCond);
-                  upCnt    = upd(upCnt,    upCond);
-                  downCnt  = upd(downCnt,  downCond);
+                if (anchorCenter) {
+                  const disp = { x: center.x - anchorCenter.x, y: center.y - anchorCenter.y };
 
-                  // --- Exclusive decision ---
-                  if (!inSuppress) {
-                    // Rotate is an event from UP movement
-                    if (upCnt >= FRAMES_CONFIRM && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                      if (tryRotate()) {
-                        flashIcon('rotate', 180);
-                      }
-                      lastRotate = now;
-                      suppressUntil = now + SUPPRESS_AFTER_ROTATE_MS;
-                      // Reset continuous actions and counters around rotate
-                      setSoftDrop(false);
-                      heldDir = 0; nextMoveAt = 0;
-                      leftCnt = rightCnt = upCnt = downCnt = 0;
-                      newAction = null;
-                      actionSince = now;
-                    } else {
-                      // Otherwise, pick one continuous action by priority: drop > right > left
-                      const candidates = [
-                        {name:'drop', score: downCnt, prio: 3},
-                        {name:'moveRight', score: rightCnt, prio: 2},
-                        {name:'moveLeft',  score: leftCnt,  prio: 1},
-                      ].sort((a,b)=> b.score - a.score || b.prio - a.prio);
+                  // Use smoothed displacement if available
+                  const avgDx = dxQ.length ? dxQ.reduce((a,b)=>a+b,0)/dxQ.length : disp.x;
+                  const avgDy = dyQ.length ? dyQ.reduce((a,b)=>a+b,0)/dyQ.length : disp.y;
 
-                      const top = candidates[0];
-                      if (top.score >= FRAMES_CONFIRM) {
-                        // Minimal dwell to avoid fast switching
-                        if (currentAction && top.name !== currentAction && (now - actionSince) < ACTION_SWITCH_MIN_MS) {
-                          newAction = currentAction;
-                        } else {
-                          newAction = top.name;
+                  // Only evaluate once displacement surpasses threshold
+                  if (Math.abs(avgDx) > thresh || Math.abs(avgDy) > thresh) {
+                    // Decide by larger magnitude axis
+                    if (Math.abs(avgDy) >= Math.abs(avgDx)) {
+                      // Vertical ⇒ rotate (up) or drop (down)
+                      if (avgDy < -thresh) {
+                        // UP ⇒ ROTATE
+                        if (performance.now() - lastRotate > ROTATE_COOLDOWN_MS) {
+                          if (tryRotate()) setOnlyIcon('rotate');
+                          lastRotate = performance.now();
+                          suppressUntil = performance.now() + SUPPRESS_AFTER_ROTATE_MS;
                         }
-                      } else {
-                        newAction = null;
+                        resolved = true;
+                      } else if (avgDy > thresh) {
+                        // DOWN ⇒ SOFT DROP (latched)
+                        dropHoldUntil = performance.now() + DROP_HOLD_MS;
+                        setOnlyIcon('drop');
+                        resolved = true;
+                      }
+                    } else {
+                      // Horizontal ⇒ LEFT / RIGHT (with short auto-repeat)
+                      if (avgDx < -thresh) {
+                        // LEFT
+                        tryMove(-1);
+                        heldDir = -1;
+                        const now2 = performance.now();
+                        nextMoveAt = now2 + DAS_MS;
+                        moveHoldUntil = now2 + MOVE_HOLD_MS;
+                        setOnlyIcon('left');
+                        resolved = true;
+                      } else if (avgDx > thresh) {
+                        // RIGHT
+                        tryMove(+1);
+                        heldDir = +1;
+                        const now2 = performance.now();
+                        nextMoveAt = now2 + DAS_MS;
+                        moveHoldUntil = now2 + MOVE_HOLD_MS;
+                        setOnlyIcon('right');
+                        resolved = true;
                       }
                     }
                   }
                 }
-                prevCenter = center;
-              } else {
-                // Open hand not detected: reset action/counters gently
-                prevCenter = center;
-                leftCnt = Math.max(0, leftCnt-2);
-                rightCnt = Math.max(0, rightCnt-2);
-                upCnt = Math.max(0, upCnt-2);
-                downCnt = Math.max(0, downCnt-2);
-                // Stop continuous actions if hand not open
-                newAction = null;
+
+                // Disarm either when resolved, or window expired
+                if (resolved || performance.now() > decideUntil) {
+                  disarm();
+                }
               }
             }
-          } else {
-            // No hand: decay and stop
-            leftCnt = Math.max(0, leftCnt-2);
-            rightCnt = Math.max(0, rightCnt-2);
-            upCnt = Math.max(0, upCnt-2);
-            downCnt = Math.max(0, downCnt-2);
-            newAction = null;
-          }
-
-          // Apply exclusivity changes
-          if (newAction !== currentAction) {
-            currentAction = newAction;
-            actionSince = now;
-          }
-
-          // Render icons exclusively and apply behavior
-          if (currentAction === 'drop') {
-            setOnlyIcon('drop');
-            setSoftDrop(true);
-            // Stop movement while dropping
-            heldDir = 0; nextMoveAt = 0;
-          } else if (currentAction === 'moveLeft' || currentAction === 'moveRight') {
-            setOnlyIcon(currentAction === 'moveLeft' ? 'left' : 'right');
-            setSoftDrop(false);
-
-            const dir = currentAction === 'moveLeft' ? -1 : +1;
-            if (heldDir !== dir) {
-              tryMove(dir);
-              heldDir = dir;
-              nextMoveAt = now + DAS_MS;
-            } else if (now >= nextMoveAt) {
-              tryMove(heldDir);
-              nextMoveAt = now + ARR_MS;
-            }
-          } else {
-            // No action
-            setOnlyIcon(null);
-            setSoftDrop(false);
-            heldDir = 0; nextMoveAt = 0;
           }
 
         } catch (e) {
