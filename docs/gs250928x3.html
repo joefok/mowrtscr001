@@ -3,72 +3,373 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gesture Tetris — Head + Simple Hand Gestures</title>
+<title>Gesture Tetris — Head Move, Fist Rotate, Swipe Down Drop</title>
+
+<!-- Prevent favicon 404 -->
+data:,
 <style>
-  body { margin:0; background:#111; color:#fff; font-family:sans-serif; }
+  :root { --tile: 30px; }
+  *{box-sizing:border-box}
+  body { margin:0; background:#111; color:#fff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
   canvas { width:100vw; height:80vh; background:#000; display:block; }
-  video { position:fixed; bottom:10px; right:10px; width:120px; border:2px solid #0ff; transform:scaleX(-1); }
-  #diag { position:fixed; top:10px; left:10px; background:rgba(0,0,0,.6); padding:8px; border-radius:6px; font-size:14px; }
+  video { position:fixed; bottom:56px; right:10px; width:128px; height:96px; border:2px solid #0ff; transform:scaleX(-1); }
+  #diag { position:fixed; top:10px; left:10px; background:rgba(0,0,0,.6); padding:8px 12px; border-radius:8px; font-size:13px; max-width:92vw; white-space:pre-wrap; }
+  #controls { position:fixed; right:10px; bottom:10px; display:flex; gap:8px; }
+  button { background:#0b3d46; border:1px solid #0ff; color:#0ff; border-radius:6px; font-size:12px; padding:6px 10px; cursor:pointer; }
+  button:hover { background:#0e4f5a; }
 </style>
 </head>
-<body<canvas id="tetris"></canvas>
-<video id="camera" autoplay playsinline muted></video>
+<body>
+  <div id="diag">Booting…</div>
+  <canvas id="tetris"></canvas>
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="controls">
+    <button id="startBtn" type="button" style="display:none">Start Camera</button>
+    <button id="camToggle" type="button">📷 Hide</button>
+  </div>
 
-<script>
-const TILE=30,COLS=10,ROWS=20;
-const canvas=document.getElementById('tetris'),ctx=canvas.getContext('2d');
-canvas.width=COLS*TILE;canvas.height=ROWS*TILE;
-const diag=document.getElementById('diag');const video=document.getElementById('camera');
+  <!-- Robust loader -->
+  <script>
+    (function loader(){
+      const diag = document.getElementById('diag');
+      const log = (msg) => { diag.textContent = msg; console.log(msg.replace(/<[^>]+>/g,'')); };
+      function add(src){
+        return new Promise((resolve,reject)=>{
+          const s=document.createElement('script');
+          s.src=src; s.async=true; s.crossOrigin='anonymous'; s.referrerPolicy='no-referrer';
+          s.onload=()=>resolve(src); s.onerror=()=>reject(new Error('Failed: '+src));
+          document.head.appendChild(s);
+        });
+      }
+      const webglSupported = () => {
+        try { const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl')); }
+        catch { return false; }
+      };
 
-let board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-const COLORS=['#000','#0ff','#00f','#f80','#ff0','#0f0','#a0f','#f00'];
-const shapes={1:[[1,1,1,1]],2:[[2,0,0],[2,2,2]],3:[[0,0,3],[3,3,3]],4:[[4,4],[4,4]],5:[[0,5,5],[5,5,0]],6:[[0,6,0],[6,6,6]],7:[[7,7,0],[0,7,7]]};
-let bag=[],active=null,score=0;
-function refillBag(){bag=[1,2,3,4,5,6,7];for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}}
-function nextId(){if(!bag.length)refillBag();return bag.pop();}
-function spawn(){const id=nextId(),mat=shapes[id].map(r=>r.slice());active={id,matrix:mat,x:3,y:-2};if(collides(mat,active.x,active.y))reset();}
-function collides(mat,ox,oy){for(let y=0;y<mat.length;y++)for(let x=0;x<mat[y].length;x++){if(mat[y][x]){const bx=ox+x,by=oy+y;if(bx<0||bx>=COLS||by>=ROWS||by>=0&&board[by][bx])return true;}}return false;}
-function merge(){for(let y=0;y<active.matrix.length;y++)for(let x=0;x<active.matrix[y].length;x++){if(active.matrix[y][x]&&active.y+y>=0)board[active.y+y][active.x+x]=active.matrix[y][x];}}
-function clearLines(){for(let y=ROWS-1;y>=0;){if(board[y].every(v=>v)){board.splice(y,1);board.unshift(Array(COLS).fill(0));score+=100;}else y--;}}
-function reset(){board=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;spawn();}
-function rotate(){const m=active.matrix,h=m.length,w=m[0].length;const r=Array.from({length:w},()=>Array(h).fill(0));for(let y=0;y<h;y++)for(let x=0;x<w;x++)r[x][h-1-y]=m[y][x];if(!collides(r,active.x,active.y))active.matrix=r;}
-function draw(){ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){if(board[y][x]){ctx.fillStyle=COLORS[board[y][x]];ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}}if(active){for(let y=0;y<active.matrix.length;y++)for(let x=0;x<active.matrix[y].length;x++){if(active.matrix[y][x]){ctx.fillStyle=COLORS[active.matrix[y][x]];ctx.fillRect((active.x+x)*TILE,(active.y+y)*TILE,TILE,TILE);}}}}
-function drop(){while(!collides(active.matrix,active.x,active.y+1))active.y++;lock();}
-function lock(){merge();clearLines();spawn();}
-function step(){active.y++;if(collides(active.matrix,active.x,active.y)){active.y--;lock();}draw();setTimeout(step,500);}
-spawn();draw();setTimeout(step,500);
+      async function boot(){
+        try {
+          log('Loading TensorFlow.js…');
+          await add('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js');
 
-// ===== Gesture Detection =====
-let lastRotate=0,lastDrop=0;
-let prevHeadX=null;
-let prevHandY=null;
-let swipeActive=false;
+          // CPU backend to avoid WebGL issues, or prefer webgl if available
+          try {
+            if (webglSupported()) { await tf.setBackend('webgl'); } else { await tf.setBackend('cpu'); }
+          } catch { await tf.setBackend('cpu'); }
+          await tf.ready();
 
-async function initDetector(){
-  await tf.setBackend('cpu');await tf.ready();
-  const handModel=handPoseDetection.SupportedModels.MediaPipeHands;
-  const handDetector=await handPoseDetection.createDetector(handModel,{runtime:'mediapipe',modelType:'lite',solutionPath:'https://cdn.jsdelivr.net/npm/@mediapipe/hands'});
-  const faceModel=poseDetection.SupportedModels.BlazePose;
-  const faceDetector=await poseDetection.createDetector(faceModel,{runtime:'mediapipe',modelType:'lite',solutionPath:'https://cdn.jsdelivr.net/npm/@mediapipe/pose'});
-  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
-  video.srcObject=stream;await video.play();
+          log('Loading detectors…');
+          // Pose (for head nose keypoint) + Hands
+          await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js');
+          await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js');
+          // MediaPipe runtimes
+          await add('https://cdn.jsdelivr.net/npm/@mediapipe/pose');
+          await add('https://cdn.jsdelivr.net/npm/@mediapipe/hands');
 
-  async function detect(){
-    const poses=await faceDetector.estimatePoses(video,{flipHorizontal:true});
-    if(poses.length){const nose=poses[0].keypoints.find(k=>k.name==='nose');if(nose){if(prevHeadX!==null){const dx=nose.x-prevHeadX;if(Math.abs(dx)>15){if(dx>0&&active.x<COLS-1&&!collides(active.matrix,active.x+1,active.y)){active.x++;}else if(dx<0&&active.x>0&&!collides(active.matrix,active.x-1,active.y)){active.x--;}}}prevHeadX=nose.x;}}
-    const hands=await handDetector.estimateHands(video,{flipHorizontal:true});
-    if(hands.length){const hand=hands[0];const wrist=hand.keypoints.find(k=>k.name==='wrist');const indexTip=hand.keypoints.find(k=>k.name==='index_finger_tip');const thumbTip=hand.keypoints.find(k=>k.name==='thumb_tip');if(wrist&&indexTip&&thumbTip){const fistDist=Math.hypot(indexTip.x-thumbTip.x,indexTip.y-thumbTip.y);if(fistDist<40&&performance.now()-lastRotate>600){rotate();lastRotate=performance.now();}if(prevHandY!==null){const dy=indexTip.y-prevHandY;if(dy>40&&!swipeActive&&performance.now()-lastDrop>800){drop();lastDrop=performance.now();swipeActive=true;}}prevHandY=indexTip.y;}}else{swipeActive=false;}
-    draw();
-    requestAnimationFrame(detect);
-  }
-  detect();
-}
-initDetector();
-</script>
-https://cdn.jsdelivr.net/npm/@tensorflow/tfjs</script>
-https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection</script>
-<script/cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection</script>
-https://cdn.jsdelivr.net/npm/@mediapipe/hands</script>
-https://cdn.jsdelivr.net/npm/@mediapipe/pose</script>
+          if (!window.poseDetection || !window.handPoseDetection) {
+            throw new Error('Detectors failed to load.');
+          }
+
+          log('Libraries ready. Initializing app…');
+          setTimeout(()=>{ if (typeof startApp === 'function') startApp(); }, 0);
+        } catch(e) {
+          log('Loader error:\n' + (e?.message || e));
+          console.error(e);
+        }
+      }
+      boot();
+    })();
+  </script>
+
+  <script>
+    async function startApp(){
+      const diag = document.getElementById('diag');
+      const video = document.getElementById('camera');
+      const camToggle = document.getElementById('camToggle');
+      const startBtn = document.getElementById('startBtn');
+
+      // ---- Tetris core (stacking) ----
+      const canvas = document.getElementById('tetris');
+      const ctx = canvas.getContext('2d');
+      const TILE=30,COLS=10,ROWS=20;
+      canvas.width=COLS*TILE; canvas.height=ROWS*TILE;
+      const COLORS=['#000','#00f0f0','#0000f0','#f0a000','#f0f000','#00f000','#a000f0','#f00000'];
+      const SHAPES = {
+        1:[[1,1,1,1]],
+        2:[[2,0,0],[2,2,2]],
+        3:[[0,0,3],[3,3,3]],
+        4:[[4,4],[4,4]],
+        5:[[0,5,5],[5,5,0]],
+        6:[[0,6,0],[6,6,6]],
+        7:[[7,7,0],[0,7,7]],
+      };
+      let board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+      let bag=[]; function refillBag(){ bag=[1,2,3,4,5,6,7]; for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; } }
+      function nextId(){ if(!bag.length) refillBag(); return bag.pop(); }
+      let active=null;
+      function spawn(){
+        const id=nextId(); const m=SHAPES[id].map(r=>r.slice());
+        active={id, matrix:m, x: Math.floor(COLS/2 - m[0].length/2), y:-2};
+        if (collides(m, active.x, active.y)) gameOverRestart();
+      }
+      function collides(mat,ox,oy){
+        for(let y=0;y<mat.length;y++)
+          for(let x=0;x<mat[y].length;x++)
+            if(mat[y][x]){
+              const bx=ox+x, by=oy+y;
+              if (bx<0||bx>=COLS||by>=ROWS) return true;
+              if (by>=0 && board[by][bx]) return true;
+            }
+        return false;
+      }
+      function merge(){
+        for(let y=0;y<active.matrix.length;y++)
+          for(let x=0;x<active.matrix[y].length;x++)
+            if(active.matrix[y][x] && active.y+y>=0) board[active.y+y][active.x+x] = active.matrix[y][x];
+      }
+      function clearLines(){
+        for (let y=ROWS-1;y>=0;){
+          if (board[y].every(v=>v)) { board.splice(y,1); board.unshift(Array(COLS).fill(0)); }
+          else y--;
+        }
+      }
+      function rotateCW(m){ const h=m.length,w=m[0].length; const r=Array.from({length:w},()=>Array(h).fill(0)); for(let y=0;y<h;y++) for(let x=0;x<w;x++) r[x][h-1-y]=m[y][x]; return r; }
+      function tryRotate(){
+        const r=rotateCW(active.matrix);
+        const kicks=[0,-1,1,-2,2];
+        for (const k of kicks){ if (!collides(r, active.x+k, active.y)){ active.matrix=r; active.x+=k; draw(); return true;} }
+        return false;
+      }
+      function tryMove(dir){ if (!collides(active.matrix, active.x+dir, active.y)){ active.x+=dir; draw(); } }
+      function hardDrop(){ while(!collides(active.matrix, active.x, active.y+1)) active.y++; lock(); }
+      function lock(){
+        const topOut = active.y < 0;
+        merge();
+        if (topOut){ draw(); gameOverRestart(); return; }
+        clearLines();
+        spawn(); draw();
+      }
+      function draw(){
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        // board
+        for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+          const v=board[y][x]; if (!v) continue;
+          ctx.fillStyle=COLORS[v]; ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+          ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.strokeRect(x*TILE+.5,y*TILE+.5,TILE-1,TILE-1);
+        }
+        // active
+        if (active) for (let y=0;y<active.matrix.length;y++) for (let x=0;x<active.matrix[y].length;x++){
+          const v=active.matrix[y][x]; if (!v) continue;
+          const by=active.y+y, bx=active.x+x; if (by<0) continue;
+          ctx.fillStyle=COLORS[v]; ctx.fillRect(bx*TILE,by*TILE,TILE,TILE);
+          ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.strokeRect(bx*TILE+.5,by*TILE+.5,TILE-1,TILE-1);
+        }
+        // grid
+        ctx.strokeStyle='rgba(255,255,255,.08)';
+        for (let gx=1;gx<COLS;gx++){ ctx.beginPath(); ctx.moveTo(gx*TILE,0); ctx.lineTo(gx*TILE,canvas.height); ctx.stroke(); }
+        for (let gy=1;gy<ROWS;gy++){ ctx.beginPath(); ctx.moveTo(0,gy*TILE); ctx.lineTo(canvas.width,gy*TILE); ctx.stroke(); }
+      }
+      function gameOverRestart(delay=800){
+        // reset board and piece after a short pause
+        setTimeout(()=>{
+          board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+          spawn(); draw();
+        }, delay);
+      }
+      // gravity
+      let lastFall = performance.now();
+      const FALL_MS = 900; // slow base
+      function step(now){
+        if (now - lastFall >= FALL_MS){
+          lastFall = now;
+          if (!collides(active.matrix, active.x, active.y+1)) active.y++;
+          else lock();
+          draw();
+        }
+        requestAnimationFrame(step);
+      }
+
+      // ---- Camera boot with fallback ----
+      async function startCamera(){
+        try {
+          diag.textContent = 'Requesting camera…';
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode:'user', width:{ideal:960}, height:{ideal:720} },
+            audio: false
+          });
+          video.srcObject = stream;
+          await new Promise(res=>{
+            if (video.readyState >= 2) res();
+            else video.onloadedmetadata = res;
+          });
+          try { await video.play(); } catch {}
+          diag.textContent = 'Camera ready. Starting detectors…';
+          return true;
+        } catch(e) {
+          diag.textContent = 'Camera error:\n' + (e?.name || '') + ' ' + (e?.message || e);
+          console.error(e);
+          // Show Start button to try again after a user gesture
+          startBtn.style.display = 'inline-block';
+          return false;
+        }
+      }
+      function setCamVisible(show){
+        video.style.display = show ? 'block' : 'none';
+        camToggle.textContent = show ? '📷 Hide' : '📷 Show';
+      }
+      let camVisible = true;
+      setCamVisible(camVisible);
+      camToggle.addEventListener('click', ()=>{ camVisible = !camVisible; setCamVisible(camVisible); });
+
+      // Auto-hide after 5s
+      setTimeout(()=>{ camVisible=false; setCamVisible(camVisible); }, 5000);
+
+      // ---- Detectors (head + hands) ----
+      let poseDetector=null, handDetector=null;
+      async function createDetectors(){
+        // BlazePose (for head)
+        poseDetector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
+          runtime: 'mediapipe', modelType:'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose'
+        });
+        // Hands
+        handDetector = await handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
+          runtime: 'mediapipe', modelType:'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
+        });
+      }
+
+      // Gesture state
+      let lastRotate = 0;
+      const ROTATE_COOLDOWN_MS = 350;
+
+      // head move smoothing + DAS/ARR feel
+      let noseHistory = []; // recent X
+      const NOSE_FRAMES = 5;
+      const MOVE_THRESH_PX = 18; // head dx per frame (smoothed) to trigger
+      let heldDir = 0, nextMoveAt = 0;
+      const DAS_MS = 220, ARR_MS = 70;
+
+      // swipe down detection window
+      const SWIPE_WINDOW_MS = 180;
+      const SWIPE_THRESH_PX = 80;
+      let yHistory = []; // {t,y}
+
+      function smooth(values){ if(!values.length) return 0; return values.reduce((a,b)=>a+b,0)/values.length; }
+
+      async function detect(){
+        try {
+          // Head → left/right
+          if (poseDetector){
+            const poses = await poseDetector.estimatePoses(video,{flipHorizontal:true});
+            if (poses.length){
+              const nose = poses[0].keypoints.find(k=>k.name==='nose');
+              if (nose && nose.x != null){
+                noseHistory.push(nose.x);
+                if (noseHistory.length > NOSE_FRAMES) noseHistory.shift();
+                if (noseHistory.length >= 2){
+                  const avg = smooth(noseHistory.slice(0,-1));
+                  const dx = noseHistory[noseHistory.length-1] - avg; // drift vs recent avg
+                  const now = performance.now();
+                  let dir = 0;
+                  if (dx >  MOVE_THRESH_PX) dir = +1;
+                  if (dx < -MOVE_THRESH_PX) dir = -1;
+
+                  if (dir === 0){
+                    heldDir = 0; nextMoveAt = 0;
+                  } else if (dir !== heldDir){
+                    tryMove(dir);
+                    heldDir = dir; nextMoveAt = now + DAS_MS;
+                  } else if (now >= nextMoveAt){
+                    tryMove(heldDir); nextMoveAt = now + ARR_MS;
+                  }
+                }
+              }
+            }
+          }
+
+          // Hands → fist = rotate; swipe down = drop
+          if (handDetector){
+            const hands = await handDetector.estimateHands(video,{flipHorizontal:true});
+            if (hands.length){
+              // Use the first visible hand
+              const kps = hands[0].keypoints || [];
+              const by = Object.fromEntries(kps.map(k=>[k.name,k]));
+              const wrist = by['wrist'];
+              const idxTip = by['index_finger_tip'];
+              const midTip = by['middle_finger_tip'];
+              const rngTip = by['ring_finger_tip'];
+              const pnkTip = by['pinky_finger_tip'];
+              const thTip  = by['thumb_tip'];
+
+              // Fist: short distances between tips (thumb-index + middle-ring-pinky cluster)
+              if (idxTip && thTip && midTip && rngTip && pnkTip){
+                const thumbIndex = Math.hypot(thTip.x-idxTip.x, thTip.y-idxTip.y);
+                const cluster = (Math.hypot(midTip.x-rngTip.x, midTip.y-rngTip.y) + Math.hypot(rngTip.x-pnkTip.x, rngTip.y-pnkTip.y))/2;
+                const fistLikely = thumbIndex < 40 && cluster < 35; // tune if needed
+                const now = performance.now();
+                if (fistLikely && (now - lastRotate > ROTATE_COOLDOWN_MS)){
+                  tryRotate();
+                  lastRotate = now;
+                }
+
+                // Swipe down: track indexTip Y over a short window
+                const t = performance.now();
+                yHistory.push({t, y: idxTip.y});
+                // keep recent
+                while (yHistory.length && (t - yHistory[0].t) > SWIPE_WINDOW_MS) yHistory.shift();
+                const minY = yHistory.reduce((m,p)=>Math.min(m,p.y), Infinity);
+                if (idxTip.y - minY > SWIPE_THRESH_PX){
+                  hardDrop();
+                  yHistory.length = 0; // reset window after drop
+                }
+              }
+            } else {
+              // no hands: reset swipe window slowly
+              const now = performance.now();
+              yHistory = yHistory.filter(p => now - p.t <= SWIPE_WINDOW_MS);
+            }
+          }
+        } catch(e){
+          diag.textContent = 'Detection error:\n' + (e?.message || e);
+          console.error(e);
+        }
+        requestAnimationFrame(detect);
+      }
+
+      // Boot the app
+      function ready(){
+        refillBag(); spawn(); draw();
+        requestAnimationFrame(step);
+        detect();
+        diag.textContent = 'Ready. (If the camera is hidden, click 📷 Show)';
+      }
+
+      // Start pipeline (camera + detectors)
+      async function startPipeline(){
+        const ok = await startCamera();
+        if (!ok) return;
+        try {
+          await createDetectors();
+          ready();
+        } catch(e){
+          diag.textContent = 'Detector init error:\n' + (e?.message || e);
+          console.error(e);
+        }
+      }
+
+      // Try to auto-start; if blocked, show Start
+      if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
+        diag.textContent = 'getUserMedia not supported. Use HTTPS and a modern browser.';
+        startBtn.style.display = 'inline-block';
+      } else {
+        // auto-start (may be blocked by browser – then show Start)
+        startPipeline().then(ok => {
+          // if startCamera failed, startBtn is shown already
+          if (video.readyState < 2) startBtn.style.display='inline-block';
+        });
+      }
+      startBtn.addEventListener('click', ()=>{ startBtn.style.display='none'; startPipeline(); });
+    }
+  </script>
+
+  <!-- Libraries loaded by the loader (don’t duplicate here) -->
 </body>
 </html>
