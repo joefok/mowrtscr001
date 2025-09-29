@@ -1,325 +1,460 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Victory ✌️ Rotate • Drop‑in</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root {
-      /* Tweak these if you like */
-      --min-scale: 0.25;
-      --max-scale: 6;
-      --rotate-smooth: 0.28; /* 0=no smoothing, 1=instant; 0.2–0.35 is nice */
-      --scale-smooth: 0.25;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Gesture Tetris — Hands Only: Open→Fist Rotate, Long Down Drop, Horizontal Move</title>
 
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: #0b0f16;
-      color: #e8f0ff;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      overflow: hidden;
-    }
-
-    /* Stage: captures gestures */
-    #stage {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      /* critical: allow Pointer Events gestures and prevent browser panning/zooming */
-      touch-action: none;              /* modern browsers (incl. iOS 13+) */
-      -ms-touch-action: none;          /* old Edge/IE */
-      user-select: none;
-    }
-
-    /* The thing we rotate/zoom/pan */
-    #rotatable {
-      width: min(75vmin, 780px);
-      aspect-ratio: 1 / 1;
-      border-radius: 24px;
-      box-shadow: 0 20px 50px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.06);
-      /* Placeholder visual: replace this block with your own content */
-      background:
-        radial-gradient(120% 120% at 100% 0%, #2ee6a8 0 30%, transparent 31%),
-        radial-gradient(120% 120% at 0% 100%, #6ca8ff 0 35%, transparent 36%),
-        linear-gradient(135deg, #182335, #0f1624 60%, #0b0f16);
-      display: grid;
-      place-items: center;
-      color: #dff3ff;
-      letter-spacing: 0.02em;
-      font-weight: 600;
-      text-align: center;
-
-      /* We transform this element via JS */
-      transform: translate3d(0px, 0px, 0px) rotate(0deg) scale(1);
-      transform-origin: center center;
-      will-change: transform;
-      /* Improve hit-testing during pan */
-      cursor: grab;
-    }
-    #rotatable:active { cursor: grabbing; }
-
-    /* Subtle helper ring so rotation is visible */
-    #rotatable::before {
-      content: "";
-      position: absolute;
-      inset: 10px;
-      border-radius: inherit;
-      border: 2px dashed rgba(255,255,255,.15);
-      pointer-events: none;
-    }
-
-    /* On-screen help */
-    #hud {
-      position: fixed;
-      left: 12px; bottom: 12px; right: 12px;
-      display: grid;
-      gap: 8px;
-      font-size: 13px;
-      opacity: .85;
-      pointer-events: none;
-    }
-    .pill {
-      justify-self: start;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.12);
-      color: #e6eeff;
-      padding: 8px 10px;
-      border-radius: 10px;
-      backdrop-filter: blur(6px);
-    }
-    #readout {
-      justify-self: end;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* Reset button (optional) */
-    #resetBtn {
-      position: fixed;
-      top: 12px; right: 12px;
-      padding: 8px 12px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,.15);
-      background: rgba(255,255,255,.07);
-      color: #fff;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    #resetBtn:active { transform: translateY(1px); }
-  </style>
+<style>
+  :root { --tile: 30px; }
+  *{box-sizing:border-box}
+  body { margin:0; background:#111; color:#fff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  canvas { width:100vw; height:80vh; background:#000; display:block; }
+  video { position:fixed; bottom:56px; right:10px; width:128px; height:96px; border:2px solid #0ff; transform:scaleX(-1); }
+  #diag { position:fixed; top:10px; left:10px; background:rgba(0,0,0,.65); padding:8px 12px; border-radius:8px; font-size:13px; max-width:92vw; white-space:pre-wrap; }
+  #controls { position:fixed; right:10px; bottom:10px; display:flex; gap:8px; }
+  button { background:#0b3d46; border:1px solid #0ff; color:#0ff; border-radius:6px; font-size:12px; padding:6px 10px; cursor:pointer; }
+  button:hover { background:#0e4f5a; }
+</style>
 </head>
 <body>
-  <div id="stage" aria-label="Gesture stage">
-    <div id="rotatable" aria-label="Rotatable content">
-      <!-- Replace this with your own element (image, canvas, model-viewer, etc.) -->
-      <div style="text-shadow: 0 2px 10px rgba(0,0,0,.35)">
-        <div style="font-size: clamp(22px,3.5vmin,28px); opacity:.9">Use ✌️ to Rotate</div>
-        <div style="font-size: clamp(14px,2.3vmin,16px); opacity:.8; margin-top: 6px">
-          Pinch to zoom • Drag to pan • Double‑tap/D to reset
-        </div>
-      </div>
-    </div>
+  <div id="diag">Booting…</div>
+  <canvas id="tetris"></canvas>
+  <video id="camera" autoplay playsinline muted></video>
+
+  <div id="controls">
+    <button id="startBtn" type="button" style="display:none">Start Camera</button>
+    <button id="camToggle" type="button">📷 Hide</button>
   </div>
 
-  <button id="resetBtn" type="button" title="Reset (D)">Reset</button>
+  <!-- Loader: TFJS + Hand Pose Detection only (no pose/MoveNet) -->
+  <script>
+    (function loader(){
+      const diag = document.getElementById('diag');
+      const log = (msg) => { diag.textContent = msg; console.log(msg.replace(/<[^>]+>/g,'')); };
+      function add(src){
+        return new Promise((resolve,reject)=>{
+          const s=document.createElement('script');
+          s.src=src; s.async=true; s.crossOrigin='anonymous'; s.referrerPolicy='no-referrer';
+          s.onload=()=>resolve(src); s.onerror=()=>reject(new Error('Failed: '+src));
+          document.head.appendChild(s);
+        });
+      }
+      const webglSupported = () => {
+        try { const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl')); }
+        catch { return false; }
+      };
+      async function boot(){
+        try {
+          log('Loading TensorFlow.js…');
+          await add('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js');
+          try {
+            if (webglSupported()) { await tf.setBackend('webgl'); } else { await tf.setBackend('cpu'); }
+          } catch { await tf.setBackend('cpu'); }
+          await tf.ready();
 
-  <div id="hud">
-    <div class="pill">Gestures: ✌️ rotate • 🤏 zoom • ☝️ pan</div>
-    <div id="readout" class="pill">x: 0, y: 0, θ: 0°, s: 1.00</div>
-  </div>
+          log('Loading Hand Pose Detection…');
+          await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js');
+          await add('https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest');
+
+          if (!window.handPoseDetection) throw new Error('Hand-Pose failed to load');
+
+          log('Libraries ready. Initializing app…');
+          setTimeout(()=>{ if (typeof startApp === 'function') startApp(); }, 0);
+        } catch(e) {
+          log('Loader error:\n' + (e?.message || e));
+          console.error(e);
+        }
+      }
+      boot();
+    })();
+  </script>
 
   <script>
-    (function () {
-      const stage = document.getElementById('stage');
-      const target = document.getElementById('rotatable');
-      const readout = document.getElementById('readout');
-      const resetBtn = document.getElementById('resetBtn');
+    async function startApp(){
+      const diag = document.getElementById('diag');
+      const video = document.getElementById('camera');
+      const camToggle = document.getElementById('camToggle');
+      const startBtn = document.getElementById('startBtn');
 
-      // ----- Transform state -----
-      const base = { x: 0, y: 0, rot: 0, scale: 1 };
-      const cur  = { ...base };     // smoothed live values
-      const tmp  = { x: 0, y: 0, rot: 0, scale: 1 }; // instant (unsmoothed) during gesture
+      // ====== TETRIS CORE (stacking) ======
+      const canvas = document.getElementById('tetris');
+      const ctx = canvas.getContext('2d');
+      const TILE=30,COLS=10,ROWS=20;
+      canvas.width=COLS*TILE; canvas.height=ROWS*TILE;
 
-      // Active pointers map
-      const pts = new Map(); // pointerId -> {x,y}
-
-      // Two-finger gesture snapshot
-      const g = {
-        startAngle: 0,
-        startDist: 0,
-        startCentroid: { x: 0, y: 0 },
-        startBase: { x: 0, y: 0, rot: 0, scale: 1 },
-        twoFinger: false
+      const COLORS=['#000','#00f0f0','#0000f0','#f0a000','#f0f000','#00f000','#a000f0','#f00000'];
+      const SHAPES = {
+        1:[[1,1,1,1]],
+        2:[[2,0,0],[2,2,2]],
+        3:[[0,0,3],[3,3,3]],
+        4:[[4,4],[4,4]],
+        5:[[0,5,5],[5,5,0]],
+        6:[[0,6,0],[6,6,6]],
+        7:[[7,7,0],[0,7,7]],
       };
 
-      // Utility
-      const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
-      const lerp  = (a, b, t) => a + (b - a) * t;
+      let board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+      let bag=[]; function refillBag(){ bag=[1,2,3,4,5,6,7]; for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; } }
+      function nextId(){ if(!bag.length) refillBag(); return bag.pop(); }
 
-      function angleDeg(p1, p2) {
-        return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+      let active=null;
+      function spawn(){
+        const id=nextId(); const m=SHAPES[id].map(r=>r.slice());
+        active={id, matrix:m, x: Math.floor(COLS/2 - m[0].length/2), y:-2};
+        if (collides(m, active.x, active.y)) gameOverRestart();
       }
-      function distance(p1, p2) {
-        const dx = p2.x - p1.x, dy = p2.y - p1.y;
-        return Math.hypot(dx, dy);
+      function collides(mat,ox,oy){
+        for(let y=0;y<mat.length;y++)
+          for(let x=0;x<mat[y].length;x++)
+            if(mat[y][x]){
+              const bx=ox+x, by=oy+y;
+              if (bx<0||bx>=COLS||by>=ROWS) return true;
+              if (by>=0 && board[by][bx]) return true;
+            }
+        return false;
       }
-      function centroid(p1, p2) {
-        return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      function merge(){
+        for(let y=0;y<active.matrix.length;y++)
+          for(let x=0;x<active.matrix[y].length;x++)
+            if(active.matrix[y][x] && active.y+y>=0) board[active.y+y][active.x+x] = active.matrix[y][x];
       }
-
-      // Apply CSS transform with smoothing
-      function applyTransform() {
-        const rs = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--rotate-smooth')) || 0.28;
-        const ss = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale-smooth'))  || 0.25;
-
-        // Smooth towards tmp/target values
-        cur.x     = lerp(cur.x,     tmp.x,     0.5);
-        cur.y     = lerp(cur.y,     tmp.y,     0.5);
-        cur.rot   = lerp(cur.rot,   tmp.rot,   rs);
-        cur.scale = lerp(cur.scale, tmp.scale, ss);
-
-        target.style.transform =
-          `translate3d(${cur.x}px, ${cur.y}px, 0) rotate(${cur.rot}deg) scale(${cur.scale})`;
-
-        readout.textContent =
-          `x: ${cur.x.toFixed(0)}, y: ${cur.y.toFixed(0)}, θ: ${cur.rot.toFixed(1)}°, s: ${cur.scale.toFixed(2)}`;
-
-        requestAnimationFrame(applyTransform);
-      }
-      requestAnimationFrame(applyTransform);
-
-      // Convert event to stage-local coords
-      function localXY(e) {
-        const r = stage.getBoundingClientRect();
-        return { x: e.clientX - r.left, y: e.clientY - r.top };
-      }
-
-      function onPointerDown(e) {
-        // ensure the stage keeps receiving move/ups
-        target.setPointerCapture?.(e.pointerId);
-        pts.set(e.pointerId, localXY(e));
-        if (pts.size === 2) {
-          // Start two-finger "victory" gesture
-          const [p1, p2] = Array.from(pts.values());
-          g.twoFinger = true;
-          g.startAngle = angleDeg(p1, p2);
-          g.startDist  = distance(p1, p2);
-          g.startCentroid = centroid(p1, p2);
-          g.startBase = { ...base }; // remember pre-gesture state
-        }
-        e.preventDefault();
-      }
-
-      function onPointerMove(e) {
-        if (!pts.has(e.pointerId)) return;
-        pts.set(e.pointerId, localXY(e));
-
-        if (pts.size === 2) {
-          // ✌️ rotate + pinch zoom around center (smoothed)
-          const [p1, p2] = Array.from(pts.values());
-          const ang = angleDeg(p1, p2);
-          const dist = distance(p1, p2);
-          const dAng = ang - g.startAngle;
-
-          // Normalize angle to avoid jumps across +/-180°
-          const rot = g.startBase.rot + ((dAng + 540) % 360 - 180);
-
-          const minS = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--min-scale')) || 0.25;
-          const maxS = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-scale')) || 6;
-          const scl = clamp(g.startBase.scale * (dist / Math.max(1, g.startDist)), minS, maxS);
-
-          // Keep pan — optional: keep centroid under fingers (advanced: compute delta and adjust base.x/y)
-          tmp.rot = rot;
-          tmp.scale = scl;
-          // Pan stays from base for two-finger unless you want to translate with centroid drift.
-          tmp.x = base.x;
-          tmp.y = base.y;
-        }
-        else if (pts.size === 1) {
-          // ☝️ pan
-          const p = pts.get(e.pointerId);
-          // store previous point on the pointer itself for delta
-          const prev = e._prev || p; // fallback first move
-          const dx = e.movementX ?? (p.x - prev.x);
-          const dy = e.movementY ?? (p.y - prev.y);
-
-          tmp.x = base.x + dx;
-          tmp.y = base.y + dy;
-
-          // remember for next move
-          e._prev = { x: p.x, y: p.y };
-        }
-        e.preventDefault();
-      }
-
-      function endPointer(e) {
-        pts.delete(e.pointerId);
-
-        if (g.twoFinger && pts.size < 2) {
-          // Gesture finished -> commit tmp to base
-          g.twoFinger = false;
-          base.rot = cur.rot = tmp.rot;
-          base.scale = cur.scale = tmp.scale;
-          base.x = cur.x = tmp.x;
-          base.y = cur.y = tmp.y;
-        }
-        else if (!g.twoFinger && pts.size === 0) {
-          // End of pan
-          base.x = cur.x = tmp.x;
-          base.y = cur.y = tmp.y;
-        }
-        e.preventDefault();
-      }
-
-      // Wheel: zoom (and Alt/Option + wheel to rotate)
-      function onWheel(e) {
-        e.preventDefault();
-        const factor = Math.exp(-e.deltaY / 300); // smooth zoom
-        if (e.altKey) {
-          // rotate with wheel when Alt pressed
-          tmp.rot = base.rot = (base.rot + (e.deltaY > 0 ?  -3 : 3));
-        } else {
-          const minS = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--min-scale')) || 0.25;
-          const maxS = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--max-scale')) || 6;
-          base.scale = clamp(base.scale * factor, minS, maxS);
-          tmp.scale = base.scale;
+      function clearLines(){
+        for (let y=ROWS-1;y>=0;){
+          if (board[y].every(v=>v)) { board.splice(y,1); board.unshift(Array(COLS).fill(0)); }
+          else y--;
         }
       }
-
-      // Double‑tap / D to reset
-      let lastTap = 0;
-      function reset() {
-        base.x = tmp.x = 0;
-        base.y = tmp.y = 0;
-        base.rot = tmp.rot = 0;
-        base.scale = tmp.scale = 1;
+      function rotateCW(m){ const h=m.length,w=m[0].length; const r=Array.from({length:w},()=>Array(h).fill(0)); for(let y=0;y<h;y++) for(let x=0;x<w;x++) r[x][h-1-y]=m[y][x]; return r; }
+      function tryRotate(){
+        const r=rotateCW(active.matrix);
+        const kicks=[0,-1,1,-2,2];
+        for (const k of kicks){ if (!collides(r, active.x+k, active.y)){ active.matrix=r; active.x+=k; draw(); return true;} }
+        return false;
+      }
+      function tryMove(dir){ if (!collides(active.matrix, active.x+dir, active.y)){ active.x+=dir; draw(); } }
+      function hardDrop(){ while(!collides(active.matrix, active.x, active.y+1)) active.y++; lock(); }
+      function lock(){
+        const topOut = active.y < 0;
+        merge();
+        if (topOut){ draw(); gameOverRestart(); return; }
+        clearLines();
+        spawn(); draw();
+      }
+      function draw(){
+        ctx.fillStyle='#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        // board
+        for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++){
+          const v=board[y][x]; if (!v) continue;
+          ctx.fillStyle=COLORS[v]; ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+          ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.strokeRect(x*TILE+.5,y*TILE+.5,TILE-1,TILE-1);
+        }
+        // active
+        if (active) for (let y=0;y<active.matrix.length;y++) for (let x=0;x<active.matrix[y].length;x++){
+          const v=active.matrix[y][x]; if (!v) continue;
+          const by=active.y+y, bx=active.x+x; if (by<0) continue;
+          ctx.fillStyle=COLORS[v]; ctx.fillRect(bx*TILE,by*TILE,TILE,TILE);
+          ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.strokeRect(bx*TILE+.5,by*TILE+.5,TILE-1,TILE-1);
+        }
+        // grid
+        ctx.strokeStyle='rgba(255,255,255,.08)';
+        for (let gx=1;gx<COLS;gx++){ ctx.beginPath(); ctx.moveTo(gx*TILE,0); ctx.lineTo(gx*TILE,canvas.height); ctx.stroke(); }
+        for (let gy=1;gy<ROWS;gy++){ ctx.beginPath(); ctx.moveTo(0,gy*TILE); ctx.lineTo(canvas.width,gy*TILE); ctx.stroke(); }
+      }
+      function gameOverRestart(delay=800){
+        setTimeout(()=>{
+          board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+          spawn(); draw();
+        }, delay);
+      }
+      // gravity
+      let lastFall = performance.now();
+      const FALL_MS = 900;
+      function step(now){
+        if (now - lastFall >= FALL_MS){
+          lastFall = now;
+          if (!collides(active.matrix, active.x, active.y+1)) active.y++;
+          else lock();
+          draw();
+        }
+        requestAnimationFrame(step);
       }
 
-      target.addEventListener('pointerdown', onPointerDown, { passive: false });
-      stage .addEventListener('pointermove', onPointerMove, { passive: false });
-      stage .addEventListener('pointerup',   endPointer,     { passive: false });
-      stage .addEventListener('pointercancel', endPointer,   { passive: false });
-      stage .addEventListener('pointerleave',  endPointer,   { passive: false });
-      stage .addEventListener('wheel', onWheel, { passive: false });
+      // ===== Camera boot (with Start fallback) =====
+      async function startCamera(){
+        try {
+          diag.textContent = 'Requesting camera…';
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode:'user', width:{ideal:960}, height:{ideal:720} },
+            audio: false
+          });
+          video.srcObject = stream;
+          await new Promise(res=>{
+            if (video.readyState >= 2) res();
+            else video.onloadedmetadata = res;
+          });
+          try { await video.play(); } catch {}
+          diag.textContent = 'Camera ready. Starting hand detector…';
+          return true;
+        } catch(e) {
+          diag.textContent = 'Camera error:\n' + (e?.name || '') + ' ' + (e?.message || e);
+          console.error(e);
+          startBtn.style.display = 'inline-block';
+          return false;
+        }
+      }
+      function setCamVisible(show){
+        video.style.display = show ? 'block' : 'none';
+        camToggle.textContent = show ? '📷 Hide' : '📷 Show';
+      }
+      let camVisible = true; setCamVisible(camVisible);
+      camToggle.addEventListener('click', ()=>{ camVisible = !camVisible; setCamVisible(camVisible); });
+      setTimeout(()=>{ camVisible=false; setCamVisible(camVisible); }, 5000);
 
-      stage.addEventListener('touchend', function(e) {
-        const now = performance.now();
-        if (now - lastTap < 300 && e.changedTouches.length === 1) reset();
-        lastTap = now;
-      }, { passive: false });
+      // ===== Hands detector (MediaPipe runtime) =====
+      let handDetector=null;
+      async function createHandDetector(){
+        handDetector = await handPoseDetection.createDetector(
+          handPoseDetection.SupportedModels.MediaPipeHands,
+          { runtime:'mediapipe', modelType:'lite', solutionPath:'https://cdn.jsdelivr.net/npm/@mediapipe/hands' }
+        );
+      }
 
-      window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'd') reset();
+      // ===== Gesture spec (hands-only) =====
+      // Utilities
+      const vsub = (a,b)=>({x:(a?.x||0)-(b?.x||0), y:(a?.y||0)-(b?.y||0)});
+      const vlen = (u)=>Math.hypot(u.x,u.y);
+      const vnorm = (u)=>{ const n=vlen(u)||1; return {x:u.x/n,y:u.y/n}; };
+      const vdot = (u,v)=>u.x*v.x+u.y*v.y;
+      const dist = (a,b)=>Math.hypot((a?.x||0)-(b?.x||0),(a?.y||0)-(b?.y||0));
+      const scoreOK = (k,t=0.4)=> !k || k.score==null || k.score>=t;
+
+      // Curl measures
+      function fingerCurl(byName, prefix){
+        const mcp = byName[`${prefix}_mcp`];
+        const pip = byName[`${prefix}_pip`];
+        const dip = byName[`${prefix}_dip`];
+        const tip = byName[`${prefix}_tip`];
+        if (!mcp||!pip||!dip||!tip) return 0;
+        const u1=vnorm(vsub(pip,mcp)), u2=vnorm(vsub(dip,pip)), u3=vnorm(vsub(tip,dip));
+        return (vdot(u1,u2)+vdot(u2,u3))/2; // 1=straight, -1=bent
+      }
+      function thumbCurl(byName){
+        const mcp = byName['thumb_mcp'], ip=byName['thumb_ip'], tip=byName['thumb_tip'];
+        if (!mcp||!ip||!tip) return 0;
+        const u1=vnorm(vsub(ip,mcp)), u2=vnorm(vsub(tip,ip));
+        return vdot(u1,u2);
+      }
+
+      // Thresholds (tuned)
+      const CURL_EXTENDED_COS = 0.80;  // open: straight fingers
+      const CURL_CLOSED_COS   = 0.30;  // closed: curled fingers
+      const SPLAY_K_ADJ       = 0.20;  // open: adjacent fingertip spacing vs handSize
+      const SPLAY_K_THUMB     = 0.22;  // open: thumb-index spacing vs handSize
+      const THUMB_PINCH_K     = 0.22;  // closed: thumb near hand (vs handSize)
+
+      const H_SMOOTH_FRAMES = 3;  // motion smoothing window
+
+      // Rotate: Open → immediate Fist
+      const OPEN_CLOSE_WINDOW_MS = 700;
+      const ROTATE_COOLDOWN_MS = 350;
+
+      // Drop: Open hand, then move down a **longer** offset
+      const DROP_LONG_K = 1.0;  // required downward displacement = handSize * K  (increase if you want even longer)
+      const DROP_MAX_WINDOW_MS = 1200;
+
+      // Move L/R: Open hand horizontal displacement with DAS/ARR feel
+      const MOVE_K = 0.35;      // threshold = handSize * MOVE_K
+      const DAS_MS = 220, ARR_MS = 70;
+      const MOVE_HOLD_MS = 800;
+
+      // State
+      let lastOpenAt = -1;
+      let lastRotate = 0;
+
+      let openAnchor = null;    // anchor for measuring displacement while open
+      let decideUntil = 0;
+
+      let dxQ=[], dyQ=[], prevCenter=null;
+
+      let heldDir = 0, nextMoveAt = 0, moveHoldUntil = 0;
+      let dropArmedAt = 0, dropAnchorY = null;
+
+      // Detection loop
+      async function detect(){
+        try {
+          if (!handDetector){ requestAnimationFrame(detect); return; }
+          const hands = await handDetector.estimateHands(video,{flipHorizontal:true});
+          if (hands.length){
+            // Use the most confident hand
+            const hand = hands[0];
+            const kps = hand.keypoints || [];
+            const by = Object.fromEntries(kps.map(k=>[k.name,k]));
+            const wrist  = by['wrist'];
+            const idxMcp = by['index_finger_mcp'];
+            const midMcp = by['middle_finger_mcp'];
+            const rngMcp = by['ring_finger_mcp'];
+            const pnkMcp = by['pinky_finger_mcp'];
+            const idxTip = by['index_finger_tip'];
+            const midTip = by['middle_finger_tip'];
+            const rngTip = by['ring_finger_tip'];
+            const pnkTip = by['pinky_finger_tip'];
+            const thTip  = by['thumb_tip'];
+
+            if (scoreOK(wrist) && scoreOK(idxMcp) && scoreOK(pnkMcp)){
+              const palmWidth = dist(idxMcp, pnkMcp);
+              const handLen   = midMcp ? dist(wrist, midMcp) : palmWidth;
+              const handSize  = Math.max(60, (palmWidth + handLen)*0.5);
+
+              const center = {
+                x:(wrist.x+idxMcp.x+midMcp.x+rngMcp.x+pnkMcp.x)/5,
+                y:(wrist.y+idxMcp.y+midMcp.y+rngMcp.y+pnkMcp.y)/5
+              };
+
+              // Motion smoothing (frame-to-frame)
+              if (prevCenter){
+                const dx = center.x - prevCenter.x;
+                const dy = center.y - prevCenter.y;
+                dxQ.push(dx); if (dxQ.length>H_SMOOTH_FRAMES) dxQ.shift();
+                dyQ.push(dy); if (dyQ.length>H_SMOOTH_FRAMES) dyQ.shift();
+              }
+              prevCenter = center;
+              const avgDx = dxQ.length ? dxQ.reduce((a,b)=>a+b,0)/dxQ.length : 0;
+              const avgDy = dyQ.length ? dyQ.reduce((a,b)=>a+b,0)/dyQ.length : 0;
+
+              // Open / Closed checks
+              const cIndex  = fingerCurl(by,'index_finger');
+              const cMiddle = fingerCurl(by,'middle_finger');
+              const cRing   = fingerCurl(by,'ring_finger');
+              const cPinky  = fingerCurl(by,'pinky_finger');
+              const cThumb  = thumbCurl(by);
+
+              const splayOK = idxTip&&midTip&&rngTip&&pnkTip&&thTip &&
+                dist(idxTip,midTip) > handSize*SPLAY_K_ADJ &&
+                dist(midTip,rngTip) > handSize*SPLAY_K_ADJ &&
+                dist(rngTip,pnkTip) > handSize*(SPLAY_K_ADJ-0.02) &&
+                dist(thTip,idxTip)  > handSize*SPLAY_K_THUMB;
+
+              const openHand = (
+                cIndex >CURL_EXTENDED_COS &&
+                cMiddle>CURL_EXTENDED_COS &&
+                cRing  >CURL_EXTENDED_COS &&
+                cPinky >CURL_EXTENDED_COS &&
+                cThumb >CURL_EXTENDED_COS &&
+                splayOK
+              );
+
+              const thumbNearIndexBase = thTip && idxMcp && (dist(thTip,idxMcp) < handSize*THUMB_PINCH_K);
+              const closedHand = (
+                cIndex  <CURL_CLOSED_COS &&
+                cMiddle <CURL_CLOSED_COS &&
+                cRing   <CURL_CLOSED_COS &&
+                cPinky  <CURL_CLOSED_COS &&
+                cThumb  <CURL_CLOSED_COS &&
+                thumbNearIndexBase
+              );
+
+              const now = performance.now();
+
+              // --- ROTATE: Open → (within 700ms) Closed (fist)
+              if (openHand) lastOpenAt = now;
+              if (closedHand && lastOpenAt>0 && (now-lastOpenAt)<=OPEN_CLOSE_WINDOW_MS){
+                if (now - lastRotate > ROTATE_COOLDOWN_MS){
+                  tryRotate();
+                  lastRotate = now;
+                }
+                // prevent double-trigger; require a new open again
+                lastOpenAt = -1;
+              }
+
+              // Maintain anchors while open for move/drop
+              if (openHand){
+                if (!openAnchor){
+                  openAnchor = { ...center };
+                  dropAnchorY = center.y;
+                  dropArmedAt = now;
+                }
+                // --- DROP: Open hand moves DOWN a **long** distance
+                const downDisp = center.y - dropAnchorY;
+                const longNeeded = handSize * DROP_LONG_K; // e.g., ~hand height
+                if (downDisp > longNeeded && (now - dropArmedAt) <= DROP_MAX_WINDOW_MS){
+                  hardDrop();
+                  // reset anchors to avoid re-trigger
+                  openAnchor = { ...center };
+                  dropAnchorY = center.y;
+                  dropArmedAt = now;
+                }
+
+                // --- MOVE L/R: Open hand horizontal displacement with DAS/ARR
+                const moveThresh = handSize * MOVE_K;
+                const dispX = center.x - openAnchor.x;
+
+                let dir = 0;
+                if (dispX >  moveThresh) dir = +1;
+                if (dispX < -moveThresh) dir = -1;
+
+                if (dir===0){
+                  // If displacement returns near neutral, release hold
+                  // (keeps a smoother feel; you can comment out if you prefer sticky)
+                } else {
+                  if (heldDir !== dir){
+                    tryMove(dir);
+                    heldDir = dir;
+                    nextMoveAt = now + DAS_MS;
+                    moveHoldUntil = now + MOVE_HOLD_MS;
+                  } else if (now >= nextMoveAt && now < moveHoldUntil){
+                    tryMove(heldDir);
+                    nextMoveAt = now + ARR_MS;
+                  }
+                }
+              } else {
+                // Not open: release move hold gradually
+                if (now >= moveHoldUntil) { heldDir=0; nextMoveAt=0; }
+                openAnchor = null;
+              }
+            }
+          }
+        } catch(e){
+          diag.textContent = 'Detection error:\n' + (e?.message || e);
+          console.error(e);
+        }
+        requestAnimationFrame(detect);
+      }
+
+      // ===== Boot sequence =====
+      function ready(){
+        refillBag(); spawn(); draw();
+        requestAnimationFrame(step);
+        detect();
+        diag.textContent = 'Ready. Gestures: Open→Fist=Rotate • Open+Long Down=Drop • Open+Horizontal=Move';
+      }
+
+      async function startPipeline(){
+        const ok = await startCamera();
+        if (!ok) return;
+        try {
+          await createHandDetector();
+          ready();
+        } catch(e){
+          diag.textContent = 'Hands init error:\n' + (e?.message || e);
+          console.error(e);
+        }
+      }
+
+      // Try to auto-start; if blocked, show Start button
+      if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
+        diag.textContent = 'getUserMedia not supported.\nUse HTTPS and a modern browser.';
+        startBtn.style.display = 'inline-block';
+      } else {
+        startPipeline().then(()=>{
+          if (video.readyState < 2) document.getElementById('startBtn').style.display='inline-block';
+        });
+      }
+      startBtn.addEventListener('click', ()=> {
+        startBtn.style.display='none';
+        startPipeline();
       });
-      resetBtn.addEventListener('click', reset);
-
-      // Fallback for Safari quirk where pointer events may be passive/scrolling:
-      document.addEventListener('gesturestart', e => e.preventDefault());
-      document.addEventListener('gesturechange', e => e.preventDefault());
-      document.addEventListener('gestureend', e => e.preventDefault());
-    })();
+    }
   </script>
 </body>
 </html>
