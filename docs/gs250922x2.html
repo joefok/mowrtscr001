@@ -344,9 +344,9 @@ if (dino.vy > 0){dino.jumping = false;}
     // Collisions
     for (let c of cacti) {
       if (DINO_X + DINO_WIDTH > c.x && DINO_X < c.x + c.width && dino.y + DINO_HEIGHT > c.y && dino.y < c.y + c.height) {
-        gameOver = false; dino.alive = true;
+        gameOver = true; dino.alive = false;
         if (score > highScore) highScore = score;
-        restartTimer = 60;
+        restartTimer = 5;
       }
     }
     score++;
