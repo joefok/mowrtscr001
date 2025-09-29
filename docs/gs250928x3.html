@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   />
-  <title>Gesture Tetris — High Certainty & Exclusive Gestures</title>
+  <title>Gesture Tetris — Open Hand + Directional Movement</title>
 
   <!-- Prevent favicon 404 -->
   data:,
@@ -153,7 +153,7 @@
     <!-- Controls -->
     <div class="row" id="controls">
       <div class="label"><b>Sensitivity</b></div>
-      <input id="sens" type="range" min="0.2" max="0.8" step="0.05" value="0.35" />
+      <input id="sens" type="range" min="0.2" max="1.0" step="0.05" value="0.35" />
       <span id="sensVal">0.35</span>
       <button id="calibBtn" type="button">🎯 Calibrate</button>
       <div class="label"><b>Keys:</b> <code>C</code> camera • <code>N</code> calibrate</div>
@@ -164,36 +164,32 @@
 
   <script>
     // ==================== CONFIG ====================
-    const MODE = 'hand'; // 'hand' | 'pose'
+    const MODE = 'hand'; // hand only (open-hand requirement)
 
-    // Tetris movement feel (DAS/ARR)
+    // Movement feel (DAS/ARR) for left/right
     const DAS_MS = 220;  // initial delay before auto-repeat
     const ARR_MS = 70;   // auto-repeat rate while held
 
-    // Smoothing
-    const SMOOTH_FRAMES = 5; // moving average window
+    // Smoothing windows
+    const SMOOTH_FRAMES = 5; // moving average for dx baseline
+    const MOTION_FRAMES = 3; // moving average for motion dx/dy
 
     // Gravity
-    const fallMsBase = 900;  // slow default gravity
+    const fallMsBase = 900;  // default gravity
     const fallMsSoft = 250;  // while soft-dropping
 
-    // Robust rotate thresholds & timing
+    // Rotation event timing
     const ROTATE_COOLDOWN_MS = 260; // minimum time between rotations
-    const PINCH_ON_NORM   = 0.18;   // thumb-index / handSize to START pinch
-    const PINCH_OFF_NORM  = 0.26;   // ...to END pinch (hysteresis)
-    const PINCH_HOLD_MS   = 120;    // pinch must persist this long to rotate
-
-    const ROTATE_ON_K        = -0.18; // POSE: wrist above nose by 18% shoulder width to START
-    const ROTATE_OFF_K       = -0.10; // POSE: ...10% for END (hysteresis)
-    const ROTATE_HOLD_MS_POSE = 120;
-
-    // High-certainty multi-frame confirmation
-    const FRAMES_CONFIRM = 4;   // frames required to confirm left/right/drop
-    const COUNT_MAX = 8;        // saturation for counters
-
-    // Exclusivity / suppression
-    const SUPPRESS_AFTER_ROTATE_MS = 250; // block other gestures briefly after rotate
+    const SUPPRESS_AFTER_ROTATE_MS = 250; // suppress other gestures briefly after rotate
     const ACTION_SWITCH_MIN_MS = 100;     // minimal dwell before switching actions
+
+    // High-certainty gating
+    const FRAMES_CONFIRM = 4; // frames to confirm an action
+
+    // Open-hand checks
+    const CURL_EXTENDED_COS = 0.80;  // finger is "straight" if average cosine > this
+    const SPLAY_K_ADJACENT = 0.22;   // min adjacent fingertip spacing (% of hand size)
+    const SPLAY_K_THUMB    = 0.25;   // min thumb-index spacing (% of hand size)
 
     window.addEventListener('DOMContentLoaded', () => {
       const m = document.getElementById('modeLabel');
@@ -233,25 +229,18 @@
           else { await tf.setBackend('cpu'); }
           await tf.ready();
 
-          // ---- Detection library per MODE ----
-          if (MODE === 'hand') {
-            log('Loading Hand Pose Detection...');
-            try { await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
-            catch { await add("https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
+          // ---- Hand Pose Detection (MediaPipe Hands runtime) ----
+          log('Loading Hand Pose Detection...');
+          try { await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
+          catch { await add("https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
 
-            // MediaPipe Hands runtime (assets)
-            log('Loading MediaPipe Hands runtime...');
-            try { await add("https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest"); }
-            catch { await add("https://unpkg.com/@mediapipe/hands@latest"); }
-          } else {
-            log('Loading Pose Detection (MoveNet)...');
-            try { await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js"); }
-            catch { await add("https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js"); }
-          }
+          log('Loading MediaPipe Hands runtime...');
+          try { await add("https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest"); }
+          catch { await add("https://unpkg.com/@mediapipe/hands@latest"); }
 
           const tfOK  = !!window.tf;
-          const libOK = MODE === 'hand' ? !!window.handPoseDetection : !!window.poseDetection;
-          log(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • ${MODE === 'hand' ? 'Hand-Pose' : 'Pose-Detection'}: ${libOK ? '<b>ok</b>' : '<i>missing</i>'}`);
+          const libOK = !!window.handPoseDetection;
+          log(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • Hand-Pose: ${libOK ? '<b>ok</b>' : '<i>missing</i>'}`);
 
           if (tfOK && libOK) setTimeout(() => { if (typeof startApp === 'function') startApp(); }, 0);
         } catch (e) {
@@ -263,13 +252,17 @@
     })();
   </script>
 
-  <!-- ====== App: Stacking Tetris + Exclusive, High-Certainty Gestures ====== -->
+  <!-- ====== App: Stacking Tetris + Open-hand Directional Gestures ====== -->
   <script>
     async function startApp() {
       // Helpers
       const $ = (id) => document.getElementById(id);
       const setText = (el, text) => { if (el) el.textContent = text; };
-      const dist = (a, b) => Math.hypot((a?.x || 0) - (b?.x || 0), (a?.y || 0) - (b?.y || 0));
+      const vsub = (a, b) => ({ x: (a?.x||0)-(b?.x||0), y: (a?.y||0)-(b?.y||0) });
+      const vlen = (u) => Math.hypot(u.x, u.y);
+      const vnorm = (u) => { const n = vlen(u)||1; return {x:u.x/n, y:u.y/n}; };
+      const vdot = (u, v) => u.x*v.x + u.y*v.y;
+      const dist = (a, b) => Math.hypot((a?.x||0)-(b?.x||0), (a?.y||0)-(b?.y||0));
       const scoreOK = (k, t=0.5) => !k || k.score == null || k.score >= t; // if score absent, accept
 
       const diag = $('diag');
@@ -289,9 +282,7 @@
       const iconDrop = $('iconDrop');
       const icons = { left: iconLeft, right: iconRight, rotate: iconRotate, drop: iconDrop };
       const setIcon = (name, active) => { const el = icons[name]; if (el) el.classList.toggle('active', !!active); };
-      const setOnlyIcon = (name) => {
-        Object.keys(icons).forEach(n => setIcon(n, n === name));
-      };
+      const setOnlyIcon = (name) => { Object.keys(icons).forEach(n => setIcon(n, n === name)); };
       const flashIcon = (name, ms=140) => { setOnlyIcon(name); setTimeout(() => setOnlyIcon(null), ms); };
 
       // Board setup
@@ -374,8 +365,9 @@
 
         // Stop soft drop & movement and reset gesture states
         softDropActive = false; heldDir = 0; nextMoveAt = 0; dxHistory.length = 0;
-        leftCnt = rightCnt = dropCnt = 0;
+        leftCnt = rightCnt = upCnt = downCnt = 0;
         currentAction = null; suppressUntil = 0;
+        dxQ.length = dyQ.length = 0; prevCenter = null;
 
         // Clear board & stats
         for (let r = 0; r < ROWS; r++) board[r].fill(0);
@@ -437,11 +429,7 @@
       function lock() {
         const topOut = active.y < 0;  // if piece locks above visible area -> Game Over
         merge();
-        if (topOut) {
-          draw();
-          gameOverRestart();
-          return;
-        }
+        if (topOut) { draw(); gameOverRestart(); return; }
         clearLines();
         spawn();
         draw();
@@ -476,9 +464,7 @@
       // Gravity (time-based)
       let lastFallAt = performance.now();
       let softDropActive = false;
-      function setSoftDrop(active) {
-        softDropActive = !!active;
-      }
+      function setSoftDrop(active) { softDropActive = !!active; setIcon('drop', softDropActive); }
       function step(now) {
         const interval = softDropActive ? fallMsSoft : fallMsBase;
         if (now - lastFallAt >= interval) {
@@ -491,28 +477,26 @@
         requestAnimationFrame(step);
       }
 
-      // ====== Exclusive, High-Certainty Gesture Engine ======
+      // ====== Exclusive, Open-hand Directional Gesture Engine ======
       let dxHistory = [];
-      let neutralDx = 0;          // calibrated neutral offset
+      let neutralDx = 0;          // not essential here; kept for completeness
       let heldDir = 0;            // -1, 0, +1 for DAS/ARR
       let nextMoveAt = 0;         // timestamp for next auto-repeat
       let lastRotate = 0;
 
-      // Rotate states
-      let pinchState = false;     // hand mode pinch state (hysteresis)
-      let pinchSince = 0;
-      let poseRotateState = false;
-      let poseRotateSince = 0;
-
       // Multi-frame confirmation counters
-      let leftCnt = 0, rightCnt = 0, dropCnt = 0;
+      let leftCnt = 0, rightCnt = 0, upCnt = 0, downCnt = 0;
 
       // Exclusivity state
       let currentAction = null;   // 'rotate' | 'drop' | 'moveLeft' | 'moveRight' | null
       let actionSince = 0;
       let suppressUntil = 0;
 
-      // Sensitivity UI
+      // Motion smoothing queues
+      const dxQ = [], dyQ = [];
+      let prevCenter = null;
+
+      // Sensitivity UI (affects movement thresholds)
       let sensitivity = parseFloat(sensRange?.value || '0.35');
       const updateSensitivityLabel = () => { if (sensVal) sensVal.textContent = sensitivity.toFixed(2); };
       updateSensitivityLabel();
@@ -536,29 +520,22 @@
         setText(diag, 'getUserMedia not supported. Use HTTPS / modern browser.');
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+        audio: false
+      });
       video.srcObject = stream;
       await new Promise(r => { if (video.readyState >= 2) r(); else video.onloadeddata = r; });
       try { await video.play(); } catch {}
 
-      // Detector
-      let detector;
-      if (MODE === 'hand') {
-        setText(diag, 'Creating MediaPipe Hands detector...');
-        const model = handPoseDetection.SupportedModels.MediaPipeHands;
-        detector = await handPoseDetection.createDetector(model, {
-          runtime: 'mediapipe',
-          modelType: 'lite',
-          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
-        });
-      } else {
-        setText(diag, 'Creating MoveNet detector...');
-        const model = poseDetection.SupportedModels.MoveNet;
-        detector = await poseDetection.createDetector(model, {
-          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-          enableSmoothing: true,
-        });
-      }
+      // Detector (MediaPipe Hands)
+      setText(diag, 'Creating MediaPipe Hands detector...');
+      const model = handPoseDetection.SupportedModels.MediaPipeHands;
+      const detector = await handPoseDetection.createDetector(model, {
+        runtime: 'mediapipe',
+        modelType: 'lite',
+        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
+      });
 
       // Start game
       refillBag();
@@ -578,188 +555,188 @@
 
       // Counter update with decay
       const upd = (cnt, cond) => {
-        if (cond) return Math.min(COUNT_MAX, cnt + 1);
+        if (cond) return Math.min(8, cnt + 1);
         return Math.max(0, cnt - 1);
       };
 
-      // ====== Detection loop (exclusive classifier) ======
+      // Finger curl (index/middle/ring/pinky)
+      function fingerCurl(byName, prefix) {
+        const mcp = byName[`${prefix}_mcp`];
+        const pip = byName[`${prefix}_pip`];
+        const dip = byName[`${prefix}_dip`];
+        const tip = byName[`${prefix}_tip`];
+        if (!mcp || !pip || !dip || !tip) return 0;
+        const u1 = vnorm(vsub(pip, mcp));
+        const u2 = vnorm(vsub(dip, pip));
+        const u3 = vnorm(vsub(tip, dip));
+        const c12 = vdot(u1, u2);
+        const c23 = vdot(u2, u3);
+        return (c12 + c23) / 2; // closer to 1 = straight
+      }
+      function thumbCurl(byName) {
+        const mcp = byName['thumb_mcp'];
+        const ip  = byName['thumb_ip'];
+        const tip = byName['thumb_tip'];
+        if (!mcp || !ip || !tip) return 0;
+        const u1 = vnorm(vsub(ip, mcp));
+        const u2 = vnorm(vsub(tip, ip));
+        return vdot(u1, u2);
+      }
+
+      // ====== Detection loop (open-hand + directional motion) ======
       async function detect() {
         try {
           let now = performance.now();
 
-          // Reset per-frame candidates
-          let candRotate = false;     // event style (fires once when ready)
-          let leftCond = false, rightCond = false, dropCond = false;
-
-          if (MODE === 'hand') {
-            const hands = await detector.estimateHands(video, { flipHorizontal: true });
-            if (hands.length) {
-              const kps = hands[0].keypoints || [];
-              const byName = Object.fromEntries(kps.map(k => [k.name, k]));
-
-              const wrist    = byName['wrist'];
-              const indexTip = byName['index_finger_tip'];
-              const thumbTip = byName['thumb_tip'];
-              const idxMcp   = byName['index_finger_mcp'];
-              const pnkMcp   = byName['pinky_finger_mcp'];
-              const midMcp   = byName['middle_finger_mcp'];
-
-              // Confidence gating where scores exist
-              if (scoreOK(wrist) && scoreOK(indexTip)) {
-                // Smoothed calibrated dx (index vs wrist)
-                let dx = (indexTip.x - wrist.x);
-                dxHistory.push(dx);
-                if (dxHistory.length > SMOOTH_FRAMES) dxHistory.shift();
-                const dxAvg = dxHistory.reduce((a,b)=>a+b,0) / dxHistory.length;
-                const adj = dxAvg - neutralDx;
-
-                // Adaptive thresholds based on hand size
-                let palmWidth = (idxMcp && pnkMcp) ? dist(idxMcp, pnkMcp) : 100;
-                const moveOn  = palmWidth * sensitivity;   // on threshold
-                const moveOff = moveOn * 0.7;              // off threshold (hysteresis)
-
-                // Hysteresis via counts; we just use conditions against "on" level
-                leftCond  = adj < -moveOn;
-                rightCond = adj >  moveOn;
-
-                // Soft drop based on vertical relation
-                const dy = indexTip.y - wrist.y;
-                const dropOn = palmWidth * 0.65;
-                dropCond = dy > dropOn;
-
-                // Robust pinch -> rotate (normalized + hysteresis + hold)
-                if (thumbTip && scoreOK(thumbTip)) {
-                  const handLen = (wrist && midMcp) ? dist(wrist, midMcp) : palmWidth;
-                  const handSize = Math.max(60, (palmWidth + handLen) * 0.5);
-
-                  const d = dist(thumbTip, indexTip);
-                  const dNorm = d / handSize;
-
-                  if (!pinchState && dNorm <= PINCH_ON_NORM) {
-                    pinchState = true; pinchSince = now;
-                  } else if (pinchState && dNorm >= PINCH_OFF_NORM) {
-                    pinchState = false; pinchSince = 0;
-                  }
-
-                  // Ready to rotate (event)
-                  if (pinchState && (now - pinchSince >= PINCH_HOLD_MS) && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                    candRotate = true;
-                  }
-                }
-              }
-            } else {
-              // No hand detected: decay counts fast
-              leftCnt = Math.max(0, leftCnt-2);
-              rightCnt = Math.max(0, rightCnt-2);
-              dropCnt = Math.max(0, dropCnt-2);
-            }
-          } else {
-            const poses = await detector.estimatePoses(video, { flipHorizontal: true });
-            if (poses.length) {
-              const kps = poses[0].keypoints || [];
-              const byName = Object.fromEntries(kps.map(k => [k.name, k]));
-              const conf = k => scoreOK(k, 0.5);
-
-              const nose = byName['nose'];
-              const lw = byName['left_wrist'], rw = byName['right_wrist'];
-              const ls = byName['left_shoulder'], rs = byName['right_shoulder'];
-              const wrist = conf(rw) ? rw : (conf(lw) ? lw : null);
-
-              if (conf(nose) && wrist) {
-                const shoulderWidth = (conf(ls) && conf(rs)) ? dist(ls, rs) : 120;
-
-                // Smoothed calibrated dx (wrist vs nose)
-                let dx = wrist.x - nose.x;
-                dxHistory.push(dx);
-                if (dxHistory.length > SMOOTH_FRAMES) dxHistory.shift();
-                const dxAvg = dxHistory.reduce((a,b)=>a+b,0) / dxHistory.length;
-                const adj = dxAvg - neutralDx;
-
-                const moveOn  = shoulderWidth * sensitivity;
-                leftCond  = adj < -moveOn;
-                rightCond = adj >  moveOn;
-
-                const dy = wrist.y - nose.y;
-                const dropOn = shoulderWidth * 0.35;
-                dropCond = dy > dropOn;
-
-                // Robust pose rotate (hysteresis + hold)
-                const onY  = ROTATE_ON_K  * shoulderWidth;  // negative
-                const offY = ROTATE_OFF_K * shoulderWidth;  // less negative
-                if (!poseRotateState && dy <= onY) {
-                  poseRotateState = true; poseRotateSince = now;
-                } else if (poseRotateState && dy >= offY) {
-                  poseRotateState = false; poseRotateSince = 0;
-                }
-                if (poseRotateState && (now - poseRotateSince >= ROTATE_HOLD_MS_POSE) && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
-                  candRotate = true;
-                }
-              }
-            } else {
-              leftCnt = Math.max(0, leftCnt-2);
-              rightCnt = Math.max(0, rightCnt-2);
-              dropCnt = Math.max(0, dropCnt-2);
-            }
-          }
-
-          // Update confirmation counters
-          leftCnt  = upd(leftCnt,  leftCond);
-          rightCnt = upd(rightCnt, rightCond);
-          dropCnt  = upd(dropCnt,  dropCond);
-
-          // --- Exclusive action decision ---
-          // Priority: rotate > drop > moveRight > moveLeft
-          // If we are in suppression window, keep current action (except we still allow rotate event to replace).
+          // Defaults (no action)
           let newAction = currentAction;
           const inSuppress = now < suppressUntil;
 
-          if (candRotate && !inSuppress) {
-            // Rotate event overrides everything
-            if (tryRotate()) {
-              flashIcon('rotate', 180);
+          const hands = await detector.estimateHands(video, { flipHorizontal: true });
+          if (hands.length) {
+            const kps = hands[0].keypoints || [];
+            const byName = Object.fromEntries(kps.map(k => [k.name, k]));
+
+            // Confidence gate basic joints
+            const wrist  = byName['wrist'];
+            const idxMcp = byName['index_finger_mcp'];
+            const midMcp = byName['middle_finger_mcp'];
+            const rngMcp = byName['ring_finger_mcp'];
+            const pnkMcp = byName['pinky_finger_mcp'];
+            const idxTip = byName['index_finger_tip'];
+            const midTip = byName['middle_finger_tip'];
+            const rngTip = byName['ring_finger_tip'];
+            const pnkTip = byName['pinky_finger_tip'];
+            const thTip  = byName['thumb_tip'];
+
+            if (scoreOK(wrist) && scoreOK(idxMcp) && scoreOK(pnkMcp)) {
+              // Hand size & center
+              const palmWidth = dist(idxMcp, pnkMcp);
+              const handLen   = midMcp ? dist(wrist, midMcp) : palmWidth;
+              const handSize  = Math.max(60, (palmWidth + handLen) * 0.5);
+
+              // --- OPEN HAND CHECK (all five extended + splay) ---
+              const cIndex  = fingerCurl(byName, 'index_finger');
+              const cMiddle = fingerCurl(byName, 'middle_finger');
+              const cRing   = fingerCurl(byName, 'ring_finger');
+              const cPinky  = fingerCurl(byName, 'pinky_finger');
+              const cThumb  = thumbCurl(byName);
+              const allExtended = (
+                cIndex  > CURL_EXTENDED_COS &&
+                cMiddle > CURL_EXTENDED_COS &&
+                cRing   > CURL_EXTENDED_COS &&
+                cPinky  > CURL_EXTENDED_COS &&
+                cThumb  > CURL_EXTENDED_COS
+              );
+
+              const splayOK =
+                idxTip && midTip && rngTip && pnkTip && thTip &&
+                dist(idxTip, midTip) > handSize * SPLAY_K_ADJACENT &&
+                dist(midTip, rngTip) > handSize * SPLAY_K_ADJACENT &&
+                dist(rngTip, pnkTip) > handSize * (SPLAY_K_ADJACENT - 0.02) &&
+                dist(thTip, idxTip)  > handSize * SPLAY_K_THUMB;
+
+              const openHandOK = allExtended && splayOK;
+
+              // Hand center (palm center approx.)
+              const center = {
+                x: (wrist.x + idxMcp.x + midMcp.x + rngMcp.x + pnkMcp.x) / 5,
+                y: (wrist.y + idxMcp.y + midMcp.y + rngMcp.y + pnkMcp.y) / 5,
+              };
+
+              // Motion (only when open-hand gate is satisfied)
+              if (openHandOK) {
+                if (prevCenter) {
+                  const dx = center.x - prevCenter.x;
+                  const dy = center.y - prevCenter.y;
+                  dxQ.push(dx); if (dxQ.length > MOTION_FRAMES) dxQ.shift();
+                  dyQ.push(dy); if (dyQ.length > MOTION_FRAMES) dyQ.shift();
+                  const avgDx = dxQ.reduce((a,b)=>a+b,0) / dxQ.length;
+                  const avgDy = dyQ.reduce((a,b)=>a+b,0) / dyQ.length;
+
+                  // Adaptive movement thresholds (smaller value = more sensitive)
+                  const moveThresh = handSize * sensitivity;
+
+                  const leftCond  = avgDx < -moveThresh;
+                  const rightCond = avgDx >  moveThresh;
+                  const upCond    = avgDy < -moveThresh; // up is negative Y
+                  const downCond  = avgDy >  moveThresh;
+
+                  // Update counters with decay
+                  leftCnt  = upd(leftCnt,  leftCond);
+                  rightCnt = upd(rightCnt, rightCond);
+                  upCnt    = upd(upCnt,    upCond);
+                  downCnt  = upd(downCnt,  downCond);
+
+                  // --- Exclusive decision ---
+                  if (!inSuppress) {
+                    // Rotate is an event from UP movement
+                    if (upCnt >= FRAMES_CONFIRM && (now - lastRotate > ROTATE_COOLDOWN_MS)) {
+                      if (tryRotate()) {
+                        flashIcon('rotate', 180);
+                      }
+                      lastRotate = now;
+                      suppressUntil = now + SUPPRESS_AFTER_ROTATE_MS;
+                      // Reset continuous actions and counters around rotate
+                      setSoftDrop(false);
+                      heldDir = 0; nextMoveAt = 0;
+                      leftCnt = rightCnt = upCnt = downCnt = 0;
+                      newAction = null;
+                      actionSince = now;
+                    } else {
+                      // Otherwise, pick one continuous action by priority: drop > right > left
+                      const candidates = [
+                        {name:'drop', score: downCnt, prio: 3},
+                        {name:'moveRight', score: rightCnt, prio: 2},
+                        {name:'moveLeft',  score: leftCnt,  prio: 1},
+                      ].sort((a,b)=> b.score - a.score || b.prio - a.prio);
+
+                      const top = candidates[0];
+                      if (top.score >= FRAMES_CONFIRM) {
+                        // Minimal dwell to avoid fast switching
+                        if (currentAction && top.name !== currentAction && (now - actionSince) < ACTION_SWITCH_MIN_MS) {
+                          newAction = currentAction;
+                        } else {
+                          newAction = top.name;
+                        }
+                      } else {
+                        newAction = null;
+                      }
+                    }
+                  }
+                }
+                prevCenter = center;
+              } else {
+                // Open hand not detected: reset action/counters gently
+                prevCenter = center;
+                leftCnt = Math.max(0, leftCnt-2);
+                rightCnt = Math.max(0, rightCnt-2);
+                upCnt = Math.max(0, upCnt-2);
+                downCnt = Math.max(0, downCnt-2);
+                // Stop continuous actions if hand not open
+                newAction = null;
+              }
             }
-            lastRotate = now;
-            // Suppress other gestures briefly
-            suppressUntil = now + SUPPRESS_AFTER_ROTATE_MS;
-            // Reset movement/drop states on rotate
-            setSoftDrop(false);
-            heldDir = 0; nextMoveAt = 0;
-            // Do not latch rotate as a continuous action
+          } else {
+            // No hand: decay and stop
+            leftCnt = Math.max(0, leftCnt-2);
+            rightCnt = Math.max(0, rightCnt-2);
+            upCnt = Math.max(0, upCnt-2);
+            downCnt = Math.max(0, downCnt-2);
             newAction = null;
-            actionSince = now;
-          } else if (!inSuppress) {
-            // Choose best continuous action by counts
-            const candidates = [
-              {name:'drop', score: dropCnt, prio: 3},
-              {name:'moveRight', score: rightCnt, prio: 2},
-              {name:'moveLeft',  score: leftCnt,  prio: 1},
-            ];
-            candidates.sort((a,b) => b.score - a.score || b.prio - a.prio);
-            const top = candidates[0];
-
-            if (top.score >= FRAMES_CONFIRM) {
-              newAction = top.name;
-            } else {
-              newAction = null;
-            }
-
-            // Minimal dwell before switching to a different action
-            if (currentAction && newAction && newAction !== currentAction && (now - actionSince) < ACTION_SWITCH_MIN_MS) {
-              newAction = currentAction;
-            }
           }
 
-          // Apply action (exclusive)
+          // Apply exclusivity changes
           if (newAction !== currentAction) {
             currentAction = newAction;
             actionSince = now;
           }
 
-          // Render icons exclusively and apply
+          // Render icons exclusively and apply behavior
           if (currentAction === 'drop') {
             setOnlyIcon('drop');
             setSoftDrop(true);
-            // stop movement while dropping (exclusive)
+            // Stop movement while dropping
             heldDir = 0; nextMoveAt = 0;
           } else if (currentAction === 'moveLeft' || currentAction === 'moveRight') {
             setOnlyIcon(currentAction === 'moveLeft' ? 'left' : 'right');
