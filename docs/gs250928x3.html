@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Gesture Tetris — Head Move, Fist Rotate, Swipe Down Drop</title>
 
-<!-- Prevent favicon 404 -->
 data:,
 <style>
   :root { --tile: 30px; }
@@ -13,7 +12,7 @@ data:,
   body { margin:0; background:#111; color:#fff; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
   canvas { width:100vw; height:80vh; background:#000; display:block; }
   video { position:fixed; bottom:56px; right:10px; width:128px; height:96px; border:2px solid #0ff; transform:scaleX(-1); }
-  #diag { position:fixed; top:10px; left:10px; background:rgba(0,0,0,.6); padding:8px 12px; border-radius:8px; font-size:13px; max-width:92vw; white-space:pre-wrap; }
+  #diag { position:fixed; top:10px; left:10px; background:rgba(0,0,0,.65); padding:8px 12px; border-radius:8px; font-size:13px; max-width:92vw; white-space:pre-wrap; }
   #controls { position:fixed; right:10px; bottom:10px; display:flex; gap:8px; }
   button { background:#0b3d46; border:1px solid #0ff; color:#0ff; border-radius:6px; font-size:12px; padding:6px 10px; cursor:pointer; }
   button:hover { background:#0e4f5a; }
@@ -23,12 +22,14 @@ data:,
   <div id="diag">Booting…</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
+
   <div id="controls">
     <button id="startBtn" type="button" style="display:none">Start Camera</button>
+    <button id="retryBtn" type="button" style="display:none">Retry Detectors</button>
     <button id="camToggle" type="button">📷 Hide</button>
   </div>
 
-  <!-- Robust loader -->
+  <!-- Robust loader (loads libs in order, then starts app) -->
   <script>
     (function loader(){
       const diag = document.getElementById('diag');
@@ -45,29 +46,24 @@ data:,
         try { const c=document.createElement('canvas'); return !!(c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl')); }
         catch { return false; }
       };
-
       async function boot(){
         try {
           log('Loading TensorFlow.js…');
           await add('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js');
-
-          // CPU backend to avoid WebGL issues, or prefer webgl if available
           try {
             if (webglSupported()) { await tf.setBackend('webgl'); } else { await tf.setBackend('cpu'); }
           } catch { await tf.setBackend('cpu'); }
           await tf.ready();
 
           log('Loading detectors…');
-          // Pose (for head nose keypoint) + Hands
+          // Pose-detection (for MoveNet) – TFJS runtime
           await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js');
+          // Hand-pose-detection (for MediaPipe Hands)
           await add('https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js');
-          // MediaPipe runtimes
-          await add('https://cdn.jsdelivr.net/npm/@mediapipe/pose');
+          // Mediapipe runtimes (for Hands only). NOTE: Pose uses MoveNet TFJS -> no MP assets here
           await add('https://cdn.jsdelivr.net/npm/@mediapipe/hands');
 
-          if (!window.poseDetection || !window.handPoseDetection) {
-            throw new Error('Detectors failed to load.');
-          }
+          if (!window.poseDetection || !window.handPoseDetection) throw new Error('Detectors failed to load');
 
           log('Libraries ready. Initializing app…');
           setTimeout(()=>{ if (typeof startApp === 'function') startApp(); }, 0);
@@ -86,12 +82,14 @@ data:,
       const video = document.getElementById('camera');
       const camToggle = document.getElementById('camToggle');
       const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
 
-      // ---- Tetris core (stacking) ----
+      // ===== Tetris core =====
       const canvas = document.getElementById('tetris');
       const ctx = canvas.getContext('2d');
       const TILE=30,COLS=10,ROWS=20;
       canvas.width=COLS*TILE; canvas.height=ROWS*TILE;
+
       const COLORS=['#000','#00f0f0','#0000f0','#f0a000','#f0f000','#00f000','#a000f0','#f00000'];
       const SHAPES = {
         1:[[1,1,1,1]],
@@ -102,9 +100,11 @@ data:,
         6:[[0,6,0],[6,6,6]],
         7:[[7,7,0],[0,7,7]],
       };
+
       let board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
       let bag=[]; function refillBag(){ bag=[1,2,3,4,5,6,7]; for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; } }
       function nextId(){ if(!bag.length) refillBag(); return bag.pop(); }
+
       let active=null;
       function spawn(){
         const id=nextId(); const m=SHAPES[id].map(r=>r.slice());
@@ -169,7 +169,6 @@ data:,
         for (let gy=1;gy<ROWS;gy++){ ctx.beginPath(); ctx.moveTo(0,gy*TILE); ctx.lineTo(canvas.width,gy*TILE); ctx.stroke(); }
       }
       function gameOverRestart(delay=800){
-        // reset board and piece after a short pause
         setTimeout(()=>{
           board = Array.from({length:ROWS},()=>Array(COLS).fill(0));
           spawn(); draw();
@@ -177,7 +176,7 @@ data:,
       }
       // gravity
       let lastFall = performance.now();
-      const FALL_MS = 900; // slow base
+      const FALL_MS = 900;
       function step(now){
         if (now - lastFall >= FALL_MS){
           lastFall = now;
@@ -188,7 +187,7 @@ data:,
         requestAnimationFrame(step);
       }
 
-      // ---- Camera boot with fallback ----
+      // ===== Camera boot with fallback =====
       async function startCamera(){
         try {
           diag.textContent = 'Requesting camera…';
@@ -207,7 +206,6 @@ data:,
         } catch(e) {
           diag.textContent = 'Camera error:\n' + (e?.name || '') + ' ' + (e?.message || e);
           console.error(e);
-          // Show Start button to try again after a user gesture
           startBtn.style.display = 'inline-block';
           return false;
         }
@@ -219,44 +217,76 @@ data:,
       let camVisible = true;
       setCamVisible(camVisible);
       camToggle.addEventListener('click', ()=>{ camVisible = !camVisible; setCamVisible(camVisible); });
-
-      // Auto-hide after 5s
       setTimeout(()=>{ camVisible=false; setCamVisible(camVisible); }, 5000);
 
-      // ---- Detectors (head + hands) ----
+      // ===== Detectors with timeouts & fallback =====
       let poseDetector=null, handDetector=null;
-      async function createDetectors(){
-        // BlazePose (for head)
-        poseDetector = await poseDetection.createDetector(poseDetection.SupportedModels.BlazePose, {
-          runtime: 'mediapipe', modelType:'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose'
-        });
-        // Hands
-        handDetector = await handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
-          runtime: 'mediapipe', modelType:'lite', solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
-        });
+      function withTimeout(promise, ms, label){
+        return Promise.race([
+          promise,
+          new Promise((_,reject)=> setTimeout(()=>reject(new Error(label+' timeout after '+ms+'ms')), ms))
+        ]);
+      }
+      async function createPoseDetector(){
+        // Use MoveNet TFJS (no Mediapipe assets)
+        diag.textContent = 'Starting detectors… (Pose: MoveNet TFJS)';
+        poseDetector = await withTimeout(
+          poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+            modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+            enableSmoothing: true,
+          }),
+          8000, 'Pose detector'
+        );
+      }
+      async function createHandDetector(){
+        // Use MediaPipe Hands runtime (best landmarks)
+        diag.textContent = 'Starting detectors… (Hands: MediaPipe)';
+        handDetector = await withTimeout(
+          handPoseDetection.createDetector(handPoseDetection.SupportedModels.MediaPipeHands, {
+            runtime: 'mediapipe',
+            modelType: 'lite',
+            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands',
+          }),
+          8000, 'Hands detector'
+        );
       }
 
-      // Gesture state
-      let lastRotate = 0;
-      const ROTATE_COOLDOWN_MS = 350;
+      async function startDetectors(){
+        try {
+          await createPoseDetector();
+        } catch(e){
+          diag.textContent = 'Pose init error:\n' + (e?.message || e) + '\nFalling back to head-only via MoveNet failed.';
+          console.error(e);
+          throw e; // pose is required (for head left/right); bail so user can retry
+        }
 
-      // head move smoothing + DAS/ARR feel
-      let noseHistory = []; // recent X
-      const NOSE_FRAMES = 5;
-      const MOVE_THRESH_PX = 18; // head dx per frame (smoothed) to trigger
-      let heldDir = 0, nextMoveAt = 0;
-      const DAS_MS = 220, ARR_MS = 70;
+        try {
+          await createHandDetector();
+          retryBtn.style.display = 'none';
+        } catch(e){
+          // Proceed head-only; show retry button
+          diag.textContent = 'Hands init error:\n' + (e?.message || e) + '\nContinuing with head-only controls. You can retry loading Hands.';
+          console.warn(e);
+          retryBtn.style.display = 'inline-block';
+          handDetector = null;
+        }
+      }
 
-      // swipe down detection window
-      const SWIPE_WINDOW_MS = 180;
-      const SWIPE_THRESH_PX = 80;
+      // ===== Gesture logic =====
+      // Head → left/right (nose drift against short-term average) with DAS/ARR feel
+      let noseHistory = []; const NOSE_FRAMES = 5; const MOVE_THRESH_PX = 18;
+      let heldDir = 0, nextMoveAt = 0; const DAS_MS = 220, ARR_MS = 70;
+
+      // Hand → fist = rotate (cooldown), swipe down = hard drop (short time window)
+      let lastRotate = 0; const ROTATE_COOLDOWN_MS = 350;
+      const SWIPE_WINDOW_MS = 180; const SWIPE_THRESH_PX = 80;
       let yHistory = []; // {t,y}
 
       function smooth(values){ if(!values.length) return 0; return values.reduce((a,b)=>a+b,0)/values.length; }
 
       async function detect(){
         try {
-          // Head → left/right
+          // Pose (head move)
           if (poseDetector){
             const poses = await poseDetector.estimatePoses(video,{flipHorizontal:true});
             if (poses.length){
@@ -266,7 +296,7 @@ data:,
                 if (noseHistory.length > NOSE_FRAMES) noseHistory.shift();
                 if (noseHistory.length >= 2){
                   const avg = smooth(noseHistory.slice(0,-1));
-                  const dx = noseHistory[noseHistory.length-1] - avg; // drift vs recent avg
+                  const dx = noseHistory[noseHistory.length-1] - avg;
                   const now = performance.now();
                   let dir = 0;
                   if (dx >  MOVE_THRESH_PX) dir = +1;
@@ -285,44 +315,42 @@ data:,
             }
           }
 
-          // Hands → fist = rotate; swipe down = drop
+          // Hands (rotate/drop) — optional if handDetector available
           if (handDetector){
             const hands = await handDetector.estimateHands(video,{flipHorizontal:true});
             if (hands.length){
-              // Use the first visible hand
               const kps = hands[0].keypoints || [];
               const by = Object.fromEntries(kps.map(k=>[k.name,k]));
-              const wrist = by['wrist'];
               const idxTip = by['index_finger_tip'];
               const midTip = by['middle_finger_tip'];
               const rngTip = by['ring_finger_tip'];
               const pnkTip = by['pinky_finger_tip'];
               const thTip  = by['thumb_tip'];
 
-              // Fist: short distances between tips (thumb-index + middle-ring-pinky cluster)
-              if (idxTip && thTip && midTip && rngTip && pnkTip){
+              if (idxTip && midTip && rngTip && pnkTip && thTip){
+                // Fist: thumb-index small + other fingertips clustered
                 const thumbIndex = Math.hypot(thTip.x-idxTip.x, thTip.y-idxTip.y);
                 const cluster = (Math.hypot(midTip.x-rngTip.x, midTip.y-rngTip.y) + Math.hypot(rngTip.x-pnkTip.x, rngTip.y-pnkTip.y))/2;
-                const fistLikely = thumbIndex < 40 && cluster < 35; // tune if needed
+                const fistLikely = thumbIndex < 40 && cluster < 35;
+
                 const now = performance.now();
                 if (fistLikely && (now - lastRotate > ROTATE_COOLDOWN_MS)){
                   tryRotate();
                   lastRotate = now;
                 }
 
-                // Swipe down: track indexTip Y over a short window
+                // Swipe down on index fingertip
                 const t = performance.now();
                 yHistory.push({t, y: idxTip.y});
-                // keep recent
                 while (yHistory.length && (t - yHistory[0].t) > SWIPE_WINDOW_MS) yHistory.shift();
                 const minY = yHistory.reduce((m,p)=>Math.min(m,p.y), Infinity);
                 if (idxTip.y - minY > SWIPE_THRESH_PX){
                   hardDrop();
-                  yHistory.length = 0; // reset window after drop
+                  yHistory.length = 0;
                 }
               }
             } else {
-              // no hands: reset swipe window slowly
+              // no hands → decay swipe window
               const now = performance.now();
               yHistory = yHistory.filter(p => now - p.t <= SWIPE_WINDOW_MS);
             }
@@ -334,42 +362,54 @@ data:,
         requestAnimationFrame(detect);
       }
 
-      // Boot the app
+      // ===== Boot sequence =====
       function ready(){
         refillBag(); spawn(); draw();
         requestAnimationFrame(step);
         detect();
-        diag.textContent = 'Ready. (If the camera is hidden, click 📷 Show)';
+        diag.textContent = handDetector
+          ? 'Ready. Head: move L/R • Fist: rotate • Swipe down: drop'
+          : 'Ready (head-only). Fist/drop disabled (click “Retry Detectors”).';
       }
 
-      // Start pipeline (camera + detectors)
       async function startPipeline(){
         const ok = await startCamera();
         if (!ok) return;
         try {
-          await createDetectors();
+          await startDetectors();
           ready();
         } catch(e){
-          diag.textContent = 'Detector init error:\n' + (e?.message || e);
-          console.error(e);
+          // Pose failed (critical)
+          document.getElementById('retryBtn').style.display = 'inline-block';
+          diag.textContent = 'Detectors failed:\n' + (e?.message || e);
         }
       }
 
-      // Try to auto-start; if blocked, show Start
+      // Try to auto-start; if blocked, show Start button
       if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
-        diag.textContent = 'getUserMedia not supported. Use HTTPS and a modern browser.';
-        startBtn.style.display = 'inline-block';
+        diag.textContent = 'getUserMedia not supported.\nUse HTTPS and a modern browser.';
+        document.getElementById('startBtn').style.display = 'inline-block';
       } else {
-        // auto-start (may be blocked by browser – then show Start)
-        startPipeline().then(ok => {
-          // if startCamera failed, startBtn is shown already
-          if (video.readyState < 2) startBtn.style.display='inline-block';
+        startPipeline().then(()=>{
+          if (video.readyState < 2) document.getElementById('startBtn').style.display='inline-block';
         });
       }
-      startBtn.addEventListener('click', ()=>{ startBtn.style.display='none'; startPipeline(); });
+
+      document.getElementById('startBtn').addEventListener('click', ()=> {
+        document.getElementById('startBtn').style.display='none';
+        startPipeline();
+      });
+      document.getElementById('retryBtn').addEventListener('click', async ()=>{
+        diag.textContent = 'Retrying Hands detector…';
+        try {
+          await createHandDetector();
+          document.getElementById('retryBtn').style.display = 'none';
+          diag.textContent = 'Hands ready.';
+        } catch(e){
+          diag.textContent = 'Retry failed:\n' + (e?.message || e);
+        }
+      });
     }
   </script>
-
-  <!-- Libraries loaded by the loader (don’t duplicate here) -->
 </body>
 </html>
