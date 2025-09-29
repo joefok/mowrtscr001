@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Gesture Tetris</title>
 
-  <!-- ✅ Load libraries correctly -->
-  https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js</script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1se-detection.min.js</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest</script>
+  <!-- (Optional) Small perf win -->
+  https://cdn.jsdelivr.net
+  https://unpkg.com
 
   <style>
+    :root { --tile: 30px; }
     body {
       margin: 0;
       overflow: hidden;
       background: #111;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      color: white;
+      color: #fff;
     }
     canvas {
       width: 100vw;
@@ -28,201 +28,255 @@
       position: fixed;
       bottom: 10px;
       right: 10px;
-      width: 96px;
-      height: 72px;
+      width: 112px;
+      height: 84px;
       border: 2px solid #0ff;
       z-index: 10;
-      /* Mirror the preview so it feels natural */
-      transform: scaleX(-1);
+      transform: scaleX(-1); /* mirror for natural control */
     }
-    #status {
+    #diag {
       position: fixed;
       top: 10px;
       left: 10px;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,.6);
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 14px;
       z-index: 10;
-      max-width: 90vw;
+      max-width: 92vw;
       white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <div id="status">Loading TensorFlow & Camera...</div>
+  <!-- UI elements -->
+  <div id="diag">Booting...</div>
   <canvas id="tetris"></canvas>
   <video id="camera" autoplay playsinline muted></video>
 
   <script>
-    window.addEventListener('DOMContentLoaded', async () => {
+    // ==================== CONFIG ====================
+    // Choose control source: 'hand' (default) or 'pose'
+    const MODE = 'hand'; // 'hand' | 'pose'
+
+    // Movement tuning
+    const MOVE_COOLDOWN_MS = 180;  // throttle horizontal moves
+    const HAND_DX_THRESHOLD = 30;  // index tip to wrist (px)
+    const POSE_DX_THRESHOLD = 30;  // wrist to nose (px)
+
+    // ==================== LOADER ====================
+    (function loadLibs(){
+      const head = document.head;
+      const diagEl = document.getElementById('diag');
+      function log(msg) {
+        if (diagEl) diagEl.innerHTML = msg;
+        else console.log(msg.replace(/<[^>]+>/g,''));
+      }
+      function add(src) {
+        return new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.crossOrigin = 'anonymous';
+          s.referrerPolicy = 'no-referrer';
+          s.onload = () => resolve(src);
+          s.onerror = () => reject(new Error('Failed: ' + src));
+          head.appendChild(s);
+        });
+      }
+
+      async function boot() {
+        try {
+          // ---- TFJS ----
+          log('Loading TensorFlow.js...');
+          try { await add("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"); }
+          catch { await add("https://unpkg.com/@tensorflow/tfjs@4.18.0/dist/tf.min.js"); }
+
+          // Backend: WebGL → CPU fallback
+          try { await tf.setBackend('webgl'); }
+          catch { await tf.setBackend('cpu'); }
+          await tf.ready();
+
+          // ---- Detection library per MODE ----
+          if (MODE === 'hand') {
+            log('Loading Hand Pose Detection...');
+            try { await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
+            catch { await add("https://unpkg.com/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"); }
+
+            // MediaPipe Hands runtime (assets)
+            log('Loading MediaPipe Hands runtime...');
+            try { await add("https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest"); }
+            catch { await add("https://unpkg.com/@mediapipe/hands@latest"); }
+          } else {
+            log('Loading Pose Detection (MoveNet)...');
+            try { await add("https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js"); }
+            catch { await add("https://unpkg.com/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.js"); }
+          }
+
+          // Sanity checks
+          const tfOK  = !!window.tf;
+          const libOK = MODE === 'hand'
+            ? !!window.handPoseDetection
+            : !!window.poseDetection;
+
+          log(`TFJS: ${tfOK ? '<b>ok</b>' : '<i>missing</i>'} • ${MODE === 'hand' ? 'Hand-Pose' : 'Pose-Detection'}: ${libOK ? '<b>ok</b>' : '<i>missing</i>'}`);
+
+          if (tfOK && libOK) {
+            setTimeout(() => {
+              if (typeof startApp === 'function') startApp();
+              else log('Libraries loaded. Define <code>startApp()</code> to continue.');
+            }, 0);
+          }
+        } catch (e) {
+          log('Loader error:<br>' + (e?.message || e));
+          console.error(e);
+        }
+      }
+      boot();
+    })();
+  </script>
+
+  <script>
+    // ==================== APP ====================
+    async function startApp() {
+      const diag = document.getElementById('diag');
+      const video = document.getElementById('camera');
       const canvas = document.getElementById('tetris');
       const ctx = canvas.getContext('2d');
-      const statusDiv = document.getElementById('status');
-      const video = document.getElementById('camera');
 
       // Board setup
-      const TILE = 30;
-      const COLS = 10;
-      const ROWS = 20;
+      const TILE = 30, COLS = 10, ROWS = 20;
       canvas.width = COLS * TILE;
       canvas.height = ROWS * TILE;
 
-      // Simple "T" piece
+      // Simple "T" piece and position
       let piece = [
         [1, 1, 1],
         [0, 1, 0],
       ];
-      let position = { x: 3, y: 0 };
-
-      // Left/right gesture handling
+      let pos = { x: 3, y: 0 };
       let lastMove = 0;
-      const MOVE_COOLDOWN_MS = 180; // throttle horizontal moves
 
       function clampX() {
         const maxX = COLS - piece[0].length;
-        if (position.x < 0) position.x = 0;
-        if (position.x > maxX) position.x = maxX;
+        if (pos.x < 0) pos.x = 0;
+        if (pos.x > maxX) pos.x = maxX;
       }
-
       function draw() {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.fillStyle = 'cyan';
         for (let y = 0; y < piece.length; ++y) {
           for (let x = 0; x < piece[y].length; ++x) {
             if (piece[y][x]) {
-              ctx.fillRect((position.x + x) * TILE, (position.y + y) * TILE, TILE, TILE);
+              ctx.fillRect((pos.x + x) * TILE, (pos.y + y) * TILE, TILE, TILE);
             }
           }
         }
 
-        // Optional: draw grid lines for clarity
+        // faint grid
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
         for (let x = 1; x < COLS; x++) {
-          ctx.beginPath();
-          ctx.moveTo(x * TILE, 0);
-          ctx.lineTo(x * TILE, canvas.height);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x * TILE, 0); ctx.lineTo(x * TILE, canvas.height); ctx.stroke();
         }
         for (let y = 1; y < ROWS; y++) {
-          ctx.beginPath();
-          ctx.moveTo(0, y * TILE);
-          ctx.lineTo(canvas.width, y * TILE);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, y * TILE); ctx.lineTo(canvas.width, y * TILE); ctx.stroke();
         }
       }
-
-      function update() {
-        position.y++;
-        if (position.y > ROWS - piece.length) position.y = 0;
+      function tick() {
+        pos.y++;
+        if (pos.y > ROWS - piece.length) pos.y = 0;
         draw();
       }
 
-      // Start the falling loop
-      let fallTimer = null;
+      // Camera setup
+      diag.textContent = 'Requesting camera...';
+      if (!navigator.mediaDevices?.getUserMedia) {
+        diag.textContent = 'getUserMedia not supported. Use HTTPS / modern browser.';
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      video.srcObject = stream;
+      await new Promise(r => {
+        if (video.readyState >= 2) return r();
+        video.onloadeddata = () => r();
+      });
+      try { await video.play(); } catch {}
 
-      // Utilities
-      async function readyVideoPlayback() {
-        // Start camera and wait for video to be ready
-        statusDiv.textContent = "Requesting camera access...";
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false
+      // Detector setup
+      let detector;
+      if (MODE === 'hand') {
+        diag.textContent = 'Creating MediaPipe Hands detector...';
+        const model = handPoseDetection.SupportedModels.MediaPipeHands;
+        detector = await handPoseDetection.createDetector(model, {
+          runtime: 'mediapipe',
+          modelType: 'lite', // 'full'|'heavy' also available
+          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
         });
-        video.srcObject = stream;
-
-        // Make sure metadata is ready before detection
-        await new Promise((resolve) => {
-          if (video.readyState >= 2) return resolve();
-          video.onloadeddata = () => resolve();
+      } else {
+        diag.textContent = 'Creating MoveNet detector...';
+        const model = poseDetection.SupportedModels.MoveNet;
+        detector = await poseDetection.createDetector(model, {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+          enableSmoothing: true,
         });
-
-        // Some browsers still need an explicit play()
-        try { await video.play(); } catch (_) {}
       }
 
-      async function setupTF() {
-        // Try WebGL first; fallback to CPU if needed
-        statusDiv.textContent = "Setting up TensorFlow backend...";
+      // Start game loop
+      draw();
+      const fall = setInterval(tick, 500);
+      diag.textContent = MODE === 'hand'
+        ? 'Ready: move your index fingertip left/right relative to your wrist.'
+        : 'Ready: move your wrist left/right relative to your nose.';
+
+      // Detection loop
+      async function detect() {
         try {
-          await tf.setBackend('webgl');
-          await tf.ready();
-        } catch (e) {
-          console.warn("WebGL backend failed, falling back to CPU", e);
-          await tf.setBackend('cpu');
-          await tf.ready();
-        }
-      }
-
-      async function main() {
-        try {
-          if (!navigator.mediaDevices?.getUserMedia) {
-            throw new Error("getUserMedia is not supported (use HTTPS and a modern browser).");
-          }
-
-          await setupTF();
-
-          statusDiv.textContent = "Creating hand detector...";
-          const model = handPoseDetection.SupportedModels.MediaPipeHands;
-          const detectorConfig = {
-            runtime: 'mediapipe',
-            modelType: 'lite',
-            // MediaPipe assets will be fetched from here
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@latest',
-          };
-          const detector = await handPoseDetection.createDetector(model, detectorConfig);
-
-          await readyVideoPlayback();
-
-          statusDiv.textContent = "Camera access granted. Gesture module active.";
-          draw();
-          fallTimer = setInterval(update, 500);
-
-          // Main detection loop
-          async function detect() {
-            try {
-              // Flip horizontally to match mirrored preview
-              const hands = await detector.estimateHands(video, { flipHorizontal: true });
-
-              if (hands.length > 0) {
-                const keypoints = hands[0].keypoints || [];
-                const wrist = keypoints.find(k => k.name === 'wrist');
-                const indexTip = keypoints.find(k => k.name === 'index_finger_tip');
-
-                if (wrist && indexTip) {
-                  const dx = indexTip.x - wrist.x; // >0 means index is to the right of wrist (after flip)
-                  const now = performance.now();
-
-                  if (now - lastMove > MOVE_COOLDOWN_MS) {
-                    if (dx > 30) {
-                      position.x += 1;
-                      lastMove = now;
-                    } else if (dx < -30) {
-                      position.x -= 1;
-                      lastMove = now;
-                    }
-                    clampX();
-                    draw();
-                  }
+          if (MODE === 'hand') {
+            const hands = await detector.estimateHands(video, { flipHorizontal: true });
+            if (hands.length > 0) {
+              const keypoints = hands[0].keypoints || [];
+              const wrist = keypoints.find(k => k.name === 'wrist');
+              const indexTip = keypoints.find(k => k.name === 'index_finger_tip');
+              if (wrist && indexTip) {
+                const dx = indexTip.x - wrist.x; // +right, -left (after flip)
+                const now = performance.now();
+                if (now - lastMove > MOVE_COOLDOWN_MS) {
+                  if (dx > HAND_DX_THRESHOLD) { pos.x += 1; lastMove = now; }
+                  else if (dx < -HAND_DX_THRESHOLD) { pos.x -= 1; lastMove = now; }
+                  clampX(); draw();
                 }
               }
-            } catch (err) {
-              statusDiv.textContent = "Error during hand detection:\n" + (err?.stack || err);
-              console.error("Hand detection error:", err);
             }
-            requestAnimationFrame(detect);
+          } else {
+            const poses = await detector.estimatePoses(video, { flipHorizontal: true });
+            if (poses.length) {
+              const kps = poses[0].keypoints || [];
+              const byName = Object.fromEntries(kps.map(k => [k.name, k]));
+              const nose = byName['nose'];
+              const rw = byName['right_wrist'];
+              const lw = byName['left_wrist'];
+              const conf = k => (k?.score ?? 0) > 0.5;
+              const wrist = conf(rw) ? rw : (conf(lw) ? lw : null);
+              if (nose && conf(nose) && wrist) {
+                const dx = wrist.x - nose.x; // +right, -left (after flip)
+                const now = performance.now();
+                if (now - lastMove > MOVE_COOLDOWN_MS) {
+                  if (dx > POSE_DX_THRESHOLD) { pos.x += 1; lastMove = now; }
+                  else if (dx < -POSE_DX_THRESHOLD) { pos.x -= 1; lastMove = now; }
+                  clampX(); draw();
+                }
+              }
+            }
           }
-
-          detect();
-        } catch (err) {
-          statusDiv.textContent = "Startup error:\n" + (err?.stack || err);
-          console.error("Startup error:", err);
+        } catch (e) {
+          diag.innerHTML = 'Detection error:<br>' + (e?.message || e);
+          console.error(e);
         }
+        requestAnimationFrame(detect);
       }
-
-      main();
-    });
+      detect();
+    }
   </script>
 </body>
+</html>
