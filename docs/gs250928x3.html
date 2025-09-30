@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Gesture Tetris — Head Absolute Position (Auto Camera & Preview Hide)</title>
+<title>Gesture Tetris — Head Absolute Position (Pinned Tiny Preview)</title>
 <style>
   :root{ --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020; }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -21,10 +21,30 @@
   .stage{position:relative;width:360px;height:720px}
   canvas#game{width:360px;height:720px;background:#0e1524;border-radius:12px;border:1px solid #1f2a44}
   canvas#hud{position:absolute;left:0;top:0;width:360px;height:720px;pointer-events:none}
-  video{max-width:100%;border-radius:10px;border:1px solid #1f2a44}
   .note{padding:8px;border:1px dashed #334d89;border-radius:8px;background:rgba(34,46,80,.35)}
   .kbd{font:12px/1.2 ui-monospace,Menlo,Consolas,monospace;background:#0f1526;border:1px solid #213066;border-radius:6px;padding:2px 6px}
-  .hidden{display:none !important}
+
+  /* ===== Camera preview pinned in the small upper corner ===== */
+  #cam{
+    position: fixed;           /* always on top of the UI */
+    top: 8px; right: 8px;      /* small upper corner (top-right) */
+    width: 160px;              /* small initial size */
+    aspect-ratio: 4/3;         /* keep shape when we change width */
+    height: auto;
+    transform: scaleX(-1);     /* mirror for natural left/right */
+    border-radius: 8px;
+    border: 1px solid #2c3f67;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35);
+    z-index: 9999;
+    transition: width .3s ease, opacity .3s ease, border-radius .3s ease;
+    pointer-events: none;      /* never capture taps; game remains interactive */
+  }
+  #cam.tiny{
+    width: 28px;               /* ultra small after 5 seconds */
+    opacity: .35;
+    border-radius: 50%;
+  }
+  #fallbackStart.hidden{ display:none; }
 </style>
 </head>
 <body>
@@ -33,22 +53,19 @@
 </header>
 
 <main>
-  <!-- LEFT: Game + Video/Debug -->
+  <!-- LEFT: Game + HUD -->
   <section class="panel">
     <div class="stack">
       <div class="row">
-        <label class="row"><input type="checkbox" id="showVideo"> Show camera</label>
         <label class="row"><input type="checkbox" id="showHud" checked> Show debug HUD</label>
         <button id="fallbackStart" class="primary hidden">📷 Tap to enable camera</button>
       </div>
-      <small>Camera auto‑starts on load and preview auto‑hides after <strong>5s</strong>. Detection keeps running in the background.</small>
+      <small>The camera preview is always shown in the small upper corner; it auto‑shrinks after <strong>5 seconds</strong>. Detection runs continuously.</small>
 
       <div class="stage">
         <canvas id="game" width="360" height="720"></canvas>
         <canvas id="hud" width="360" height="720"></canvas>
       </div>
-      <!-- Preview is mirrored for natural left/right control. -->
-      <video id="cam" autoplay playsinline muted style="transform:scaleX(-1); display:none"></video>
 
       <div class="note">
         <strong>Keyboard fallback:</strong>
@@ -68,6 +85,9 @@
     </div>
   </section>
 </main>
+
+<!-- Always-on pinned camera preview -->
+<video id="cam" autoplay playsinline muted></video>
 
 <script type="module">
 /* =========================================================
@@ -164,18 +184,14 @@ const game = new Tetris();
    Gesture Settings — ABSOLUTE HEAD POSITION (no offset)
    ========================================================= */
 const settings = {
-  // Head absolute thresholds: normalized face X in [-1 .. +1]
-  headAbsThreshold: 0.25,
-  headDeadZoneAbs: 0.08,
+  headAbsThreshold: 0.25,  // start moving when |faceX| exceeds this
+  headDeadZoneAbs: 0.08,   // stop when back inside this zone
   moveInitialDelay: 250,
   moveRepeat: 100,
-  // 1-hand rotate (motion-based)
-  oneHandSpeedThresh: 0.030,
+  oneHandSpeedThresh: 0.030, // 1-hand motion → rotate
   rotateCooldownMs: 300,
-  // 2-hands steady → drop
-  twoHandsSteadySpeed: 0.010,
+  twoHandsSteadySpeed: 0.010, // 2 hands steady → drop
   twoHandsDwellMs: 650,
-  // smoothing
   alphaFace: 0.6,
   alphaHand: 0.6
 };
@@ -185,46 +201,42 @@ const settings = {
    ========================================================= */
 const hud = document.getElementById('hud'); const hctx = hud.getContext('2d');
 const stateEl = document.getElementById('state');
+const video = document.getElementById('cam');
+const fallbackBtn = document.getElementById('fallbackStart');
+
 function ema(prev,v,a){ return prev*a + v*(1-a); }
 
 const gesture = {
-  // Face absolute normalized position
   faceX: 0, faceY: 0,
   lastFrameTs: performance.now(),
   moveDir: 0, nextMoveAt: 0,
-  // Hands
   lastOneHandPos: null, lastRotateAt: 0,
   twoHandsSteadySince: 0,
-  _last2: null // stores previous 2-hand positions for speed
+  _last2: null
 };
 
 function normXY(x,y,w,h){
-  // Map pixel coords to [-1,+1], origin at center; y positive down; mirror x to match preview
   let nx = (x / w) * 2 - 1;
   let ny = (y / h) * 2 - 1;
-  nx = -nx; // mirror so screen-left is negative
+  nx = -nx; // mirror for natural left/right
   return {nx, ny};
 }
 function faceCenterFromLandmarks(lms){
-  // Use face bounding box center for stability across devices
   let minX=+1e9, minY=+1e9, maxX=-1e9, maxY=-1e9;
   for(const p of lms){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }
-  return { cx:(minX+maxX)/2, cy:(minY+maxY)/2 }; // normalized [0..1]
+  return { cx:(minX+maxX)/2, cy:(minY+maxY)/2 };
 }
 function palmCenter(lm){
-  const picks=[0,5,9,13,17]; let sx=0,sy=0;
-  for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
+  const picks=[0,5,9,13,17]; let sx=0,sy=0; for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
   return { cx:sx/picks.length, cy:sy/picks.length };
 }
 function drawHUD(show){
   hctx.clearRect(0,0,hud.width,hud.height); if(!show) return;
   const midX=hud.width/2, midY=hud.height/2;
-  // Head absolute bands
   const t = settings.headAbsThreshold*midX;
   const d = settings.headDeadZoneAbs*midX;
   hctx.fillStyle="rgba(0,255,0,.14)"; hctx.fillRect(midX - t, 0, 2, hud.height); hctx.fillRect(midX + t, 0, 2, hud.height);
   hctx.fillStyle="rgba(255,165,0,.14)"; hctx.fillRect(midX - d, 0, 2, hud.height); hctx.fillRect(midX + d, 0, 2, hud.height);
-  // Face dot
   const px = gesture.faceX*midX + midX;
   const py = gesture.faceY*midY + midY;
   hctx.beginPath(); hctx.arc(px,py,6,0,Math.PI*2); hctx.fillStyle="#50e3c2"; hctx.fill();
@@ -233,32 +245,19 @@ function drawHUD(show){
 /* =========================================================
    Camera + Models (Front camera)
    ========================================================= */
-const video = document.getElementById('cam');
-const showVideoChk = document.getElementById('showVideo');
-const fallbackBtn = document.getElementById('fallbackStart');
 let camStream = null, faceLandmarker = null, handLandmarker = null;
 
 async function initModels(){
   const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
   faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
-    },
-    runningMode: "VIDEO",
-    numFaces: 1,
-    minFaceDetectionConfidence: 0.5,
-    minFacePresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
+    runningMode: "VIDEO", numFaces: 1,
+    minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5
   });
   handLandmarker = await HandLandmarker.createFromOptions(fileset, {
-    baseOptions: {
-      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-    },
-    runningMode: "VIDEO",
-    numHands: 2,
-    minHandDetectionConfidence: 0.5,
-    minHandPresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5
+    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
+    runningMode: "VIDEO", numHands: 2,
+    minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5
   });
 }
 
@@ -293,26 +292,26 @@ async function detectLoop(){
   if(!camStream || !faceLandmarker || !handLandmarker){ requestAnimationFrame(detectLoop); return; }
   const now = performance.now();
   const dt = now - gesture.lastFrameTs;
-  const fpsFactor = dt>0 ? (16.7 / dt) : 1; // normalize speeds to ~60fps
+  const fpsFactor = dt>0 ? (16.7 / dt) : 1;
 
-  // --- Face: absolute normalized position [-1..+1] ---
+  // Face absolute normalized position
   const fRes = await faceLandmarker.detectForVideo(video, now);
   const allFaces = fRes?.faceLandmarks ?? [];
   if(allFaces.length){
-    const { cx, cy } = faceCenterFromLandmarks(allFaces[0]); // normalized [0..1]
+    const { cx, cy } = faceCenterFromLandmarks(allFaces[0]);
     const { nx, ny } = normXY(cx*video.videoWidth, cy*video.videoHeight, video.videoWidth, video.videoHeight);
     gesture.faceX = ema(gesture.faceX, nx, settings.alphaFace);
     gesture.faceY = ema(gesture.faceY, ny, settings.alphaFace);
   }
 
-  // --- Hands ---
+  // Hands
   const hRes = await handLandmarker.detectForVideo(video, now);
   const hands = (hRes?.landmarks ?? []).map(lm => lm.map(p => ({ x:p.x*video.videoWidth, y:p.y*video.videoHeight })));
 
   const events = [];
 
-  // 1) HEAD ABSOLUTE X → MOVE (repeat like keyboard)
-  const pos = gesture.faceX; // [-1,+1]
+  // HEAD ABSOLUTE X → MOVE (repeat)
+  const pos = gesture.faceX;
   const left = pos < -settings.headAbsThreshold;
   const right = pos >  settings.headAbsThreshold;
   if(left || right){
@@ -327,7 +326,7 @@ async function detectLoop(){
     gesture.moveDir = 0;
   }
 
-  // 2) ANY 1 HAND MOVEMENT → ROTATE (motion edge)
+  // 1 HAND MOVEMENT → ROTATE
   if(hands.length === 1){
     const { cx, cy } = palmCenter(hands[0]);
     const { nx, ny } = normXY(cx, cy, video.videoWidth, video.videoHeight);
@@ -344,7 +343,7 @@ async function detectLoop(){
     gesture.lastOneHandPos = null;
   }
 
-  // 3) ANY 2 HANDS STEADY → DROP (dwell)
+  // 2 HANDS STEADY → DROP
   if(hands.length >= 2){
     const [A,B] = hands;
     const pcA = palmCenter(A), pcB = palmCenter(B);
@@ -375,41 +374,32 @@ async function detectLoop(){
 }
 
 /* =========================================================
-   UI & Auto‑boot (auto camera start + 5s preview)
+   Auto‑boot (auto camera start; shrink after 5s)
    ========================================================= */
-const $ = (id)=>document.getElementById(id);
-$('showVideo').onchange = (e)=>{ video.style.display = e.target.checked ? 'block' : 'none'; };
-$('showHud').onchange = ()=> drawHUD($('showHud').checked);
-
-// Auto‑boot on page load. Show preview immediately, then hide after 5s.
-// If permissions are blocked, reveal a fallback button.
 async function bootCameraAndModels(){
   try{
     await startCamera();
     await initModels();
 
-    // Show preview immediately
-    showVideoChk.checked = true;
-    video.style.display = 'block';
+    // Make sure preview starts visible at small size (no 'tiny' class yet)
+    video.classList.remove('tiny');
 
-    // Hide after 5 seconds, keep detection running
-    setTimeout(()=>{
-      showVideoChk.checked = false;
-      video.style.display = 'none';
-    }, 5000);
+    // Shrink to tiny after 5 seconds (detection continues)
+    setTimeout(()=>{ video.classList.add('tiny'); }, 5000);
 
     // Start detection loop
     requestAnimationFrame(detectLoop);
   }catch(err){
     console.error("Auto-start failed:", err);
-    fallbackBtn.classList.remove('hidden');
+    document.getElementById('fallbackStart').classList.remove('hidden');
   }
 }
-fallbackBtn.addEventListener('click', async ()=>{
-  fallbackBtn.disabled = true;
+document.getElementById('fallbackStart').addEventListener('click', async ()=>{
+  const btn = document.getElementById('fallbackStart');
+  btn.disabled = true;
   await bootCameraAndModels();
-  fallbackBtn.classList.add('hidden');
-  fallbackBtn.disabled = false;
+  btn.classList.add('hidden');
+  btn.disabled = false;
 });
 
 window.addEventListener('DOMContentLoaded', bootCameraAndModels);
@@ -430,3 +420,4 @@ function gameLoop(ts){ const dt = ts - lastTS; lastTS = ts; game.step(dt); game.
 requestAnimationFrame(gameLoop);
 </script>
 </body>
+</html>
