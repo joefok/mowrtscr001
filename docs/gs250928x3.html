@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Gesture Tetris — Head Absolute Position (Pinned Tiny Preview)</title>
+<title>Gesture Tetris — Head Lane Control (Pinned Tiny Preview)</title>
 <style>
   :root{ --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020; }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
@@ -26,21 +26,21 @@
 
   /* ===== Camera preview pinned in the small upper corner ===== */
   #cam{
-    position: fixed;           /* always on top of the UI */
-    top: 8px; right: 8px;      /* small upper corner (top-right) */
-    width: 160px;              /* small initial size */
-    aspect-ratio: 4/3;         /* keep shape when we change width */
+    position: fixed;
+    top: 8px; right: 8px;
+    width: 160px;           /* small initial size */
+    aspect-ratio: 4/3;
     height: auto;
-    transform: scaleX(-1);     /* mirror for natural left/right */
+    transform: scaleX(-1);  /* mirror for natural left/right */
     border-radius: 8px;
     border: 1px solid #2c3f67;
     box-shadow: 0 4px 16px rgba(0,0,0,.35);
     z-index: 9999;
     transition: width .3s ease, opacity .3s ease, border-radius .3s ease;
-    pointer-events: none;      /* never capture taps; game remains interactive */
+    pointer-events: none;   /* never capture taps; game remains interactive */
   }
   #cam.tiny{
-    width: 28px;               /* ultra small after 5 seconds */
+    width: 28px;            /* ultra small after 5 seconds */
     opacity: .35;
     border-radius: 50%;
   }
@@ -49,7 +49,7 @@
 </head>
 <body>
 <header>
-  <h1>Gesture Tetris — <span class="pill">Head Absolute X → Move</span> • <span class="pill">1 Hand Move → Rotate</span> • <span class="pill">2 Hands Steady → Drop</span> • <span class="pill">Auto‑Restart</span></h1>
+  <h1>Gesture Tetris — <span class="pill">Head → Lane (absolute)</span> • <span class="pill">1 Hand Move → Rotate</span> • <span class="pill">2 Hands Steady → Drop</span> • <span class="pill">Auto‑Restart</span></h1>
 </header>
 
 <main>
@@ -60,7 +60,7 @@
         <label class="row"><input type="checkbox" id="showHud" checked> Show debug HUD</label>
         <button id="fallbackStart" class="primary hidden">📷 Tap to enable camera</button>
       </div>
-      <small>The camera preview is always shown in the small upper corner; it auto‑shrinks after <strong>5 seconds</strong>. Detection runs continuously.</small>
+      <small>Align your head horizontally with a lane; the piece will **snap** to that lane. After <strong>5s</strong>, the camera preview shrinks but detection stays active.</small>
 
       <div class="stage">
         <canvas id="game" width="360" height="720"></canvas>
@@ -181,17 +181,18 @@ class Tetris {
 const game = new Tetris();
 
 /* =========================================================
-   Gesture Settings — ABSOLUTE HEAD POSITION (no offset)
+   Gesture Settings — ABSOLUTE HEAD LANE CONTROL
    ========================================================= */
 const settings = {
-  headAbsThreshold: 0.25,  // start moving when |faceX| exceeds this
-  headDeadZoneAbs: 0.08,   // stop when back inside this zone
-  moveInitialDelay: 250,
-  moveRepeat: 100,
-  oneHandSpeedThresh: 0.030, // 1-hand motion → rotate
+  // Lane quantization from head absolute X ([-1..+1]):
+  laneHysteresis: 0.06,   // keep within lane by requiring this margin before switching
+  // 1-hand rotate (motion-based)
+  oneHandSpeedThresh: 0.030,
   rotateCooldownMs: 300,
-  twoHandsSteadySpeed: 0.010, // 2 hands steady → drop
+  // 2-hands steady → drop
+  twoHandsSteadySpeed: 0.010,
   twoHandsDwellMs: 650,
+  // smoothing
   alphaFace: 0.6,
   alphaHand: 0.6
 };
@@ -209,12 +210,15 @@ function ema(prev,v,a){ return prev*a + v*(1-a); }
 const gesture = {
   faceX: 0, faceY: 0,
   lastFrameTs: performance.now(),
-  moveDir: 0, nextMoveAt: 0,
+  // Lane control
+  currentLane: Math.floor(W/2),   // start centered
+  // Hand gestures
   lastOneHandPos: null, lastRotateAt: 0,
   twoHandsSteadySince: 0,
   _last2: null
 };
 
+// Convert pixel -> normalized [-1,+1] (mirrored)
 function normXY(x,y,w,h){
   let nx = (x / w) * 2 - 1;
   let ny = (y / h) * 2 - 1;
@@ -230,15 +234,91 @@ function palmCenter(lm){
   const picks=[0,5,9,13,17]; let sx=0,sy=0; for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
   return { cx:sx/picks.length, cy:sy/picks.length };
 }
+
+/* ---------- LANE LOGIC ---------- */
+/**
+ * Map headX in [-1,+1] to a discrete lane 0..W-1 with hysteresis so we
+ * don't jitter at lane boundaries.
+ */
+function laneFromHeadX(nx, prevLane){
+  // Lane width in normalized units:
+  const laneW = 2 / W; // total span [-1..+1] is 2
+  // Lane centers from -1+laneW/2 to +1-laneW/2
+  const idx = Math.floor((nx + 1) / laneW);            // provisional lane
+  const lane = Math.max(0, Math.min(W-1, idx));
+
+  // Hysteresis: stay in prevLane until we move past prev center ± margin
+  if (prevLane == null) return lane;
+  const centerPrev = -1 + (prevLane + 0.5) * laneW;
+  const margin = settings.laneHysteresis;
+  if (nx > centerPrev + (laneW/2 + margin) && prevLane < W-1) return prevLane + 1;
+  if (nx < centerPrev - (laneW/2 + margin) && prevLane > 0)   return prevLane - 1;
+  return prevLane;
+}
+
+/**
+ * Snap current piece horizontally so its **center** aligns with the lane center,
+ * clamped to board and avoiding collisions if possible.
+ */
+function snapPieceToLane(lane){
+  if(!game.curr) return;
+  const shape = game.curr.shape;
+  const pieceW = shape[0].length;
+
+  // Desired x so that piece center aligns to lane column center
+  const desiredCenterCol = lane;
+  let desiredX = desiredCenterCol - Math.floor(pieceW/2);
+  desiredX = Math.max(0, Math.min(W - pieceW, desiredX));
+
+  // If direct placement collides, pick the nearest valid x (by center distance)
+  const validX = nearestValidX(desiredX, pieceW, shape);
+  if (validX !== null && validX !== game.curr.x) {
+    const test = {...game.curr, x: validX};
+    if(!game.collide(test.x, test.y, test.shape)) game.curr = test;
+  }
+}
+
+function nearestValidX(desiredX, pieceW, shape){
+  // Scan across all legal x to find the closest center to desired lane center
+  let bestX = null, bestDist = Infinity;
+  for (let x=0; x<=W-pieceW; x++){
+    if (!game.collide(x, game.curr.y, shape)) {
+      const center = x + Math.floor(pieceW/2);
+      const desiredCenter = desiredX + Math.floor(pieceW/2);
+      const d = Math.abs(center - desiredCenter);
+      if (d < bestDist) { bestDist = d; bestX = x; }
+    }
+  }
+  return bestX;
+}
+
+/* ---------- HUD ---------- */
 function drawHUD(show){
   hctx.clearRect(0,0,hud.width,hud.height); if(!show) return;
   const midX=hud.width/2, midY=hud.height/2;
-  const t = settings.headAbsThreshold*midX;
-  const d = settings.headDeadZoneAbs*midX;
-  hctx.fillStyle="rgba(0,255,0,.14)"; hctx.fillRect(midX - t, 0, 2, hud.height); hctx.fillRect(midX + t, 0, 2, hud.height);
-  hctx.fillStyle="rgba(255,165,0,.14)"; hctx.fillRect(midX - d, 0, 2, hud.height); hctx.fillRect(midX + d, 0, 2, hud.height);
-  const px = gesture.faceX*midX + midX;
-  const py = gesture.faceY*midY + midY;
+
+  // Draw 10 vertical lane separators + centers
+  const laneWpx = hud.width / W;
+  hctx.strokeStyle="rgba(255,255,255,.08)"; hctx.lineWidth=1;
+  for(let i=0;i<=W;i++){
+    const x = Math.round(i*laneWpx);
+    hctx.beginPath(); hctx.moveTo(x,0); hctx.lineTo(x,hud.height); hctx.stroke();
+  }
+  // Lane centers
+  hctx.strokeStyle="rgba(80,227,194,.25)";
+  for(let i=0;i<W;i++){
+    const cx = Math.round((i+0.5)*laneWpx);
+    hctx.beginPath(); hctx.moveTo(cx,0); hctx.lineTo(cx,hud.height); hctx.stroke();
+  }
+
+  // Current lane highlight
+  const lane = gesture.currentLane;
+  hctx.fillStyle="rgba(80,227,194,.08)";
+  hctx.fillRect(lane*laneWpx, 0, laneWpx, hud.height);
+
+  // Face dot (for reference)
+  const px = (gesture.faceX * midX) + midX;
+  const py = (gesture.faceY * midY) + midY;
   hctx.beginPath(); hctx.arc(px,py,6,0,Math.PI*2); hctx.fillStyle="#50e3c2"; hctx.fill();
 }
 
@@ -272,18 +352,17 @@ async function startCamera(){
 }
 
 /* =========================================================
-   Detection → Mappings (Absolute Head X + Hand logic)
+   Detection → Mappings (Head lane + Hand gestures)
    ========================================================= */
 function dispatch(events){
   for(const e of events){
-    if(e.type==='move') (e.dir<0?game.left():game.right());
     if(e.type==='rotate') game.rotateCW();
-    if(e.type==='drop') game.hardDrop();
+    if(e.type==='drop')   game.hardDrop();
   }
   const s = {
     faceX: gesture.faceX.toFixed(3),
-    moveDir: gesture.moveDir,
-    nextMoveInMs: Math.max(0, gesture.nextMoveAt - performance.now()).toFixed(0)
+    lane: gesture.currentLane,
+    pieceX: game.curr ? game.curr.x : null
   };
   stateEl.textContent = JSON.stringify(s,null,2);
 }
@@ -294,7 +373,7 @@ async function detectLoop(){
   const dt = now - gesture.lastFrameTs;
   const fpsFactor = dt>0 ? (16.7 / dt) : 1;
 
-  // Face absolute normalized position
+  // Face → normalized head pos (absolute), smoothed
   const fRes = await faceLandmarker.detectForVideo(video, now);
   const allFaces = fRes?.faceLandmarks ?? [];
   if(allFaces.length){
@@ -302,6 +381,13 @@ async function detectLoop(){
     const { nx, ny } = normXY(cx*video.videoWidth, cy*video.videoHeight, video.videoWidth, video.videoHeight);
     gesture.faceX = ema(gesture.faceX, nx, settings.alphaFace);
     gesture.faceY = ema(gesture.faceY, ny, settings.alphaFace);
+
+    // Update lane from absolute head X with hysteresis
+    const newLane = laneFromHeadX(gesture.faceX, gesture.currentLane);
+    gesture.currentLane = newLane;
+
+    // Snap the current piece horizontally to that lane
+    snapPieceToLane(gesture.currentLane);
   }
 
   // Hands
@@ -309,22 +395,6 @@ async function detectLoop(){
   const hands = (hRes?.landmarks ?? []).map(lm => lm.map(p => ({ x:p.x*video.videoWidth, y:p.y*video.videoHeight })));
 
   const events = [];
-
-  // HEAD ABSOLUTE X → MOVE (repeat)
-  const pos = gesture.faceX;
-  const left = pos < -settings.headAbsThreshold;
-  const right = pos >  settings.headAbsThreshold;
-  if(left || right){
-    const dir = left ? -1 : +1;
-    if(gesture.moveDir !== dir){
-      gesture.moveDir = dir; events.push({type:'move', dir});
-      gesture.nextMoveAt = now + settings.moveInitialDelay;
-    } else if(now >= gesture.nextMoveAt){
-      events.push({type:'move', dir}); gesture.nextMoveAt = now + settings.moveRepeat;
-    }
-  } else if (Math.abs(pos) <= settings.headDeadZoneAbs){
-    gesture.moveDir = 0;
-  }
 
   // 1 HAND MOVEMENT → ROTATE
   if(hands.length === 1){
@@ -343,7 +413,7 @@ async function detectLoop(){
     gesture.lastOneHandPos = null;
   }
 
-  // 2 HANDS STEADY → DROP
+  // 2 HANDS STEADY → DROP (dwell)
   if(hands.length >= 2){
     const [A,B] = hands;
     const pcA = palmCenter(A), pcB = palmCenter(B);
@@ -381,13 +451,10 @@ async function bootCameraAndModels(){
     await startCamera();
     await initModels();
 
-    // Make sure preview starts visible at small size (no 'tiny' class yet)
+    // Show preview small initially; shrink to ultra small after 5 seconds
     video.classList.remove('tiny');
-
-    // Shrink to tiny after 5 seconds (detection continues)
     setTimeout(()=>{ video.classList.add('tiny'); }, 5000);
 
-    // Start detection loop
     requestAnimationFrame(detectLoop);
   }catch(err){
     console.error("Auto-start failed:", err);
