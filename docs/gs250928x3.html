@@ -3,11 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Gesture Tetris — Head Absolute Position</title>
+<title>Gesture Tetris — Head Absolute Position (Auto Camera & Preview Hide)</title>
 <style>
-  :root{
-    --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020;
-  }
+  :root{ --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020; }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   header{padding:10px 16px;border-bottom:1px solid #1f2a44;background:var(--panel);position:sticky;top:0;z-index:10}
   h1{font-size:16px;margin:0}
@@ -26,6 +24,7 @@
   video{max-width:100%;border-radius:10px;border:1px solid #1f2a44}
   .note{padding:8px;border:1px dashed #334d89;border-radius:8px;background:rgba(34,46,80,.35)}
   .kbd{font:12px/1.2 ui-monospace,Menlo,Consolas,monospace;background:#0f1526;border:1px solid #213066;border-radius:6px;padding:2px 6px}
+  .hidden{display:none !important}
 </style>
 </head>
 <body>
@@ -38,17 +37,17 @@
   <section class="panel">
     <div class="stack">
       <div class="row">
-        <button id="startCam" class="primary">📷 Start Front Camera</button>
-        <button id="stopCam">🛑 Stop</button>
         <label class="row"><input type="checkbox" id="showVideo"> Show camera</label>
         <label class="row"><input type="checkbox" id="showHud" checked> Show debug HUD</label>
+        <button id="fallbackStart" class="primary hidden">📷 Tap to enable camera</button>
       </div>
-      <small>Head absolute X controls move (screen‑aligned). Wave any one hand to rotate. Hold two hands steady to drop.</small>
+      <small>Camera auto‑starts on load and preview auto‑hides after <strong>5s</strong>. Detection keeps running in the background.</small>
 
       <div class="stage">
         <canvas id="game" width="360" height="720"></canvas>
         <canvas id="hud" width="360" height="720"></canvas>
       </div>
+      <!-- Preview is mirrored for natural left/right control. -->
       <video id="cam" autoplay playsinline muted style="transform:scaleX(-1); display:none"></video>
 
       <div class="note">
@@ -166,7 +165,6 @@ const game = new Tetris();
    ========================================================= */
 const settings = {
   // Head absolute thresholds: normalized face X in [-1 .. +1]
-  // Example: beyond ±0.25 starts moving; within ±0.08 stops (dead zone).
   headAbsThreshold: 0.25,
   headDeadZoneAbs: 0.08,
   moveInitialDelay: 250,
@@ -207,7 +205,6 @@ function normXY(x,y,w,h){
   nx = -nx; // mirror so screen-left is negative
   return {nx, ny};
 }
-
 function faceCenterFromLandmarks(lms){
   // Use face bounding box center for stability across devices
   let minX=+1e9, minY=+1e9, maxX=-1e9, maxY=-1e9;
@@ -219,7 +216,6 @@ function palmCenter(lm){
   for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
   return { cx:sx/picks.length, cy:sy/picks.length };
 }
-
 function drawHUD(show){
   hctx.clearRect(0,0,hud.width,hud.height); if(!show) return;
   const midX=hud.width/2, midY=hud.height/2;
@@ -238,6 +234,8 @@ function drawHUD(show){
    Camera + Models (Front camera)
    ========================================================= */
 const video = document.getElementById('cam');
+const showVideoChk = document.getElementById('showVideo');
+const fallbackBtn = document.getElementById('fallbackStart');
 let camStream = null, faceLandmarker = null, handLandmarker = null;
 
 async function initModels(){
@@ -274,11 +272,6 @@ async function startCamera(){
   await new Promise(r=> video.onloadedmetadata = r);
 }
 
-function stopCamera(){
-  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
-  video.srcObject=null;
-}
-
 /* =========================================================
    Detection → Mappings (Absolute Head X + Hand logic)
    ========================================================= */
@@ -302,12 +295,11 @@ async function detectLoop(){
   const dt = now - gesture.lastFrameTs;
   const fpsFactor = dt>0 ? (16.7 / dt) : 1; // normalize speeds to ~60fps
 
-  // --- Face: absolute normalized position [-1..+1], NO OFFSET/BASELINE ---
+  // --- Face: absolute normalized position [-1..+1] ---
   const fRes = await faceLandmarker.detectForVideo(video, now);
   const allFaces = fRes?.faceLandmarks ?? [];
   if(allFaces.length){
     const { cx, cy } = faceCenterFromLandmarks(allFaces[0]); // normalized [0..1]
-    // convert to pixels to reuse normXY; then to [-1,+1], mirrored
     const { nx, ny } = normXY(cx*video.videoWidth, cy*video.videoHeight, video.videoWidth, video.videoHeight);
     gesture.faceX = ema(gesture.faceX, nx, settings.alphaFace);
     gesture.faceY = ema(gesture.faceY, ny, settings.alphaFace);
@@ -320,7 +312,7 @@ async function detectLoop(){
   const events = [];
 
   // 1) HEAD ABSOLUTE X → MOVE (repeat like keyboard)
-  const pos = gesture.faceX; // already in [-1,+1], screen-aligned
+  const pos = gesture.faceX; // [-1,+1]
   const left = pos < -settings.headAbsThreshold;
   const right = pos >  settings.headAbsThreshold;
   if(left || right){
@@ -332,7 +324,6 @@ async function detectLoop(){
       events.push({type:'move', dir}); gesture.nextMoveAt = now + settings.moveRepeat;
     }
   } else if (Math.abs(pos) <= settings.headDeadZoneAbs){
-    // Stop when returning to dead zone around center
     gesture.moveDir = 0;
   }
 
@@ -356,8 +347,9 @@ async function detectLoop(){
   // 3) ANY 2 HANDS STEADY → DROP (dwell)
   if(hands.length >= 2){
     const [A,B] = hands;
-    const nA = normXY(...Object.values(palmCenter(A)), video.videoWidth, video.videoHeight);
-    const nB = normXY(...Object.values(palmCenter(B)), video.videoWidth, video.videoHeight);
+    const pcA = palmCenter(A), pcB = palmCenter(B);
+    const nA = normXY(pcA.cx, pcA.cy, video.videoWidth, video.videoHeight);
+    const nB = normXY(pcB.cx, pcB.cy, video.videoWidth, video.videoHeight);
     if(!gesture._last2) gesture._last2 = { nA, nB };
     const speedA = Math.hypot(nA.nx - gesture._last2.nA.nx, nA.ny - gesture._last2.nA.ny) * fpsFactor;
     const speedB = Math.hypot(nB.nx - gesture._last2.nB.nx, nB.ny - gesture._last2.nB.ny) * fpsFactor;
@@ -383,20 +375,46 @@ async function detectLoop(){
 }
 
 /* =========================================================
-   UI & App wiring
+   UI & Auto‑boot (auto camera start + 5s preview)
    ========================================================= */
 const $ = (id)=>document.getElementById(id);
-$('startCam').onclick = async ()=>{
-  $('startCam').disabled = true;
-  await startCamera();
-  await initModels();
-  requestAnimationFrame(detectLoop);
-  $('startCam').disabled = false;
-};
-$('stopCam').onclick = ()=> stopCamera();
 $('showVideo').onchange = (e)=>{ video.style.display = e.target.checked ? 'block' : 'none'; };
 $('showHud').onchange = ()=> drawHUD($('showHud').checked);
 
+// Auto‑boot on page load. Show preview immediately, then hide after 5s.
+// If permissions are blocked, reveal a fallback button.
+async function bootCameraAndModels(){
+  try{
+    await startCamera();
+    await initModels();
+
+    // Show preview immediately
+    showVideoChk.checked = true;
+    video.style.display = 'block';
+
+    // Hide after 5 seconds, keep detection running
+    setTimeout(()=>{
+      showVideoChk.checked = false;
+      video.style.display = 'none';
+    }, 5000);
+
+    // Start detection loop
+    requestAnimationFrame(detectLoop);
+  }catch(err){
+    console.error("Auto-start failed:", err);
+    fallbackBtn.classList.remove('hidden');
+  }
+}
+fallbackBtn.addEventListener('click', async ()=>{
+  fallbackBtn.disabled = true;
+  await bootCameraAndModels();
+  fallbackBtn.classList.add('hidden');
+  fallbackBtn.disabled = false;
+});
+
+window.addEventListener('DOMContentLoaded', bootCameraAndModels);
+
+/* Keyboard fallback */
 window.addEventListener('keydown', (ev)=>{
   if(ev.repeat) return;
   if(ev.key==='ArrowLeft') game.left();
@@ -406,7 +424,7 @@ window.addEventListener('keydown', (ev)=>{
   if(ev.key.toLowerCase()==='p') game.pauseToggle();
 });
 
-// Game loop
+/* Game loop */
 let lastTS = performance.now();
 function gameLoop(ts){ const dt = ts - lastTS; lastTS = ts; game.step(dt); game.draw(); requestAnimationFrame(gameLoop); }
 requestAnimationFrame(gameLoop);
