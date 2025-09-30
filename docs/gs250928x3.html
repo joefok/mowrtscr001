@@ -1,288 +1,609 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Gesture Tetris — Hands Only</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    /* Keep the original simple look */
-    :root { color-scheme: dark; }
-    html,body { margin:0; padding:16px; background:#0b0f14; color:#e9f1fb; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    h1, .title { font-size: 16px; margin:0 0 10px 0; white-space: pre-wrap; }
-    .muted { color:#9fb0c3; font-size: 13px; }
-    .row { display:inline-flex; gap:8px; align-items:center; margin:8px 0; }
-    button { background:#1b283a; color:#e9f1fb; border:1px solid #2b3c56; padding:6px 10px; border-radius:8px; cursor:pointer; }
-    button:hover { background:#22324a; }
-    #hud { display:inline-block; margin-left:8px; font-size:12px; color:#cde2ff; }
-    /* Keep camera elements unobtrusive; you can show for debugging if you want */
-    video, canvas { display:none; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gesture Tetris — Hands Only (Drop‑in)</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--text);margin:0;font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{padding:10px 16px;border-bottom:1px solid #1f2a44;background:var(--panel);position:sticky;top:0;z-index:10}
+  h1{font-size:16px;margin:0}
+  main{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px}
+  @media (max-width: 960px){ main{grid-template-columns:1fr} }
+  .panel{background:var(--panel);border:1px solid #1f2a44;border-radius:10px;padding:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+  button,select,input[type="checkbox"],input[type="range"]{cursor:pointer}
+  button{background:#1d2a3f;color:var(--text);border:1px solid #2c3f67;border-radius:8px;padding:8px 10px}
+  button.primary{background:#224d3f;border-color:#1d6f58}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  small{color:var(--muted)}
+  .kbd{font:12px/1.2 ui-monospace,Menlo,Consolas,monospace;background:#0f1526;border:1px solid #213066;border-radius:6px;padding:2px 6px}
+  .stack{display:flex;flex-direction:column;gap:6px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  canvas#game{width:360px;height:720px;background:#0e1524;border-radius:12px;border:1px solid #1f2a44}
+  .stage{position:relative;width:360px;height:720px}
+  canvas#hud{position:absolute;left:0;top:0;width:360px;height:720px;pointer-events:none}
+  video{max-width:100%;border-radius:10px;border:1px solid #1f2a44}
+  .note{padding:8px;border:1px dashed #334d89;border-radius:8px;background:rgba(34,46,80,.35)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#132744;border:1px solid #27518a;color:#cde}
+</style>
 </head>
 <body>
-  <!-- Keep the original headline style, just update the control hints -->
-  <div class="title"># Gesture Tetris — Hands Only: Head Pose ◀/▶ Move, OK Rotate, Victory Drop</div>
-  <div id="status" class="muted">Booting…</div>
+<header>
+  <h1>Gesture Tetris — Hands Only: <span class="pill">Open→Fist Rotate</span> • <span class="pill">Long Down Drop</span> • <span class="pill">Horizontal Move</span></h1>
+</header>
 
-  <div class="row">
-    <button id="btnStart">Start Camera 📷</button>
-    <button id="btnHide">Hide</button>
-    <span id="hud" aria-live="polite"></span>
-  </div>
+<main>
+  <!-- LEFT: Game + Video/Debug -->
+  <section class="panel">
+    <div class="stack">
+      <div class="row">
+        <button id="startCam" class="primary">📷 Start Camera</button>
+        <button id="stopCam">🛑 Stop Camera</button>
+        <label class="row"><input type="checkbox" id="showVideo"> Show camera</label>
+        <label class="row"><input type="checkbox" id="showHud" checked> Show debug HUD</label>
+        <button id="calibrate">🎯 Calibrate baseline</button>
+      </div>
+      <div class="row"><small>Tip: mirror preview is on; left/right will feel natural.</small></div>
 
-  <!-- Off-screen media elements (hidden to preserve original simple design) -->
-  <video id="video" playsinline></video>
-  <canvas id="overlay" width="640" height="480"></canvas>
+      <div class="stage">
+        <canvas id="game" width="360" height="720"></canvas>
+        <canvas id="hud" width="360" height="720"></canvas>
+      </div>
 
-  <!-- MediaPipe from CDN (FaceMesh for head pose, Hands for gestures) -->
-  https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js</script>
-  https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js</script>
+      <video id="cam" autoplay playsinline muted style="transform:scaleX(-1); display:none"></video>
 
-  <script>
-    /********************************************************************
-     * Minimal configuration — preserves your original page design
-     * Map to your engine OR let it fall back to keyboard events.
-     ********************************************************************/
-    const CONFIG = {
-      // If your engine exposes methods, put them here (optional but best):
-      // Example:
-      // left:   () => window.game.moveLeft(),
-      // right:  () => window.game.moveRight(),
-      // rotate: () => window.game.rotatePiece(), // or rotate()
-      // drop:   () => window.game.hardDrop(),    // or drop()
-      left:   null,
-      right:  null,
-      rotate: null,
-      drop:   null,
+      <div class="note">
+        <strong>Controls (keyboard fallback):</strong>
+        <span class="kbd">←</span>/<span class="kbd">→</span> move,
+        <span class="kbd">↑</span> rotate,
+        <span class="kbd">↓</span> soft drop,
+        <span class="kbd">Space</span> hard drop,
+        <span class="kbd">C</span> hold,
+        <span class="kbd">P</span> pause.
+      </div>
+    </div>
+  </section>
 
-      // Keyboard fallback (used when a direct call above is null)
-      // Adjust to your engine’s bindings if needed.
-      keys: {
-        left:   "ArrowLeft",
-        right:  "ArrowRight",
-        rotate: "ArrowUp",
-        drop:   "Space"
-      },
+  <!-- RIGHT: Settings & State -->
+  <section class="panel">
+    <div class="stack">
+      <h3 style="margin:0">Gesture Settings</h3>
 
-      // Head-move feel
-      head: { deadZone: 0.08, trigger: 0.15, firstDelay: 260, repeatEvery: 110, yawSmoothing: 0.30 }
-    };
+      <div class="grid2">
+        <div class="stack">
+          <label>Rotate gesture
+            <select id="rotateKind">
+              <option value="edge_open_to_fist" selected>Open→Fist (edge)</option>
+              <option value="thumbs_up_edge">Thumbs‑Up (edge)</option>
+            </select>
+          </label>
+          <label>Rotate cooldown <input type="range" id="rotateCooldown" min="150" max="600" value="250"> <small><span id="rotateCooldownV">250</span> ms</small></label>
+          <label>Open high (arm) <input type="range" id="openHigh" min="0.5" max="0.95" step="0.01" value="0.7"> <small><span id="openHighV">0.70</span></small></label>
+          <label>Open low (fist) <input type="range" id="openLow" min="0.05" max="0.5" step="0.01" value="0.3"> <small><span id="openLowV">0.30</span></small></label>
+        </div>
 
-    /********************************************************************
-     * Adapter: either call your functions or send the mapped key.
-     ********************************************************************/
-    function sendKey(code) {
-      const e = new KeyboardEvent("keydown", { key: code, code, bubbles: true, cancelable: true });
-      window.dispatchEvent(e); document.dispatchEvent(e);
-    }
-    const act = {
-      left()   { if (CONFIG.left)   return CONFIG.left();   sendKey(CONFIG.keys.left); },
-      right()  { if (CONFIG.right)  return CONFIG.right();  sendKey(CONFIG.keys.right); },
-      rotate() { if (CONFIG.rotate) return CONFIG.rotate(); sendKey(CONFIG.keys.rotate); },
-      drop()   { if (CONFIG.drop)   return CONFIG.drop();   sendKey(CONFIG.keys.drop); }
-    };
+        <div class="stack">
+          <label>Move threshold (|x|) <input type="range" id="moveThresh" min="0.04" max="0.18" step="0.005" value="0.08"> <small><span id="moveThreshV">0.08</span></small></label>
+          <label>Move dead‑zone <input type="range" id="moveDead" min="0.02" max="0.12" step="0.005" value="0.04"> <small><span id="moveDeadV">0.04</span></small></label>
+          <label>Move initial delay <input type="range" id="moveInitDelay" min="120" max="600" value="250"> <small><span id="moveInitDelayV">250</span> ms</small></label>
+          <label>Move repeat <input type="range" id="moveRepeat" min="60" max="240" value="100"> <small><span id="moveRepeatV">100</span> ms</small></label>
+        </div>
+      </div>
 
-    /********************************************************************
-     * Minimal UI hooks (same as original)
-     ********************************************************************/
-    const $ = s => document.querySelector(s);
-    const statusEl = $("#status");
-    const hudEl = $("#hud");
-    const videoEl = $("#video");
-    const canvasEl = $("#overlay");
-    const ctx = canvasEl.getContext("2d");
-    let camera = null;
+      <div class="grid2">
+        <div class="stack">
+          <label>Drop dwell time <input type="range" id="dropDwell" min="300" max="1200" value="600"> <small><span id="dropDwellV">600</span> ms</small></label>
+          <label>Drop deltaY <input type="range" id="dropDelta" min="0.06" max="0.25" step="0.005" value="0.12"> <small><span id="dropDeltaV">0.12</span></small></label>
+        </div>
+        <div class="stack">
+          <label><input type="checkbox" id="enablePinch" checked> Enable pinch → Hold</label>
+          <label><input type="checkbox" id="enableTwoFists" checked> Enable two‑fists dwell → Pause</label>
+        </div>
+      </div>
 
-    $("#btnStart").addEventListener("click", startCamera);
-    $("#btnHide").addEventListener("click", () => {
-      // Hide only the helper HUD/status to keep original simplicity
-      hudEl.style.display = "none";
-      statusEl.style.display = "none";
-    });
+      <div class="stack">
+        <h3 style="margin:4px 0 0">State</h3>
+        <div id="state" style="white-space:pre; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; background:#0f162a; border:1px solid #253a6a; border-radius:8px; padding:8px; min-height:88px"></div>
+      </div>
+    </div>
+  </section>
+</main>
 
-    function setStatus(t) { statusEl.textContent = t; }
+<script type="module">
+/* ===========================
+   Imports (MediaPipe Tasks)
+   =========================== */
+import { FilesetResolver, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-    /********************************************************************
-     * Head pose state (yaw) and repeat
-     ********************************************************************/
-    let calib = { centerX: 0.5, faceWidth: 0.25, has: false };
-    let yawEMA = 0;
-    let lastDir = 0, lastDirChangeAt = 0, lastRepeatAt = 0;
+/* ===========================
+   TETRIS ENGINE (minimal)
+   =========================== */
+const gameCanvas = document.getElementById('game');
+const gctx = gameCanvas.getContext('2d');
+const W = 10, H = 20, CELL = 36; // board 10x20; canvas 360x720 (scaled CSS = 360x720)
+const COLORS = {
+  0:'#0e1524',
+  I:'#50e3c2', J:'#4aa3ff', L:'#ffb020',
+  O:'#ffd166', S:'#2ee59d', T:'#c084fc', Z:'#ff4d6d'
+};
+const SHAPES = {
+  I:[[1,1,1,1]],
+  J:[[1,0,0],[1,1,1]],
+  L:[[0,0,1],[1,1,1]],
+  O:[[1,1],[1,1]],
+  S:[[0,1,1],[1,1,0]],
+  T:[[0,1,0],[1,1,1]],
+  Z:[[1,1,0],[0,1,1]]
+};
+const BAG = ()=>Object.keys(SHAPES).sort(()=>Math.random()-0.5);
 
-    // Simple calibration: hold neutral for ~1s after camera starts
-    let calibSamples = [], calibUntil = 0;
-    function startCalibration() {
-      calib.has = false; calibSamples = []; calibUntil = performance.now() + 1000;
-      setStatus("Calibrating… hold head neutral for 1s");
-    }
-    function maybeDoCalibration(centerX, faceW) {
-      const now = performance.now();
-      if (calibUntil > 0) {
-        calibSamples.push({ cx:centerX, fw:faceW });
-        if (now > calibUntil) {
-          const cx = calibSamples.map(s=>s.cx).sort((a,b)=>a-b)[Math.floor(calibSamples.length/2)];
-          const fw = calibSamples.map(s=>s.fw).sort((a,b)=>a-b)[Math.floor(calibSamples.length/2)];
-          calib.centerX = cx; calib.faceWidth = fw || 0.25; calib.has = true; calibUntil = 0;
-          setStatus("Camera running");
-        }
+function rotateMatrix(m){ const h=m.length,w=m[0].length; const r=Array.from({length:w},()=>Array(h).fill(0)); for(let y=0;y<h;y++)for(let x=0;x<w;x++) r[x][h-1-y]=m[y][x]; return r; }
+
+class Tetris {
+  constructor(){
+    this.reset();
+  }
+  reset(){
+    this.board = Array.from({length:H}, ()=>Array(W).fill(0));
+    this.score=0; this.lines=0; this.level=1;
+    this.queue=BAG(); this.curr=null; this.holdPiece=null; this.holdLocked=false;
+    this.spawn();
+    this.dropInterval=800; this.acc=0; this.paused=false; this.gameOver=false;
+  }
+  spawn(){
+    if(!this.queue.length) this.queue=BAG();
+    const id=this.queue.pop();
+    this.curr={id, shape:SHAPES[id].map(r=>r.slice()), x:3, y:0};
+    if(this.collide(this.curr.x,this.curr.y,this.curr.shape)){ this.gameOver=true; }
+    this.holdLocked=false;
+  }
+  collide(px,py,shape){
+    for(let y=0;y<shape.length;y++){
+      for(let x=0;x<shape[0].length;x++){
+        if(!shape[y][x]) continue;
+        const nx=px+x, ny=py+y;
+        if(nx<0||nx>=W||ny>=H) return true;
+        if(ny>=0 && this.board[ny][nx]) return true;
       }
     }
-
-    /********************************************************************
-     * MediaPipe: FaceMesh for head pose (left/right)
-     ********************************************************************/
-    const faceMesh = new FaceMesh.FaceMesh({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-    });
-    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-    faceMesh.onResults(onFaceResults);
-
-    function onFaceResults(results) {
-      const faces = results.multiFaceLandmarks;
-      if (!faces || faces.length === 0) { hudEl.textContent = "No face"; return; }
-      const lm = faces[0];
-      const NOSE_TIP = 1, LEFT_EAR = 234, RIGHT_EAR = 454;
-
-      const noseX = lm[NOSE_TIP].x;
-      const leftX = lm[LEFT_EAR].x;
-      const rightX = lm[RIGHT_EAR].x;
-      const faceW = Math.max(1e-4, Math.abs(rightX - leftX));
-      const centerX = (leftX + rightX) / 2;
-
-      maybeDoCalibration(centerX, faceW);
-
-      const cfg = CONFIG.head;
-      const cx = calib.has ? calib.centerX : 0.5;
-      const fw = calib.has ? calib.faceWidth : faceW;
-
-      // Relative yaw proxy (nose offset normalized by face width)
-      let yaw = (noseX - cx) / Math.max(1e-4, fw);
-      yaw = Math.max(-0.8, Math.min(0.8, yaw));
-      yawEMA = cfg.yawSmoothing * yaw + (1 - cfg.yawSmoothing) * yawEMA;
-
-      hudEl.textContent = `Yaw ${yawEMA.toFixed(2)} ${Math.abs(yawEMA) < cfg.deadZone ? "" : (yawEMA>0?"→": "←")}`;
-      handleHeadMove(yawEMA);
+    return false;
+  }
+  lock(){
+    const {x,y,shape,id}=this.curr;
+    for(let j=0;j<shape.length;j++)
+      for(let i=0;i<shape[0].length;i++)
+        if(shape[j][i] && y+j>=0) this.board[y+j][x+i]=id;
+    // clear lines
+    let cleared=0;
+    for(let r=H-1;r>=0;r--){
+      if(this.board[r].every(v=>v)) { this.board.splice(r,1); this.board.unshift(Array(W).fill(0)); cleared++; r++; }
     }
-
-    function handleHeadMove(yawVal) {
-      const cfg = CONFIG.head;
-      const now = performance.now();
-      if (Math.abs(yawVal) < cfg.deadZone) { lastDir = 0; lastDirChangeAt = 0; return; }
-      const dir = yawVal > 0 ? 1 : -1;
-      if (Math.abs(yawVal) >= cfg.trigger) {
-        if (dir !== lastDir) {
-          if (dir > 0) act.right(); else act.left();
-          lastDir = dir; lastDirChangeAt = now; lastRepeatAt = now;
-        } else {
-          if (now - lastDirChangeAt > cfg.firstDelay && now - lastRepeatAt > cfg.repeatEvery) {
-            if (dir > 0) act.right(); else act.left();
-            lastRepeatAt = now;
-          }
-        }
+    if(cleared){ this.lines+=cleared; this.score+= [0,40,100,300,1200][cleared]*this.level; }
+    this.level = 1 + Math.floor(this.lines/10);
+    this.dropInterval = Math.max(120, 800 - (this.level-1)*60);
+    this.spawn();
+  }
+  step(dt){
+    if(this.paused||this.gameOver) return;
+    this.acc += dt;
+    if(this.acc >= this.dropInterval){ this.acc=0; this.down(); }
+  }
+  draw(){
+    gctx.clearRect(0,0,gameCanvas.width,gameCanvas.height);
+    // board
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      const v=this.board[y][x]; drawCell(x,y,v?v:0);
+    }
+    // piece
+    if(this.curr){
+      const {x,y,shape,id}=this.curr;
+      for(let j=0;j<shape.length;j++) for(let i=0;i<shape[0].length;i++){
+        if(shape[j][i]) drawCell(x+i,y+j,id);
       }
     }
-
-    /********************************************************************
-     * MediaPipe: Hands for OK (rotate) + Victory (hard drop)
-     ********************************************************************/
-    const hands = new Hands.Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-    hands.setOptions({ maxNumHands: 2, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6, modelComplexity: 1 });
-    hands.onResults(onHandResults);
-
-    // Gesture debouncing
-    let okArmed = true, vArmed = true;
-    const okCooldown = 280, vCooldown = 450;
-    let lastOkAt = 0, lastVAt = 0;
-
-    function onHandResults(results) {
-      const handsLm = results.multiHandLandmarks || [];
-      const handedness = results.multiHandedness || [];
-
-      for (let i = 0; i < handsLm.length; i++) {
-        handleGestures(handsLm[i], handedness[i]?.label || "?");
-      }
+    // overlay texts
+    gctx.fillStyle="#9db4ff"; gctx.font="12px ui-monospace,Menlo,Consolas,monospace";
+    gctx.fillText(`Score ${this.score}  Lines ${this.lines}  Lv ${this.level}`, 8, 16);
+    if(this.paused) banner("PAUSED");
+    if(this.gameOver) banner("GAME OVER");
+  }
+  left(){ this.move(-1); }
+  right(){ this.move(+1); }
+  move(dx){
+    if(this.paused||this.gameOver) return;
+    const n={...this.curr,x:this.curr.x+dx};
+    if(!this.collide(n.x,n.y,n.shape)) this.curr=n;
+  }
+  down(){
+    if(this.paused||this.gameOver) return;
+    const n={...this.curr,y:this.curr.y+1};
+    if(!this.collide(n.x,n.y,n.shape)) this.curr=n;
+    else this.lock();
+  }
+  softDrop(){ this.down(); this.score+=1; }
+  hardDrop(){
+    if(this.paused||this.gameOver) return;
+    while(!this.collide(this.curr.x,this.curr.y+1,this.curr.shape)) this.curr.y++;
+    this.lock(); this.score+=2;
+  }
+  rotateCW(){
+    if(this.paused||this.gameOver) return;
+    let r=rotateMatrix(this.curr.shape);
+    // simple kicks
+    const kicks=[[0,0],[1,0],[-1,0],[0,-1],[2,0],[-2,0]];
+    for(const [kx,ky] of kicks){
+      if(!this.collide(this.curr.x+kx,this.curr.y+ky,r)){ this.curr.shape=r; this.curr.x+=kx; this.curr.y+=ky; return; }
     }
+  }
+  hold(){
+    if(this.paused||this.gameOver || this.holdLocked) return;
+    const currId=this.curr.id;
+    if(this.holdPiece==null){ this.holdPiece=currId; this.spawn(); }
+    else { const temp=this.holdPiece; this.holdPiece=currId; this.curr={id:temp, shape:SHAPES[temp].map(r=>r.slice()), x:3, y:0}; }
+    this.holdLocked=true;
+  }
+  pauseToggle(){ this.paused=!this.paused; }
+}
+function drawCell(x,y,id){
+  const px=x*CELL, py=y*CELL;
+  gctx.fillStyle = id ? COLORS[id] : COLORS[0];
+  gctx.fillRect(px,py,CELL-1,CELL-1);
+}
+function banner(text){
+  gctx.save();
+  gctx.fillStyle="rgba(0,0,0,.5)"; gctx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
+  gctx.fillStyle="#fff"; gctx.font="bold 28px system-ui,Segoe UI,Roboto"; gctx.textAlign="center";
+  gctx.fillText(text, gameCanvas.width/2, gameCanvas.height/2);
+  gctx.restore();
+}
 
-    function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy); }
-    function isExtended(lm, tipIdx, pipIdx, slack=0.015){ return lm[tipIdx].y < lm[pipIdx].y - slack; }
+const game = new Tetris();
 
-    function handleGestures(lm, whichHand) {
-      // Indices
-      const THUMB_TIP = 4, INDEX_TIP = 8, MIDDLE_TIP = 12, RING_TIP = 16, PINKY_TIP = 20;
-      const INDEX_PIP = 6, MIDDLE_PIP = 10, RING_PIP = 14, PINKY_PIP = 18;
-      const INDEX_MCP = 5, PINKY_MCP = 17;
+/* ===========================
+   GESTURE ENGINE
+   =========================== */
+const hud = document.getElementById('hud');
+const hctx = hud.getContext('2d');
+const stateEl = document.getElementById('state');
 
-      const palmW = Math.max(1e-4, dist(lm[INDEX_MCP], lm[PINKY_MCP]));
+const settings = {
+  rotateKind: "edge_open_to_fist",
+  rotateCooldownMs: 250,
+  openHigh: 0.70,
+  openLow: 0.30,
 
-      // OK → rotate: thumb-index pinch + other three extended
-      const pinch = dist(lm[THUMB_TIP], lm[INDEX_TIP]) / palmW < 0.35;
-      const midExt = isExtended(lm, MIDDLE_TIP, MIDDLE_PIP);
-      const ringExt = isExtended(lm, RING_TIP, RING_PIP);
-      const pinkExt = isExtended(lm, PINKY_TIP, PINKY_PIP);
-      const isOK = pinch && midExt && ringExt && pinkExt;
+  moveThreshold: 0.08,
+  moveDead: 0.04,
+  moveInitDelay: 250,
+  moveRepeat: 100,
 
-      // Victory → drop: index & middle extended & separated; ring & pinky folded
-      const idxExt = isExtended(lm, INDEX_TIP, INDEX_PIP);
-      const sepIM = dist(lm[INDEX_TIP], lm[MIDDLE_TIP]) / palmW > 0.25;
-      const ringFold = !isExtended(lm, RING_TIP, RING_PIP);
-      const pinkFold = !isExtended(lm, PINKY_TIP, PINKY_PIP);
-      const isV = idxExt && midExt && sepIM && ringFold && pinkFold;
+  dropDwellMs: 600,
+  dropDeltaY: 0.12,
 
-      const now = performance.now();
-      if (isOK && okArmed && now - lastOkAt > okCooldown) {
-        act.rotate(); okArmed = false; lastOkAt = now; hudEl.textContent = "Rotate (OK)";
-      } else if (!isOK && now - lastOkAt > okCooldown) {
-        okArmed = true;
-      }
+  enablePinch: true,
+  enableTwoFists: true,
 
-      if (isV && vArmed && now - lastVAt > vCooldown) {
-        act.drop(); vArmed = false; lastVAt = now; hudEl.textContent = "Hard Drop (✌)";
-      } else if (!isV && now - lastVAt > vCooldown) {
-        vArmed = true;
-      }
+  smoothAlpha: 0.6
+};
+
+const gesture = {
+  palmX: 0, palmY: 0, openEMA: 1.0, baselineY: null,
+  armedRotate: false, lastRotateAt: 0,
+  dropArmedAt: 0,
+  moveDir: 0, nextMoveAt: 0,
+  pinchArmed:false, lastHoldAt:0,
+  twoFistSince:0, lastPauseAt:0
+};
+
+function ema(prev, v, a=settings.smoothAlpha){ return prev*a + v*(1-a); }
+
+function palmCenter(lm){
+  // wrist + MCPs average
+  const picks=[0,5,9,13,17];
+  let sx=0,sy=0; for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
+  return { cx: sx/picks.length, cy: sy/picks.length };
+}
+function normalize(cx,cy,w,h){
+  // map to [-1,+1] with origin at center; y positive down
+  let nx = (cx / w) * 2 - 1;
+  let ny = (cy / h) * 2 - 1;
+  // mirror horizontally to match preview
+  nx = -nx;
+  return {nx,ny};
+}
+
+function isFingerExtended(lm, tip, pip, mcp){
+  const t=lm[tip], p=lm[pip], m=lm[mcp];
+  const extendedY = t.y < p.y && p.y < m.y; // up is smaller y
+  const dx1=t.x-p.x, dy1=t.y-p.y, dx2=p.x-m.x, dy2=p.y-m.y;
+  const cos=(dx1*dx2 + dy1*dy2) / ((Math.hypot(dx1,dy1)*Math.hypot(dx2,dy2)) + 1e-6);
+  return extendedY && cos > 0.5;
+}
+function opennessFromLandmarks(lm){
+  const fingers=[
+    isFingerExtended(lm,8,6,5),
+    isFingerExtended(lm,12,10,9),
+    isFingerExtended(lm,16,14,13),
+    isFingerExtended(lm,20,18,17),
+  ];
+  const thumbTip=lm[4], thumbMcp=lm[2], wrist=lm[0];
+  const thumbExtended = Math.abs(thumbTip.x - wrist.x) > Math.abs(thumbMcp.x - wrist.x);
+  const openCount = fingers.filter(Boolean).length + (thumbExtended?1:0);
+  return openCount/5;
+}
+function pinchStrength(lm){
+  const t=lm[4], i=lm[8], wrist=lm[0], mid=lm[9];
+  const pinch=Math.hypot(t.x-i.x,t.y-i.y);
+  const size=Math.hypot(mid.x-wrist.x,mid.y-wrist.y)+1e-6;
+  return Math.max(0, Math.min(1, 1 - (pinch/(size*1.2))));
+}
+function isThumbsUp(lm){
+  const tip=lm[4], ip=lm[3], mcp=lm[2];
+  const thumbUp = tip.y < ip.y && ip.y < mcp.y;
+  const curled = [
+    !isFingerExtended(lm,8,6,5),
+    !isFingerExtended(lm,12,10,9),
+    !isFingerExtended(lm,16,14,13),
+    !isFingerExtended(lm,20,18,17)
+  ].every(Boolean);
+  return thumbUp && curled;
+}
+function twoClosedFists(hands){
+  if(hands.length<2) return false;
+  const fist = (lm)=> opennessFromLandmarks(lm) < 0.25;
+  const a = hands[0]?.landmarks, b = hands[1]?.landmarks;
+  return a && b && fist(a) && fist(b);
+}
+
+function updateGesture(hands, vw, vh, now=performance.now()){
+  // choose first hand with landmarks
+  const hand = hands?.[0];
+  if(!hand?.landmarks) return [];
+
+  // 1) smooth palm position
+  const {cx,cy}=palmCenter(hand.landmarks);
+  const {nx,ny}=normalize(cx,cy,vw,vh);
+  gesture.palmX = ema(gesture.palmX, nx);
+  gesture.palmY = ema(gesture.palmY, ny);
+
+  // 2) openness
+  const openNow = opennessFromLandmarks(hand.landmarks);
+  gesture.openEMA = ema(gesture.openEMA, openNow);
+
+  // 3) baseline
+  if(gesture.baselineY===null) gesture.baselineY = gesture.palmY;
+
+  const out=[];
+
+  // ROTATE
+  if(settings.rotateKind==="edge_open_to_fist"){
+    if(gesture.openEMA > settings.openHigh) gesture.armedRotate=true;
+    if(gesture.armedRotate && gesture.openEMA < settings.openLow && (now - gesture.lastRotateAt) > settings.rotateCooldownMs){
+      out.push({type:'rotate'});
+      gesture.lastRotateAt=now; gesture.armedRotate=false;
     }
-
-    /********************************************************************
-     * Camera start — minimal changes, keep same controls
-     ********************************************************************/
-    async function startCamera() {
-      if (camera) return;
-      setStatus("Starting camera…");
-      camera = new Camera(videoEl, {
-        onFrame: async () => {
-          // send same frame to both models
-          await faceMesh.send({ image: videoEl });
-          await hands.send({ image: videoEl });
-          // keep canvas clean (hidden by default)
-          ctx.clearRect(0,0,canvasEl.width, canvasEl.height);
-        },
-        width: 640, height: 480
-      });
-      camera.start();
-      setStatus("Camera running (press ‘C’ to recalibrate)");
-      startCalibration(); // auto calibration on start
+  } else if(settings.rotateKind==="thumbs_up_edge"){
+    const lm = hand.landmarks;
+    if(isThumbsUp(lm) && (now - gesture.lastRotateAt) > settings.rotateCooldownMs){
+      out.push({type:'rotate'});
+      gesture.lastRotateAt=now;
     }
+  }
 
-    // Optional: press 'C' anytime to recalibrate neutral head pose
-    document.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "c") startCalibration(); });
+  // MOVE with repeat
+  const th = settings.moveThreshold, dead = settings.moveDead;
+  const left = gesture.palmX < -th, right = gesture.palmX > th;
+  if(left||right){
+    const dir = left ? -1 : +1;
+    if(gesture.moveDir !== dir){
+      gesture.moveDir = dir; out.push({type:'move', dir});
+      gesture.nextMoveAt = now + settings.moveInitDelay;
+    } else if(now >= gesture.nextMoveAt){
+      out.push({type:'move', dir}); gesture.nextMoveAt = now + settings.moveRepeat;
+    }
+  } else if (Math.abs(gesture.palmX) <= dead){
+    gesture.moveDir = 0;
+  }
 
-    // Small convenience: try to detect a global game object to wire direct calls automatically.
-    // (Safe no-op if nothing found; keeps your simple page intact)
-    window.addEventListener("load", () => {
-      const g = window.game || window.tetris || window.engine || window.Game || null;
-      try {
-        if (g) {
-          if (!CONFIG.left   && typeof g.moveLeft   === "function") CONFIG.left   = () => g.moveLeft();
-          if (!CONFIG.right  && typeof g.moveRight  === "function") CONFIG.right  = () => g.moveRight();
-          if (!CONFIG.rotate && typeof g.rotatePiece=== "function") CONFIG.rotate = () => g.rotatePiece();
-          if (!CONFIG.rotate && typeof g.rotate     === "function") CONFIG.rotate = () => g.rotate();
-          if (!CONFIG.drop   && typeof g.hardDrop   === "function") CONFIG.drop   = () => g.hardDrop();
-          if (!CONFIG.drop   && typeof g.drop       === "function") CONFIG.drop   = () => g.drop();
-        }
-      } catch (_) {}
-    });
-  </script>
+  // DROP dwell
+  const down = gesture.palmY > (gesture.baselineY + settings.dropDeltaY);
+  if(down){
+    if(!gesture.dropArmedAt) gesture.dropArmedAt = now;
+    if(now - gesture.dropArmedAt >= settings.dropDwellMs){ out.push({type:'drop'}); gesture.dropArmedAt = 0; }
+  } else gesture.dropArmedAt = 0;
+
+  // PINCH → HOLD
+  if(settings.enablePinch){
+    const p = pinchStrength(hand.landmarks);
+    if(p < 0.5) gesture.pinchArmed = true;
+    if(gesture.pinchArmed && p > 0.75 && (now - gesture.lastHoldAt) > 400){
+      out.push({type:'hold'}); gesture.lastHoldAt = now; gesture.pinchArmed=false;
+    }
+  }
+
+  // TWO FISTS → PAUSE
+  if(settings.enableTwoFists){
+    if(twoClosedFists(hands)){
+      if(!gesture.twoFistSince) gesture.twoFistSince = now;
+      if(now - gesture.twoFistSince >= 800 && (now - gesture.lastPauseAt) > 1000){
+        out.push({type:'pauseToggle'}); gesture.lastPauseAt = now; gesture.twoFistSince=0;
+      }
+    } else gesture.twoFistSince = 0;
+  }
+
+  return out;
+}
+
+function drawHUD(show){
+  hctx.clearRect(0,0,hud.width,hud.height);
+  if(!show) return;
+  const midX=hud.width/2, midY=hud.height/2;
+
+  // X thresholds
+  const xT = settings.moveThreshold*midX;
+  const xD = settings.moveDead*midX;
+  hctx.fillStyle="rgba(0,255,0,.12)";
+  hctx.fillRect(midX - xT, 0, 2, hud.height);
+  hctx.fillRect(midX + xT, 0, 2, hud.height);
+  hctx.fillStyle="rgba(255,165,0,.12)";
+  hctx.fillRect(midX - xD, 0, 2, hud.height);
+  hctx.fillRect(midX + xD, 0, 2, hud.height);
+
+  // Y drop line
+  const dropY = (gesture.baselineY??0)*midY + midY + settings.dropDeltaY*midY;
+  hctx.fillStyle="rgba(90,150,255,.18)";
+  hctx.fillRect(0, dropY, hud.width, 2);
+
+  // Palm dot
+  const px = gesture.palmX*midX + midX;
+  const py = gesture.palmY*midY + midY;
+  hctx.beginPath(); hctx.arc(px,py,6,0,Math.PI*2); hctx.fillStyle="#ff2d55"; hctx.fill();
+
+  // Text
+  hctx.fillStyle="#cfe3ff"; hctx.font="12px ui-monospace,Menlo,Consolas,monospace";
+  hctx.fillText(`open=${gesture.openEMA.toFixed(2)}  x=${gesture.palmX.toFixed(2)}  y=${gesture.palmY.toFixed(2)}`, 8, 16);
+  hctx.fillText(`rotateArmed=${gesture.armedRotate} moveDir=${gesture.moveDir}`, 8, 32);
+}
+
+/* ===========================
+   CAMERA + MEDIAPIPE
+   =========================== */
+const video = document.getElementById('cam');
+let handLandmarker = null;
+let camStream = null;
+
+async function initHands(){
+  const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
+  handLandmarker = await HandLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    },
+    numHands: 2,
+    runningMode: "VIDEO",
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+}
+
+async function startCamera(){
+  if(camStream) return;
+  camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
+  video.srcObject = camStream;
+  await new Promise(r=> video.onloadedmetadata = r);
+}
+
+function stopCamera(){
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  video.srcObject=null;
+}
+
+/* ===========================
+   MAIN LOOPS
+   =========================== */
+let lastTS = performance.now();
+
+async function detectLoop(){
+  if(!camStream || !handLandmarker){ requestAnimationFrame(detectLoop); return; }
+  const now=performance.now();
+  const res = await handLandmarker.detectForVideo(video, now);
+  const hands = (res?.landmarks ?? []).map((lm,i)=>({
+    landmarks: lm.map(p => ({ x: p.x * video.videoWidth, y: p.y * video.videoHeight })),
+    handedness: res.handedness?.[i]?.[0]?.categoryName || "Unknown"
+  }));
+  const events = updateGesture(hands, video.videoWidth, video.videoHeight, now);
+  dispatch(events);
+  drawHUD(document.getElementById('showHud').checked);
+  requestAnimationFrame(detectLoop);
+}
+
+function gameLoop(ts){
+  const dt = ts - lastTS; lastTS = ts;
+  game.step(dt);
+  game.draw();
+  requestAnimationFrame(gameLoop);
+}
+
+function dispatch(events){
+  for(const e of events){
+    if(e.type==='rotate') game.rotateCW();
+    if(e.type==='move')   (e.dir<0 ? game.left() : game.right());
+    if(e.type==='drop')   game.hardDrop();
+    if(e.type==='hold')   game.hold();
+    if(e.type==='pauseToggle') game.pauseToggle();
+  }
+  // update state box
+  const s = {
+    palmX: gesture.palmX.toFixed(3),
+    palmY: gesture.palmY.toFixed(3),
+    open: gesture.openEMA.toFixed(3),
+    baselineY: (gesture.baselineY??0).toFixed(3),
+    armedRotate: gesture.armedRotate,
+    moveDir: gesture.moveDir,
+    dropArmedAt: gesture.dropArmedAt ? '✓' : '·',
+  };
+  stateEl.textContent = JSON.stringify(s,null,2);
+}
+
+/* ===========================
+   UI WIRES
+   =========================== */
+const $ = (id)=>document.getElementById(id);
+$('startCam').onclick = async ()=>{
+  $('startCam').disabled=true;
+  await Promise.all([initHands(), startCamera()]);
+  requestAnimationFrame(detectLoop);
+  $('startCam').disabled=false;
+};
+$('stopCam').onclick = ()=>{ stopCamera(); };
+$('showVideo').onchange = (e)=>{ video.style.display = e.target.checked ? 'block' : 'none'; };
+$('showHud').onchange = ()=> drawHUD($('showHud').checked);
+$('calibrate').onclick = ()=>{
+  // set baseline to current averaged Y
+  gesture.baselineY = gesture.palmY;
+};
+
+function bindRange(id, fmt, onChange){
+  const el=$(id), vEl=$(id+'V');
+  const set = ()=>{
+    vEl.textContent = fmt ? fmt(el.value) : el.value;
+    onChange(+el.value);
+  };
+  el.addEventListener('input', set); set();
+}
+
+bindRange('rotateCooldown', v=>v, v=> settings.rotateCooldownMs=v);
+bindRange('openHigh', v=>(+v).toFixed(2), v=> settings.openHigh=+v);
+bindRange('openLow', v=>(+v).toFixed(2), v=> settings.openLow=+v);
+bindRange('moveThresh', v=>(+v).toFixed(2), v=> settings.moveThreshold=+v);
+bindRange('moveDead', v=>(+v).toFixed(2), v=> settings.moveDead=+v);
+bindRange('moveInitDelay', v=>v, v=> settings.moveInitDelay=+v);
+bindRange('moveRepeat', v=>v, v=> settings.moveRepeat=+v);
+bindRange('dropDwell', v=>v, v=> settings.dropDwellMs=+v);
+bindRange('dropDelta', v=>(+v).toFixed(2), v=> settings.dropDeltaY=+v);
+
+$('rotateKind').onchange = (e)=> settings.rotateKind = e.target.value;
+$('enablePinch').onchange = (e)=> settings.enablePinch = e.target.checked;
+$('enableTwoFists').onchange = (e)=> settings.enableTwoFists = e.target.checked;
+
+/* Keyboard fallback */
+window.addEventListener('keydown', (ev)=>{
+  if(ev.repeat) return;
+  if(ev.key==='ArrowLeft') game.left();
+  if(ev.key==='ArrowRight') game.right();
+  if(ev.key==='ArrowUp') game.rotateCW();
+  if(ev.key==='ArrowDown') game.softDrop();
+  if(ev.code==='Space') game.hardDrop();
+  if(ev.key.toLowerCase()==='c') game.hold();
+  if(ev.key.toLowerCase()==='p') game.pauseToggle();
+});
+
+/* Start game loop */
+requestAnimationFrame(gameLoop);
+</script>
 </body>
 </html>
