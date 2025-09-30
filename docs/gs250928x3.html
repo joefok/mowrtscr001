@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Gesture Tetris — Head & Hands</title>
+<title>Gesture Tetris — Head Absolute Position</title>
 <style>
   :root{
     --bg:#0b0f14; --panel:#121826; --text:#e8eefc; --muted:#7d8aa5; --accent:#50e3c2; --warn:#ffb020;
@@ -20,8 +20,8 @@
   small{color:var(--muted)}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#132744;border:1px solid #27518a;color:#cde}
   .stack{display:flex;flex-direction:column;gap:6px}
-  canvas#game{width:360px;height:720px;background:#0e1524;border-radius:12px;border:1px solid #1f2a44}
   .stage{position:relative;width:360px;height:720px}
+  canvas#game{width:360px;height:720px;background:#0e1524;border-radius:12px;border:1px solid #1f2a44}
   canvas#hud{position:absolute;left:0;top:0;width:360px;height:720px;pointer-events:none}
   video{max-width:100%;border-radius:10px;border:1px solid #1f2a44}
   .note{padding:8px;border:1px dashed #334d89;border-radius:8px;background:rgba(34,46,80,.35)}
@@ -30,7 +30,7 @@
 </head>
 <body>
 <header>
-  <h1>Gesture Tetris — <span class="pill">Head Left/Right → Move</span> • <span class="pill">1 Hand Move → Rotate</span> • <span class="pill">2 Hands Steady → Drop</span> • <span class="pill">Auto‑Restart on Game Over</span></h1>
+  <h1>Gesture Tetris — <span class="pill">Head Absolute X → Move</span> • <span class="pill">1 Hand Move → Rotate</span> • <span class="pill">2 Hands Steady → Drop</span> • <span class="pill">Auto‑Restart</span></h1>
 </header>
 
 <main>
@@ -42,9 +42,8 @@
         <button id="stopCam">🛑 Stop</button>
         <label class="row"><input type="checkbox" id="showVideo"> Show camera</label>
         <label class="row"><input type="checkbox" id="showHud" checked> Show debug HUD</label>
-        <button id="calibrate">🎯 Calibrate face center</button>
       </div>
-      <small>Move your **head** left/right to move; wave **one** hand to rotate; hold up **two** hands steady to drop.</small>
+      <small>Head absolute X controls move (screen‑aligned). Wave any one hand to rotate. Hold two hands steady to drop.</small>
 
       <div class="stage">
         <canvas id="game" width="360" height="720"></canvas>
@@ -91,11 +90,9 @@ const SHAPES = {
 const BAG = ()=>Object.keys(SHAPES).sort(()=>Math.random()-0.5);
 function rotateMatrix(m){ const h=m.length,w=m[0].length; const r=Array.from({length:w},()=>Array(h).fill(0)); for(let y=0;y<h;y++)for(let x=0;x<w;x++) r[x][h-1-y]=m[y][x]; return r; }
 function drawCell(x,y,id){ const px=x*CELL, py=y*CELL; gctx.fillStyle=id?COLORS[id]:COLORS[0]; gctx.fillRect(px,py,CELL-1,CELL-1); }
-function banner(text){
-  gctx.save(); gctx.fillStyle="rgba(0,0,0,.55)"; gctx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
+function banner(text){ gctx.save(); gctx.fillStyle="rgba(0,0,0,.55)"; gctx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
   gctx.fillStyle="#fff"; gctx.font="bold 28px system-ui,Segoe UI,Roboto"; gctx.textAlign="center";
-  gctx.fillText(text, gameCanvas.width/2, gameCanvas.height/2); gctx.restore();
-}
+  gctx.fillText(text, gameCanvas.width/2, gameCanvas.height/2); gctx.restore(); }
 class Tetris {
   constructor(){ this.reset(); }
   reset(){
@@ -110,10 +107,8 @@ class Tetris {
     const id=this.queue.pop();
     this.curr={id,shape:SHAPES[id].map(r=>r.slice()),x:3,y:0};
     if(this.collide(this.curr.x,this.curr.y,this.curr.shape)){
-      this.gameOver=true;
-      this.draw();
-      // Auto‑restart after a short pause
-      setTimeout(()=>{ this.reset(); }, 1000);
+      this.gameOver=true; this.draw();
+      setTimeout(()=>{ this.reset(); }, 1000); // auto‑restart
       return;
     }
     this.holdLocked=false;
@@ -132,7 +127,6 @@ class Tetris {
     for(let j=0;j<shape.length;j++)
       for(let i=0;i<shape[0].length;i++)
         if(shape[j][i] && y+j>=0) this.board[y+j][x+i]=id;
-    // clear lines
     let cleared=0;
     for(let r=H-1;r>=0;r--){
       if(this.board[r].every(v=>v)){ this.board.splice(r,1); this.board.unshift(Array(W).fill(0)); cleared++; r++; }
@@ -168,19 +162,20 @@ class Tetris {
 const game = new Tetris();
 
 /* =========================================================
-   Gesture Settings (tuned for mobile front camera)
+   Gesture Settings — ABSOLUTE HEAD POSITION (no offset)
    ========================================================= */
 const settings = {
-  // Head-based horizontal move (normalized [-1,+1] from face center vs baseline)
-  headMoveThreshold: 0.08,   // beyond this → start moving
-  headDeadZone: 0.04,        // inside this → stop
-  moveInitialDelay: 250,     // first repeat delay
-  moveRepeat: 100,           // subsequent repeats
-  // 1-hand rotate (based on motion)
-  oneHandSpeedThresh: 0.030, // per-frame normalized motion (auto-compensated for FPS)
+  // Head absolute thresholds: normalized face X in [-1 .. +1]
+  // Example: beyond ±0.25 starts moving; within ±0.08 stops (dead zone).
+  headAbsThreshold: 0.25,
+  headDeadZoneAbs: 0.08,
+  moveInitialDelay: 250,
+  moveRepeat: 100,
+  // 1-hand rotate (motion-based)
+  oneHandSpeedThresh: 0.030,
   rotateCooldownMs: 300,
   // 2-hands steady → drop
-  twoHandsSteadySpeed: 0.010, // both hands beneath this
+  twoHandsSteadySpeed: 0.010,
   twoHandsDwellMs: 650,
   // smoothing
   alphaFace: 0.6,
@@ -195,39 +190,42 @@ const stateEl = document.getElementById('state');
 function ema(prev,v,a){ return prev*a + v*(1-a); }
 
 const gesture = {
-  // Face
-  faceX: 0, faceY: 0, baseFaceX: null,
-  lastFaceX: null, lastFrameTs: performance.now(),
+  // Face absolute normalized position
+  faceX: 0, faceY: 0,
+  lastFrameTs: performance.now(),
   moveDir: 0, nextMoveAt: 0,
   // Hands
-  lastOneHandPos: null, lastOneHandTs: 0, lastRotateAt: 0,
-  twoHandsSteadySince: 0
+  lastOneHandPos: null, lastRotateAt: 0,
+  twoHandsSteadySince: 0,
+  _last2: null // stores previous 2-hand positions for speed
 };
 
 function normXY(x,y,w,h){
-  // Map to [-1,+1] with origin at center; y positive down; mirror x to match preview
+  // Map pixel coords to [-1,+1], origin at center; y positive down; mirror x to match preview
   let nx = (x / w) * 2 - 1;
   let ny = (y / h) * 2 - 1;
-  nx = -nx; // mirror
+  nx = -nx; // mirror so screen-left is negative
   return {nx, ny};
 }
+
 function faceCenterFromLandmarks(lms){
-  // Use bounding box center across all face points (robust across phones)
+  // Use face bounding box center for stability across devices
   let minX=+1e9, minY=+1e9, maxX=-1e9, maxY=-1e9;
   for(const p of lms){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }
-  return { cx:(minX+maxX)/2, cy:(minY+maxY)/2 };
+  return { cx:(minX+maxX)/2, cy:(minY+maxY)/2 }; // normalized [0..1]
 }
 function palmCenter(lm){
   const picks=[0,5,9,13,17]; let sx=0,sy=0;
   for(const i of picks){ sx+=lm[i].x; sy+=lm[i].y; }
   return { cx:sx/picks.length, cy:sy/picks.length };
 }
+
 function drawHUD(show){
   hctx.clearRect(0,0,hud.width,hud.height); if(!show) return;
   const midX=hud.width/2, midY=hud.height/2;
-  // Head move bands
-  const t = settings.headMoveThreshold*midX;
-  const d = settings.headDeadZone*midX;
+  // Head absolute bands
+  const t = settings.headAbsThreshold*midX;
+  const d = settings.headDeadZoneAbs*midX;
   hctx.fillStyle="rgba(0,255,0,.14)"; hctx.fillRect(midX - t, 0, 2, hud.height); hctx.fillRect(midX + t, 0, 2, hud.height);
   hctx.fillStyle="rgba(255,165,0,.14)"; hctx.fillRect(midX - d, 0, 2, hud.height); hctx.fillRect(midX + d, 0, 2, hud.height);
   // Face dot
@@ -237,7 +235,7 @@ function drawHUD(show){
 }
 
 /* =========================================================
-   Camera + Models
+   Camera + Models (Front camera)
    ========================================================= */
 const video = document.getElementById('cam');
 let camStream = null, faceLandmarker = null, handLandmarker = null;
@@ -269,7 +267,6 @@ async function initModels(){
 async function startCamera(){
   if(camStream) return;
   camStream = await navigator.mediaDevices.getUserMedia({
-    // Always front camera on mobile
     video: { facingMode: { ideal: "user" }, width: { ideal: 640 }, height: { ideal: 480 } },
     audio: false
   });
@@ -283,7 +280,7 @@ function stopCamera(){
 }
 
 /* =========================================================
-   Detection → Mappings (Head & Hands)
+   Detection → Mappings (Absolute Head X + Hand logic)
    ========================================================= */
 function dispatch(events){
   for(const e of events){
@@ -291,12 +288,10 @@ function dispatch(events){
     if(e.type==='rotate') game.rotateCW();
     if(e.type==='drop') game.hardDrop();
   }
-  // State panel
   const s = {
     faceX: gesture.faceX.toFixed(3),
-    baseFaceX: gesture.baseFaceX!==null ? gesture.baseFaceX.toFixed(3) : null,
     moveDir: gesture.moveDir,
-    nextMoveAt: Math.max(0, gesture.nextMoveAt - performance.now()).toFixed(0)+'ms',
+    nextMoveInMs: Math.max(0, gesture.nextMoveAt - performance.now()).toFixed(0)
   };
   stateEl.textContent = JSON.stringify(s,null,2);
 }
@@ -305,100 +300,79 @@ async function detectLoop(){
   if(!camStream || !faceLandmarker || !handLandmarker){ requestAnimationFrame(detectLoop); return; }
   const now = performance.now();
   const dt = now - gesture.lastFrameTs;
-  const fpsFactor = dt>0 ? (16.7 / dt) : 1; // normalize motion threshold to ~60fps baseline
+  const fpsFactor = dt>0 ? (16.7 / dt) : 1; // normalize speeds to ~60fps
 
-  // Face
+  // --- Face: absolute normalized position [-1..+1], NO OFFSET/BASELINE ---
   const fRes = await faceLandmarker.detectForVideo(video, now);
   const allFaces = fRes?.faceLandmarks ?? [];
   if(allFaces.length){
-    const { cx, cy } = faceCenterFromLandmarks(allFaces[0]);
-    const { nx, ny } = normXY(cx * video.videoWidth, cy * video.videoHeight, video.videoWidth, video.videoHeight);
+    const { cx, cy } = faceCenterFromLandmarks(allFaces[0]); // normalized [0..1]
+    // convert to pixels to reuse normXY; then to [-1,+1], mirrored
+    const { nx, ny } = normXY(cx*video.videoWidth, cy*video.videoHeight, video.videoWidth, video.videoHeight);
     gesture.faceX = ema(gesture.faceX, nx, settings.alphaFace);
     gesture.faceY = ema(gesture.faceY, ny, settings.alphaFace);
-    if(gesture.baseFaceX===null) gesture.baseFaceX = gesture.faceX; // initial baseline
   }
 
-  // Hands
+  // --- Hands ---
   const hRes = await handLandmarker.detectForVideo(video, now);
-  const hands = (hRes?.landmarks ?? []).map((lm)=> lm.map(p=>({ x:p.x*video.videoWidth, y:p.y*video.videoHeight })));
+  const hands = (hRes?.landmarks ?? []).map(lm => lm.map(p => ({ x:p.x*video.videoWidth, y:p.y*video.videoHeight })));
 
-  // Build events
   const events = [];
 
-  // 1) HEAD → MOVE (with repeat like keyboard)
-  if(gesture.baseFaceX!==null){
-    const offset = gesture.faceX - gesture.baseFaceX;
-    const left = offset < -settings.headMoveThreshold;
-    const right = offset > settings.headMoveThreshold;
-    if(left || right){
-      const dir = left ? -1 : +1;
-      if(gesture.moveDir !== dir){
-        gesture.moveDir = dir; events.push({type:'move', dir});
-        gesture.nextMoveAt = now + settings.moveInitialDelay;
-      } else if(now >= gesture.nextMoveAt){
-        events.push({type:'move', dir}); gesture.nextMoveAt = now + settings.moveRepeat;
-      }
-    } else if(Math.abs(offset) <= settings.headDeadZone){
-      gesture.moveDir = 0;
+  // 1) HEAD ABSOLUTE X → MOVE (repeat like keyboard)
+  const pos = gesture.faceX; // already in [-1,+1], screen-aligned
+  const left = pos < -settings.headAbsThreshold;
+  const right = pos >  settings.headAbsThreshold;
+  if(left || right){
+    const dir = left ? -1 : +1;
+    if(gesture.moveDir !== dir){
+      gesture.moveDir = dir; events.push({type:'move', dir});
+      gesture.nextMoveAt = now + settings.moveInitialDelay;
+    } else if(now >= gesture.nextMoveAt){
+      events.push({type:'move', dir}); gesture.nextMoveAt = now + settings.moveRepeat;
     }
+  } else if (Math.abs(pos) <= settings.headDeadZoneAbs){
+    // Stop when returning to dead zone around center
+    gesture.moveDir = 0;
   }
 
-  // 2) ANY 1 HAND MOVEMENT → ROTATE (edge on speed)
+  // 2) ANY 1 HAND MOVEMENT → ROTATE (motion edge)
   if(hands.length === 1){
-    const lm = hands[0];
-    // palm center (pixel)
-    const { cx, cy } = palmCenter(lm);
+    const { cx, cy } = palmCenter(hands[0]);
     const { nx, ny } = normXY(cx, cy, video.videoWidth, video.videoHeight);
     if(gesture.lastOneHandPos){
       const dx = nx - gesture.lastOneHandPos.nx;
       const dy = ny - gesture.lastOneHandPos.ny;
-      const speed = Math.hypot(dx, dy) * fpsFactor; // normalized per-frame motion
+      const speed = Math.hypot(dx, dy) * fpsFactor;
       if(speed > settings.oneHandSpeedThresh && (now - gesture.lastRotateAt) > settings.rotateCooldownMs){
         events.push({type:'rotate'}); gesture.lastRotateAt = now;
       }
     }
     gesture.lastOneHandPos = { nx, ny };
-    gesture.lastOneHandTs = now;
   } else {
     gesture.lastOneHandPos = null;
   }
 
-  // 3) ANY 2 HANDS STEADY → DROP (dwell when both speeds small)
-  if(hands.length >= 2){
-    // take first two
-    const [A,B] = hands;
-    const a = normXY(...Object.values(palmCenter(A)), video.videoWidth, video.videoHeight); // expands incorrectly; fix below
-  }
-
-  // Corrected two-hands steady computation
+  // 3) ANY 2 HANDS STEADY → DROP (dwell)
   if(hands.length >= 2){
     const [A,B] = hands;
-    const pcA = palmCenter(A), pcB = palmCenter(B);
-    const nA = normXY(pcA.cx, pcA.cy, video.videoWidth, video.videoHeight);
-    const nB = normXY(pcB.cx, pcB.cy, video.videoWidth, video.videoHeight);
-
-    // Keep simple per-frame speed using last cached positions in closure:
-    // We'll store these on the gesture object across frames.
-    if(!gesture._last2){ gesture._last2 = { nA, nB }; }
-
+    const nA = normXY(...Object.values(palmCenter(A)), video.videoWidth, video.videoHeight);
+    const nB = normXY(...Object.values(palmCenter(B)), video.videoWidth, video.videoHeight);
+    if(!gesture._last2) gesture._last2 = { nA, nB };
     const speedA = Math.hypot(nA.nx - gesture._last2.nA.nx, nA.ny - gesture._last2.nA.ny) * fpsFactor;
     const speedB = Math.hypot(nB.nx - gesture._last2.nB.nx, nB.ny - gesture._last2.nB.ny) * fpsFactor;
-
     const steady = (speedA < settings.twoHandsSteadySpeed) && (speedB < settings.twoHandsSteadySpeed);
     if(steady){
       if(!gesture.twoHandsSteadySince) gesture.twoHandsSteadySince = now;
       if(now - gesture.twoHandsSteadySince >= settings.twoHandsDwellMs){
-        events.push({type:'drop'});
-        gesture.twoHandsSteadySince = 0; // fire once per steady hold
+        events.push({type:'drop'}); gesture.twoHandsSteadySince = 0;
       }
     } else {
       gesture.twoHandsSteadySince = 0;
     }
-
     gesture._last2 = { nA, nB };
   } else {
-    gesture.twoHandsSteadySince = 0;
-    gesture._last2 = null;
+    gesture.twoHandsSteadySince = 0; gesture._last2 = null;
   }
 
   dispatch(events);
@@ -422,7 +396,6 @@ $('startCam').onclick = async ()=>{
 $('stopCam').onclick = ()=> stopCamera();
 $('showVideo').onchange = (e)=>{ video.style.display = e.target.checked ? 'block' : 'none'; };
 $('showHud').onchange = ()=> drawHUD($('showHud').checked);
-$('calibrate').onclick = ()=>{ gesture.baseFaceX = gesture.faceX; };
 
 window.addEventListener('keydown', (ev)=>{
   if(ev.repeat) return;
@@ -439,4 +412,3 @@ function gameLoop(ts){ const dt = ts - lastTS; lastTS = ts; game.step(dt); game.
 requestAnimationFrame(gameLoop);
 </script>
 </body>
-</html>
