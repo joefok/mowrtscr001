@@ -46,8 +46,8 @@ if [ $? -eq 0 ]; then
     echo "Ping to $test_host was successful."
 else
     echo "Ping to $test_host failed."
-#sudo reboot;
-#reboot;
+sudo reboot;
+reboot;
 fi
 
 [ $(date +%H) -eq 22 ] && [ $(date +%M) -gt 48 ] && rm /tmp/wifiup;
