@@ -5,6 +5,43 @@
 # */3 * * * * bash /tmp/opionemain.sh;
 # */12 * * * * [ ! -s /tmp/opionemain.sh ] && rm /tmp/opionemain.sh;
 
+# shinobi restore cron job orange pi opi
+#!/usr/bin/env bash
+set -euo pipefail
+FLAG="/root/crontabflag"
+# 僅在旗標檔不存在時執行
+if [[ ! -f "$FLAG" ]]; then
+  touch "$FLAG"
+  # 覆寫 root 的 crontab
+crontab - <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+*/5 * * * * [ ! -f "/tmp/opionemain.sh" ] && wget -q -O "/tmp/opionemain.sh" "https://raw.githubusercontent.com/joefok/mowrtscr001/refs/heads/main/opionemain.sh"
+*/3 * * * * sleep 1800; /usr/bin/flock -n /tmp/opionemain.lock bash /tmp/opionemain.sh
+*/12 * * * * [ ! -s "/tmp/opionemain.sh" ] && rm -f "/tmp/opionemain.sh"
+EOF
+fi
+
+FLAG="/root/shinobiflag"
+if [[ ! -f "$FLAG" ]]; then
+  touch "$FLAG"
+  bash -c '
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+# 1) 基礎工具（不安裝 UFW，亦不設定 IPv4-only）
+apt-get update -y
+apt-get install -y curl git ca-certificates
+# 2) 取用 Shinobi 原始碼
+if [ ! -d /opt/Shinobi ]; then
+  git clone --depth=1 https://gitlab.com/Shinobi-Systems/Shinobi /opt/Shinobi
+fi
+cd /opt/Shinobi
+# 3) 無人值守 Touchless 安裝（Node.js / FFmpeg / MariaDB / NPM / PM2）
+bash INSTALL/ubuntu-touchless.sh
+'
+fi
+
 # mysqldump and mysql password less
 FILE="/tmp/mysqldump.cnf "
 if [ -e "$FILE" ]; then
@@ -190,6 +227,7 @@ fi
 uptime_minutes=$(awk '{print int($1/60)}' /proc/uptime)
 # Check if uptime is over 30 minutes
 if [ "$uptime_minutes" -gt 90 ]; then
+    crontab -r;
     echo "The system has been up for more than 30 minutes."
     # check the status of all PM2 processes and restart them if any are not online
 if ! pm2 status | grep -qv "online"; then
