@@ -25,7 +25,7 @@ fi;
 
 # check if any sftp error
 if grep -q SFTP /root/.pm2/logs/camera-out.log; then
-  rm /tmp/shinupdate;
+#  rm /tmp/shinupdate;
 fi;
 
 # Over 3MB size
