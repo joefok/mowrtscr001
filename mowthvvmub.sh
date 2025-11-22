@@ -50,8 +50,21 @@ pm2 restart camera;
 cd /home/Shinobi;
 pm2 restart cron;
 echo 'HostKeyAlgorithms +ssh-rsa,ssh-dss' | sudo tee -a /etc/ssh/sshd_config
-sudo systemctl restart sshd
-killall ssh;
+
+# Get uptime in seconds
+upSeconds=$(awk '{print int($1)}' /proc/uptime)
+# Convert to minutes
+upMins=$(( upSeconds / 60 ))
+# Check if uptime is less than 10 minutes
+if (( upMins < 10 )); then
+    echo "System uptime is less than 10 minutes."
+    sudo systemctl restart sshd
+    killall ssh;
+else
+    echo "System uptime is 10 minutes or more."
+fi
+
+
 sed -i '990s/.*/$.each(getMonitorsFromIds(["BBTrm01R","BBTrm01L","BBlobb006","BBexam003","BBexam002","BBexam001","BBTrm02R","BBTrm02L","BBlobb004","BBexam006","BBexam005","BBexam004","BBTrm03R","BBTrm03L","BBlobb002","BBexam009","BBexam008","b1usbWcm1","BBconfeL","BBTrm04R","BBlobb103","BBlobb142","BBMEET01L","BBMEET01R","BBTrm05R","BBTrm05L","BBlobb143","BBlobb113","BBMEET2L","BBMEET2R"]),function(monitorId,monitor){/' /home/Shinobi/web/assets/js/bs5.liveGrid.js;
 
 fi;
