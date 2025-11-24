@@ -25,7 +25,19 @@ fi;
 
 # check if any sftp error
 if grep -q SFTP /root/.pm2/logs/camera-out.log; then
-#  rm /tmp/shinupdate;
+
+# Get uptime in seconds
+upSeconds=$(awk '{print int($1)}' /proc/uptime)
+# Convert to minutes
+upMins=$(( upSeconds / 60 ))
+# Check if uptime is less than 10 minutes
+if (( upMins < 10 )); then
+    echo "System uptime is less than 10 minutes."
+    rm /tmp/shinupdate;
+else
+    echo "System uptime is 10 minutes or more."
+fi;
+
 fi;
 
 # Over 3MB size
