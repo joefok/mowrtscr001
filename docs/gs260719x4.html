@@ -6,175 +6,172 @@
     <title>扔彩虹模擬器 | Coin Toss Rainbow Simulator</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        
         body {
-            margin: 0; height: 100vh; overflow: hidden;
-            background: linear-gradient(#1a0033, #330066, #660033);
-            font-family: 'Press Start 2P', cursive;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            margin:0; height:100vh; overflow:hidden;
+            background:#111; font-family:'Press Start 2P', cursive; color:white;
+            display:flex; justify-content:center; align-items:center;
         }
-
-        .game {
-            text-align: center;
-            background: rgba(0,0,0,0.7);
-            padding: 25px;
-            border: 8px solid #ffd700;
-            border-radius: 20px;
-            box-shadow: 0 0 60px #ff00ff;
+        .game { position:relative; }
+        canvas { background:#f0f0f0; border:8px solid #ffd700; image-rendering:pixelated; }
+        .hud {
+            position:absolute; top:15px; left:15px; background:rgba(0,0,0,0.7);
+            padding:10px; border-radius:8px; font-size:13px; line-height:1.4;
         }
-
-        canvas {
-            background: linear-gradient(to bottom, #111, #2a004d);
-            border: 5px solid #ffff00;
-            border-radius: 12px;
-            box-shadow: inset 0 0 80px rgba(255, 0, 255, 0.4);
-        }
-
-        .stats { margin: 15px 0; font-size: 15px; }
-        .result { font-size: 24px; min-height: 70px; margin-top: 15px; text-shadow: 0 0 15px #ffff00; }
     </style>
 </head>
 <body>
     <div class="game">
-        <h1>🌈 扔彩虹模擬器 🌈</h1>
-        <p style="font-size:13px;">Made in Hong Kong • Toss & Test Your Luck</p>
-        
-        <div class="stats">
-            Balance: <span id="balance">0</span> 🪙 &nbsp;&nbsp; 
-            Streak: <span id="streak">0</span>
+        <div class="hud" id="hud">
+            Red: <span id="red">0</span><br>
+            Green: <span id="green">0</span><br>
+            Yellow: <span id="yellow">0</span><br>
+            Purple: <span id="purple">0</span><br><br>
+            Toss Power: <span id="power">0</span><br>
+            Coins Tossed: <span id="tossed">0</span>
         </div>
-
-        <canvas id="canvas" width="480" height="360"></canvas>
-        
-        <div class="result" id="result">Swipe the coin to toss!</div>
+        <canvas id="canvas" width="800" height="520"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        let balance = parseInt(localStorage.getItem('rainbowBalance') || 0);
-        let streak = 0;
+        
+        let coins = [];
+        let scores = {red:0, green:0, yellow:0, purple:0};
+        let tossed = 0;
+        let dragging = false;
+        let startX, startY, coinX = 100, coinY = 400;
 
-        let coinX = 140, coinY = 220;
-        let isDragging = false;
-        let startX, startY;
+        function drawTarget(x, y) {
+            const colors = ['#ff0000', '#00ff00', '#ffff00', '#8b00ff'];
+            for (let i = 0; i < 4; i++) {
+                ctx.beginPath();
+                ctx.arc(x, y, 55 - i*13, 0, Math.PI*2);
+                ctx.fillStyle = colors[i];
+                ctx.fill();
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, 18, 0, Math.PI*2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
 
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            
+            // Grid of targets
+            for (let x = 140; x < 700; x += 170) {
+                for (let y = 90; y < 420; y += 160) {
+                    drawTarget(x, y);
+                }
+            }
 
-            // Rainbow floor
-            const grad = ctx.createLinearGradient(0, 180, 0, 360);
-            grad.addColorStop(0, '#ff00ff');
-            grad.addColorStop(0.5, '#00ffff');
-            grad.addColorStop(1, '#ffff00');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 180, canvas.width, canvas.height);
+            // Existing landed coins
+            coins.forEach(c => {
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                ctx.fillStyle = '#c0a040';
+                ctx.beginPath();
+                ctx.arc(0,0,14,0,Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            });
 
-            // Coin
+            // Current coin
             ctx.save();
             ctx.translate(coinX, coinY);
             ctx.fillStyle = '#ffd700';
             ctx.beginPath();
-            ctx.arc(0, 0, 35, 0, Math.PI * 2);
+            ctx.arc(0,0,18,0,Math.PI*2);
             ctx.fill();
             ctx.fillStyle = '#b8860b';
-            ctx.font = 'bold 50px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('🪙', 0, 18);
+            ctx.font = 'bold 22px Arial';
+            ctx.fillText('🪙', -8, 8);
             ctx.restore();
         }
 
-        function toss(power, angle) {
-            let x = coinX, y = coinY;
-            let vx = power * Math.cos(angle) * 0.9;
-            let vy = power * Math.sin(angle) * -0.8;
-
-            let frame = 0;
-            const anim = setInterval(() => {
-                draw();
-                x += vx;
-                y += vy;
-                vy += 0.6; // gravity
-
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(frame * 0.4);
-                ctx.fillStyle = '#ffd700';
-                ctx.beginPath();
-                ctx.arc(0,0,35,0,Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = '#b8860b';
-                ctx.font = 'bold 50px Arial';
-                ctx.fillText('🪙', 0, 18);
-                ctx.restore();
-
-                frame++;
-
-                if (y > 340) {
-                    clearInterval(anim);
-                    const isWin = Math.random() < 0.5 + (power > 70 ? 0.1 : 0);
-                    
-                    if (isWin) {
-                        streak++;
-                        const prize = Math.floor(15 + power * 0.8 + streak * 3);
-                        balance += prize;
-                        document.getElementById('result').innerHTML = `🎉 HEADS WIN! +${prize} 🪙`;
-                    } else {
-                        streak = 0;
-                        document.getElementById('result').innerHTML = `🌈 TAILS...`;
+        function getScore(x, y) {
+            // Find nearest target and ring
+            let minDist = Infinity;
+            let color = 'miss';
+            
+            const targets = [];
+            for (let tx = 140; tx < 700; tx += 170) {
+                for (let ty = 90; ty < 420; ty += 160) {
+                    const d = Math.hypot(tx - x, ty - y);
+                    if (d < minDist) {
+                        minDist = d;
+                        if (d < 22) color = 'purple';
+                        else if (d < 38) color = 'yellow';
+                        else if (d < 52) color = 'green';
+                        else if (d < 68) color = 'red';
                     }
-
-                    document.getElementById('balance').textContent = balance;
-                    document.getElementById('streak').textContent = streak;
-                    localStorage.setItem('rainbowBalance', balance);
-
-                    setTimeout(() => {
-                        coinX = 140; coinY = 220;
-                        draw();
-                    }, 1400);
                 }
-            }, 20);
+            }
+            
+            if (color !== 'miss') {
+                scores[color]++;
+                document.getElementById(color).textContent = scores[color];
+            }
         }
 
-        // Swipe controls
+        // Swipe throw
         canvas.addEventListener('mousedown', e => {
             const rect = canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left;
-            if (Math.hypot(mx - coinX, e.clientY - rect.top - coinY) < 50) {
-                isDragging = true;
-                startX = mx;
-                startY = e.clientY - rect.top;
+            const my = e.clientY - rect.top;
+            if (Math.hypot(mx-coinX, my-coinY) < 30) {
+                dragging = true;
+                startX = mx; startY = my;
             }
         });
 
         canvas.addEventListener('mouseup', e => {
-            if (!isDragging) return;
-            isDragging = false;
+            if (!dragging) return;
+            dragging = false;
             const rect = canvas.getBoundingClientRect();
             const endX = e.clientX - rect.left;
             const endY = e.clientY - rect.top;
             
-            const power = Math.min(95, Math.hypot(startX - endX, startY - endY) * 0.6);
-            const angle = Math.atan2(endY - startY, endX - startX);
+            const power = Math.min(110, Math.hypot(startX-endX, startY-endY) * 0.45);
+            document.getElementById('power').textContent = Math.floor(power);
             
-            toss(power, angle);
-        });
-
-        // Touch support
-        canvas.addEventListener('touchstart', e => { /* similar logic as mouse */ });
-        canvas.addEventListener('touchend', e => { /* similar */ });
-
-        // Right click to zoom (as in original game)
-        canvas.addEventListener('contextmenu', e => {
-            e.preventDefault();
-            canvas.style.transform = canvas.style.transform === 'scale(1.6)' ? 'scale(1)' : 'scale(1.6)';
+            let vx = (startX - endX) * 0.085;
+            let vy = (startY - endY) * 0.085;
+            
+            let x = coinX, y = coinY;
+            let frame = 0;
+            
+            const anim = setInterval(() => {
+                draw();
+                x += vx; y += vy; vy += 0.35;
+                
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(frame*0.3);
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#b8860b';
+                ctx.fillText('🪙', -8, 8);
+                ctx.restore();
+                
+                frame++;
+                
+                if (y > 500) {
+                    clearInterval(anim);
+                    coins.push({x, y: Math.min(500, y)});
+                    tossed++;
+                    document.getElementById('tossed').textContent = tossed;
+                    getScore(x, y);
+                    coinX = 100; coinY = 400;
+                    draw();
+                }
+            }, 16);
         });
 
         draw();
-        document.getElementById('balance').textContent = balance;
     </script>
 </body>
 </html>
