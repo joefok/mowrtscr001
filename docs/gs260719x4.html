@@ -690,6 +690,14 @@
     }
     window.cleanDesk = cleanDesk;
 
+    const AUTO_CLEAN_COUNT = 6;
+    function checkAutoClean() {
+        if (coins.length >= AUTO_CLEAN_COUNT && isCleanReady()) {
+            addPopup(W / 2, H * 0.5, '🧹 自动清桌', '#ffd700');
+            cleanDesk();
+        }
+    }
+
     // ============================================================
     //  Main loop
     // ============================================================
@@ -719,6 +727,7 @@
         updateAndDrawParticles();
         updateAndDrawPopups();
         updateCleanButton();
+        checkAutoClean();
 
         requestAnimationFrame(frame);
     }
