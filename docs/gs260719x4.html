@@ -1,585 +1,638 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌈 扔彩虹 · 精准投掷</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        * { margin:0; padding:0; box-sizing:border-box; user-select:none; touch-action:none; }
-        body {
-            height: 100vh; width: 100vw; overflow: hidden;
-            background: #0a001f; font-family: 'Press Start 2P', cursive;
-            color: #fff;
-        }
-        canvas { display: block; }
-        .hud {
-            position: absolute; top: 12px; left: 12px; z-index: 20;
-            background: rgba(0,0,0,0.8); padding: 10px 14px; border-radius: 8px;
-            font-size: 11px; line-height: 1.6;
-            border: 1px solid rgba(255,215,0,0.2);
-            pointer-events: none;
-        }
-        .hud .row { display: flex; gap: 10px; flex-wrap: wrap; }
-        .hud .score { color: #ffd700; }
-        .hud .power-wrap { display: flex; justify-content: space-between; margin-top: 2px; }
-        .controls {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 20; display: flex; gap: 12px;
-        }
-        .controls button {
-            background: rgba(255,215,0,0.15); border: 2px solid #ffd700;
-            color: #ffd700; padding: 8px 16px;
-            font-family: 'Press Start 2P', cursive; font-size: 10px;
-            border-radius: 30px; cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s;
-            touch-action: manipulation;
-        }
-        .controls button:active { transform: scale(0.94); background: rgba(255,215,0,0.3); }
-        .combo {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            z-index: 15; font-size: 40px; color: #ffdd44;
-            text-shadow: 0 0 40px rgba(255,220,0,0.6);
-            pointer-events: none; opacity: 0;
-            transition: opacity 0.2s;
-        }
-        .combo.show { opacity: 1; animation: pop 0.5s ease-out; }
-        @keyframes pop {
-            0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
-            50% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
-            100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
-        }
-        .hint {
-            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-            z-index: 12; font-size: 11px; color: rgba(255,215,0,0.5);
-            background: rgba(0,0,0,0.4); padding: 6px 16px;
-            border-radius: 20px; backdrop-filter: blur(2px);
-            border: 1px solid rgba(255,215,0,0.1);
-            white-space: nowrap;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0%,100%{opacity:0.4;} 50%{opacity:0.9;} }
-        @media (max-width:500px) {
-            .hud { font-size: 9px; padding: 6px 10px; }
-            .hud .row { gap: 6px; }
-            .controls button { font-size: 8px; padding: 6px 12px; }
-            .combo { font-size: 28px; }
-            .hint { font-size: 9px; bottom: 70px; white-space: normal; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🌈 扔彩虹 · 甩手投掷</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; touch-action:none; -webkit-tap-highlight-color: transparent; }
+    body {
+        height: 100vh; width: 100vw; overflow: hidden;
+        background: #0a001f; font-family: 'Press Start 2P', cursive;
+        color: #fff;
+    }
+    canvas { display: block; }
+    .hud {
+        position: absolute; top: 12px; left: 12px; z-index: 20;
+        background: rgba(0,0,0,0.8); padding: 10px 14px; border-radius: 8px;
+        font-size: 11px; line-height: 1.6;
+        border: 1px solid rgba(255,215,0,0.2);
+        pointer-events: none;
+    }
+    .hud .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .hud .score { color: #ffd700; }
+    .hud .power-wrap { display: flex; justify-content: space-between; margin-top: 2px; }
+    .state-badge {
+        position: absolute; top: 12px; right: 12px; z-index: 20;
+        font-size: 10px; padding: 8px 12px; border-radius: 20px;
+        background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.15);
+        transition: all 0.25s;
+    }
+    .state-badge.ready { color: #66ff99; border-color: rgba(102,255,153,0.5); }
+    .state-badge.wait { color: #ff8866; border-color: rgba(255,136,102,0.5); }
+    .state-badge.flying { color: #ffdd44; border-color: rgba(255,221,68,0.5); }
+    .controls {
+        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+        z-index: 20; display: flex; gap: 12px;
+    }
+    .controls button {
+        background: rgba(255,215,0,0.15); border: 2px solid #ffd700;
+        color: #ffd700; padding: 10px 18px;
+        font-family: 'Press Start 2P', cursive; font-size: 10px;
+        border-radius: 30px; cursor: pointer;
+        backdrop-filter: blur(4px);
+        transition: all 0.2s;
+        touch-action: manipulation;
+    }
+    .controls button:active { transform: scale(0.94); background: rgba(255,215,0,0.3); }
+    .controls button.disabled {
+        opacity: 0.35; border-color: rgba(255,215,0,0.35); color: rgba(255,215,0,0.5);
+        pointer-events: none;
+    }
+    .combo {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        z-index: 15; font-size: 40px; color: #ffdd44;
+        text-shadow: 0 0 40px rgba(255,220,0,0.6);
+        pointer-events: none; opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .combo.show { opacity: 1; animation: pop 0.5s ease-out; }
+    @keyframes pop {
+        0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+        50% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+        100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    }
+    .hint {
+        position: absolute; bottom: 82px; left: 50%; transform: translateX(-50%);
+        z-index: 12; font-size: 10px; color: rgba(255,215,0,0.6);
+        background: rgba(0,0,0,0.45); padding: 6px 16px;
+        border-radius: 20px; backdrop-filter: blur(2px);
+        border: 1px solid rgba(255,215,0,0.1);
+        white-space: nowrap; text-align: center;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.5;} 50%{opacity:1;} }
+
+    .overlay {
+        position: absolute; inset: 0; z-index: 50;
+        background: radial-gradient(circle at 50% 40%, #1a0838, #04000f);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 22px; text-align: center; padding: 24px;
+    }
+    .overlay h1 { font-size: 16px; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.5); line-height: 1.6; }
+    .overlay p { font-size: 10px; color: rgba(255,255,255,0.75); line-height: 1.8; max-width: 320px; }
+    .overlay button {
+        background: linear-gradient(135deg, #ffd700, #ff9900);
+        border: none; color: #1a0e00; padding: 14px 26px;
+        font-family: 'Press Start 2P', cursive; font-size: 11px;
+        border-radius: 30px; cursor: pointer; box-shadow: 0 4px 20px rgba(255,180,0,0.4);
+    }
+    .overlay button:active { transform: scale(0.96); }
+    .overlay .sub { font-size: 9px; color: rgba(255,255,255,0.4); }
+
+    @media (max-width:500px) {
+        .hud { font-size: 9px; padding: 6px 10px; }
+        .hud .row { gap: 6px; }
+        .state-badge { font-size: 9px; padding: 6px 10px; }
+        .controls button { font-size: 8px; padding: 8px 14px; }
+        .combo { font-size: 28px; }
+        .hint { font-size: 9px; bottom: 74px; white-space: normal; }
+        .overlay h1 { font-size: 13px; }
+    }
+</style>
 </head>
 <body>
-    <div class="hud" id="hud">
-        <div class="row">
-            <span>🔴 <span id="red" class="score">0</span></span>
-            <span>🟢 <span id="green" class="score">0</span></span>
-            <span>🟡 <span id="yellow" class="score">0</span></span>
-            <span>🟣 <span id="purple" class="score">0</span></span>
-        </div>
-        <div class="power-wrap">
-            <span>⚡ <span id="power">0</span></span>
-        </div>
+
+<div class="overlay" id="startOverlay">
+    <h1>🌈 扔彩虹<br>甩手投掷</h1>
+    <p>把手机当作真的硬币来甩：<br>手握稳，向前快速一甩，<br>硬币就会滑向桌子远端的彩虹靶。<br>力度太轻滑不到，太重会冲过头弹回来。</p>
+    <button id="startBtn">📳 开始 · 授权动作感应</button>
+    <div class="sub" id="startSub">需要动作感应权限才能甩动投掷</div>
+</div>
+
+<div class="hud" id="hud">
+    <div class="row">
+        <span>🔴 <span id="red" class="score">0</span></span>
+        <span>🟢 <span id="green" class="score">0</span></span>
+        <span>🟡 <span id="yellow" class="score">0</span></span>
+        <span>🟣 <span id="purple" class="score">0</span></span>
     </div>
-
-    <div class="combo" id="comboDisplay"></div>
-    <div class="hint" id="hint">👆 向上滑动投掷 · 瞄准彩虹</div>
-
-    <div class="controls">
-        <button onclick="cleanDesk()">🧹 清桌</button>
+    <div class="power-wrap">
+        <span>⚡ <span id="power">0</span></span>
     </div>
+</div>
 
-    <canvas id="canvas"></canvas>
+<div class="state-badge wait" id="stateBadge">🤳 稳住手机…</div>
 
-    <script>
-        // ============================================================
-        //  1. Canvas & 基础设置
-        // ============================================================
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let W, H;
+<div class="combo" id="comboDisplay"></div>
+<div class="hint" id="hint">🤳 稳住手机 2 秒 → 快速向前甩动投掷</div>
 
-        function resize() {
-            W = window.innerWidth;
-            H = window.innerHeight;
-            canvas.width = W;
-            canvas.height = H;
-            coinX = W * 0.20;
-            coinY = H * 0.82;
-        }
+<div class="controls">
+    <button id="cleanBtn" class="disabled" onclick="cleanDesk()">🧹 清桌</button>
+</div>
 
-        // ============================================================
-        //  2. 游戏状态
-        // ============================================================
-        let coins = [];
-        let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
-        let coinX, coinY;
-        let powerValue = 0;
-        let isThrowing = false;
-        let comboCount = 0;
-        let lastHitTime = 0;
-        let comboEl = document.getElementById('comboDisplay');
+<canvas id="canvas"></canvas>
 
-        // 环定义（从外到内）
-        const RINGS = [
-            { radius: 55, label: 'red', pts: 1, color: '#ff4466' },
-            { radius: 42, label: 'green', pts: 2, color: '#44ff88' },
-            { radius: 29, label: 'yellow', pts: 3, color: '#ffdd44' },
-            { radius: 16, label: 'purple', pts: 5, color: '#cc66ff' }
-        ];
+<script>
+    // ============================================================
+    //  Canvas & basic setup
+    // ============================================================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    let coinStartX, coinStartY;
+    let target = { x: 0, y: 0 };
 
-        // 靶心位置 (行列)
-        const TARGET_COLS = 4;
-        const TARGET_ROWS = 3;
-        let targets = [];
+    function layout() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+        coinStartX = W * 0.5;
+        coinStartY = H * 0.90;
+        target.x = W * 0.5;
+        target.y = H * 0.22;
+    }
 
-        function generateTargets() {
-            targets = [];
-            const marginX = W * 0.08;
-            const marginY = H * 0.22;
-            const spacingX = (W - 2 * marginX) / (TARGET_COLS - 1);
-            const spacingY = (H * 0.52 - marginY) / (TARGET_ROWS - 1);
-            for (let r = 0; r < TARGET_ROWS; r++) {
-                for (let c = 0; c < TARGET_COLS; c++) {
-                    targets.push({
-                        x: marginX + c * spacingX,
-                        y: marginY + r * spacingY
-                    });
-                }
-            }
-        }
-        generateTargets();
+    // ============================================================
+    //  Game state
+    // ============================================================
+    let coins = [];               // landed coins: {x,y,landedAt}
+    let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
+    let powerValue = 0;
+    let isThrowing = false;
+    let comboCount = 0;
+    let lastHitTime = 0;
+    const comboEl = document.getElementById('comboDisplay');
+    const stateBadge = document.getElementById('stateBadge');
+    const cleanBtn = document.getElementById('cleanBtn');
 
-        // ============================================================
-        //  3. 绘图函数
-        // ============================================================
-        function drawTarget(x, y) {
-            const colors = ['#ff2244', '#33ff77', '#ffdd33', '#aa44ff'];
-            const radii = [55, 42, 29, 16];
-            for (let i = 0; i < 4; i++) {
-                ctx.beginPath();
-                ctx.arc(x, y, radii[i], 0, Math.PI * 2);
-                ctx.fillStyle = colors[i];
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                ctx.lineWidth = 4;
-                ctx.stroke();
-            }
+    // Rings, outer to inner. Radii are relative to the smaller screen dimension.
+    const RING_DEFS = [
+        { label: 'red',    pts: 1, color: '#ff2244', frac: 0.150 },
+        { label: 'green',  pts: 2, color: '#33ff77', frac: 0.112 },
+        { label: 'yellow', pts: 3, color: '#ffdd33', frac: 0.076 },
+        { label: 'purple', pts: 5, color: '#aa44ff', frac: 0.040 }
+    ];
+    let RINGS = [];
+    function computeRings() {
+        const base = Math.min(W, H);
+        RINGS = RING_DEFS.map(r => ({ ...r, radius: base * r.frac }));
+    }
+
+    // ============================================================
+    //  Drawing helpers
+    // ============================================================
+    function drawTable() {
+        ctx.fillStyle = '#0a001f';
+        ctx.fillRect(0, 0, W, H);
+
+        const deskTop = H * 0.10;
+        // trapezoid desk, narrow at top (far / 3m away) wide at bottom (near player)
+        const topHalf = W * 0.28;
+        const botHalf = W * 0.62;
+        const grad = ctx.createLinearGradient(0, deskTop, 0, H);
+        grad.addColorStop(0, '#241608');
+        grad.addColorStop(1, '#3a281a');
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - topHalf, deskTop);
+        ctx.lineTo(W / 2 + topHalf, deskTop);
+        ctx.lineTo(W / 2 + botHalf, H);
+        ctx.lineTo(W / 2 - botHalf, H);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // faint depth lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < 5; i++) {
+            const t = i / 5;
+            const y = deskTop + (H - deskTop) * t;
+            const half = topHalf + (botHalf - topHalf) * t;
             ctx.beginPath();
-            ctx.arc(x, y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-        }
-
-        function drawCoin(x, y, scale = 1, glow = 0) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.scale(scale, scale);
-            if (glow > 0) {
-                const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 40 + glow * 15);
-                g.addColorStop(0, `rgba(255,215,0,${0.12 * glow})`);
-                g.addColorStop(1, 'rgba(255,215,0,0)');
-                ctx.beginPath();
-                ctx.arc(0, 0, 40 + glow * 15, 0, Math.PI * 2);
-                ctx.fillStyle = g;
-                ctx.fill();
-            }
-            const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 24);
-            grad.addColorStop(0, '#ffe066');
-            grad.addColorStop(0.6, '#ffd700');
-            grad.addColorStop(1, '#b8860b');
-            ctx.beginPath();
-            ctx.arc(0, 0, 22, 0, Math.PI * 2);
-            ctx.fillStyle = grad;
-            ctx.fill();
-            ctx.strokeStyle = '#a67c00';
-            ctx.lineWidth = 2;
+            ctx.moveTo(W / 2 - half, y);
+            ctx.lineTo(W / 2 + half, y);
             ctx.stroke();
+        }
+
+        const glow = ctx.createLinearGradient(0, deskTop, 0, H);
+        glow.addColorStop(0, 'rgba(255,100,255,0.10)');
+        glow.addColorStop(0.5, 'rgba(100,200,255,0.06)');
+        glow.addColorStop(1, 'rgba(255,200,100,0.04)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, deskTop, W, H - deskTop);
+    }
+
+    function drawTarget() {
+        for (let i = 0; i < RINGS.length; i++) {
             ctx.beginPath();
-            ctx.arc(-5, -7, 5, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.arc(target.x, target.y, RINGS[i].radius, 0, Math.PI * 2);
+            ctx.fillStyle = RINGS[i].color;
             ctx.fill();
-            ctx.fillStyle = '#8a6e00';
-            ctx.font = 'bold 14px Arial';
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, RINGS[RINGS.length - 1].radius * 0.28, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+    }
+
+    function drawCoin(x, y, scale = 1, glow = 0) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+        if (glow > 0) {
+            const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 40 + glow * 15);
+            g.addColorStop(0, `rgba(255,215,0,${0.12 * glow})`);
+            g.addColorStop(1, 'rgba(255,215,0,0)');
+            ctx.beginPath();
+            ctx.arc(0, 0, 40 + glow * 15, 0, Math.PI * 2);
+            ctx.fillStyle = g;
+            ctx.fill();
+        }
+        const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 22);
+        grad.addColorStop(0, '#ffe066');
+        grad.addColorStop(0.6, '#ffd700');
+        grad.addColorStop(1, '#b8860b');
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = '#a67c00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(-5, -7, 5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // transient particles
+    let particles = [];
+    function emitParticles(x, y, count, color, spread = 3, life = 30) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * spread;
+            particles.push({
+                x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                size: 2 + Math.random() * 5, color, life, maxLife: life
+            });
+        }
+    }
+    function updateAndDrawParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--;
+            const alpha = Math.max(0, p.life / p.maxLife);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    // popup text
+    let popups = [];
+    function addPopup(x, y, text, color) {
+        popups.push({ x, y, text, color, life: 55, maxLife: 55, vy: -1.6 });
+    }
+    function updateAndDrawPopups() {
+        for (let i = popups.length - 1; i >= 0; i--) {
+            const p = popups[i];
+            p.y += p.vy; p.vy *= 0.97; p.life--;
+            const alpha = p.life / p.maxLife;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.font = 'bold 20px "Press Start 2P", cursive';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('🪙', 0, 1);
-            ctx.restore();
+            ctx.shadowColor = p.color + '80';
+            ctx.shadowBlur = 18;
+            ctx.fillText(p.text, p.x, p.y);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+            if (p.life <= 0) popups.splice(i, 1);
         }
+    }
 
-        function draw() {
-            ctx.fillStyle = '#0a001f';
-            ctx.fillRect(0, 0, W, H);
+    // ============================================================
+    //  Flying coin (friction slide, not gravity arc)
+    // ============================================================
+    let flying = null; // {x,y,vx,vy,frame}
 
-            // 桌面
-            const deskY = H * 0.42;
-            const dg = ctx.createLinearGradient(0, deskY, 0, H);
-            dg.addColorStop(0, '#3a281a');
-            dg.addColorStop(1, '#1a0e08');
-            ctx.fillStyle = dg;
-            ctx.fillRect(0, deskY, W, H);
+    function performThrow(power, aimVX) {
+        if (isThrowing) return;
+        isThrowing = true;
+        updateStateBadge();
 
-            // 环境光
-            const glow = ctx.createLinearGradient(0, deskY, 0, H);
-            glow.addColorStop(0, 'rgba(255,100,255,0.15)');
-            glow.addColorStop(0.5, 'rgba(100,200,255,0.10)');
-            glow.addColorStop(1, 'rgba(255,200,100,0.05)');
-            ctx.fillStyle = glow;
-            ctx.fillRect(0, deskY, W, H);
-
-            // 靶心
-            targets.forEach(t => drawTarget(t.x, t.y));
-
-            // 已落地硬币
-            coins.forEach(c => {
-                drawCoin(c.x, c.y, 0.85, 0);
-            });
-
-            // 投掷中的硬币（如果未在投掷中，显示在起始位置）
-            if (!isThrowing) {
-                const glow = powerValue / 120;
-                drawCoin(coinX, coinY, 1 + powerValue / 600, Math.min(glow, 1.2));
-                // 力度光圈
-                if (powerValue > 15) {
-                    ctx.beginPath();
-                    ctx.arc(coinX, coinY, 28 + powerValue / 16, 0, Math.PI * 2);
-                    ctx.strokeStyle = `rgba(255,215,0,${0.1 + powerValue / 400})`;
-                    ctx.lineWidth = 2 + powerValue / 50;
-                    ctx.setLineDash([6, 10]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-            }
-        }
-
-        // ============================================================
-        //  4. 投掷逻辑 (带水平速度、反弹、精准得分)
-        // ============================================================
-        function performThrow(power) {
-            if (isThrowing) return;
-            if (power < 12) {
-                // 力量太小，提示
-                addPopup(coinX, coinY - 40, '💪 再用力!', '#ffaa44');
-                return;
-            }
-
-            isThrowing = true;
-
-            // 水平速度：向右为主，加少量随机
-            const vx = 1.2 + power * 0.045 + (Math.random() - 0.5) * 1.0;
-            // 垂直速度：向上
-            const vy = -power * 0.13 - 1.2;
-            let x = coinX,
-                y = coinY;
-            let frame = 0;
-            const gravity = 0.44;
-            let bounced = false;
-
-            // 尾迹粒子（简单绘制）
-            const trail = setInterval(() => {
-                if (frame % 2 === 0) emitParticles(x, y, 3, '#ffd700', 1.5, 25);
-            }, 30);
-
-            const anim = setInterval(() => {
-                x += vx;
-                y += vy;
-                vy += gravity;
-
-                // 左右墙反弹
-                if (x < 0) { x = 0;
-                    vx = -vx * 0.7;
-                    emitParticles(x, y, 6, '#ff9966', 2, 20);
-                    bounced = true; }
-                if (x > W) { x = W;
-                    vx = -vx * 0.7;
-                    emitParticles(x, y, 6, '#ff9966', 2, 20);
-                    bounced = true; }
-                // 地面反弹
-                if (y > H) {
-                    y = H;
-                    vy = -vy * 0.5;
-                    if (Math.abs(vy) < 0.8) vy = 0;
-                    emitParticles(x, H, 10, '#aa8866', 3, 25);
-                    bounced = true;
-                }
-
-                // 绘制飞行中的硬币
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(frame * 0.25);
-                drawCoin(0, 0, 0.9 + Math.sin(frame * 0.15) * 0.04);
-                ctx.restore();
-
-                frame++;
-
-                // 停止条件：接近地面且速度很小
-                const nearGround = y > H * 0.85;
-                const slow = Math.abs(vy) < 0.3 && Math.abs(vx) < 0.3;
-                if ((nearGround && slow && bounced) || (y > H * 0.92 && vy >= 0)) {
-                    clearInterval(anim);
-                    clearInterval(trail);
-
-                    const landX = Math.min(W - 5, Math.max(5, x));
-                    const landY = Math.min(H * 0.88, y);
-                    coins.push({ x: landX, y: landY });
-                    emitParticles(landX, landY, 18, '#b8942a', 3, 30);
-
-                    // ----- 精准得分检测 -----
-                    let hit = false;
-                    let ringHit = null;
-                    // 遍历所有靶心
-                    for (let t of targets) {
-                        const d = Math.hypot(t.x - landX, t.y - landY);
-                        // 如果落在最大环内
-                        if (d < RINGS[0].radius) {
-                            // 从内到外检查
-                            for (let i = RINGS.length - 1; i >= 0; i--) {
-                                if (d < RINGS[i].radius) {
-                                    ringHit = RINGS[i];
-                                    break;
-                                }
-                            }
-                            if (ringHit) {
-                                // 加分
-                                scores[ringHit.label] += ringHit.pts;
-                                document.getElementById(ringHit.label).textContent = scores[ringHit.label];
-                                hit = true;
-
-                                // 连击
-                                const now = Date.now();
-                                if (now - lastHitTime < 1500) comboCount++;
-                                else comboCount = 1;
-                                lastHitTime = now;
-
-                                if (comboCount >= 2) {
-                                    const txt = comboCount >= 5 ? `🔥 ${comboCount}x` :
-                                        comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
-                                    comboEl.textContent = txt;
-                                    comboEl.className = 'combo show';
-                                    clearTimeout(comboEl._timer);
-                                    comboEl._timer = setTimeout(() => comboEl.className = 'combo', 800);
-                                    // 连击音效 (这里省略音频)
-                                }
-                                // 粒子爆炸
-                                emitParticles(landX, landY, 40, ringHit.color, 5, 45);
-                                emitParticles(landX, landY, 20, '#fff', 3, 25);
-                                emitParticles(landX, landY, 15, '#ffd700', 4, 35);
-                                addPopup(landX, landY - 30, `+${ringHit.pts}`, ringHit.color);
-                                document.getElementById('power').textContent = '💥';
-                                break;
-                            }
-                        }
-                        if (hit) break;
-                    }
-
-                    if (!hit) {
-                        addPopup(landX, landY - 30, '✗', '#ff6666');
-                        comboCount = 0;
-                        comboEl.className = 'combo';
-                        emitParticles(landX, landY, 12, '#888', 2, 20);
-                    }
-
-                    // 重置投掷状态
-                    setTimeout(() => {
-                        coinX = W * 0.20;
-                        coinY = H * 0.82;
-                        powerValue = 0;
-                        document.getElementById('power').textContent = '0';
-                        isThrowing = false;
-                        draw();
-                    }, 400);
-                }
-            }, 16);
-        }
-
-        // 粒子发射（简单版，在画布上绘制瞬态粒子）
-        function emitParticles(x, y, count, color, spread = 3, life = 40) {
-            // 由于我们没有完整的粒子系统，直接绘制瞬态粒子（它们会留在画布上直到重绘）
-            // 但我们的动画循环会持续重绘，所以这些粒子会很快消失。
-            // 为了效果更好，我们使用一个简单的粒子数组，但为了保持代码轻量，这里直接用canvas绘制一次。
-            // 在动画循环中，这些粒子会被下一帧覆盖，所以看起来是闪烁。
-            // 为了更好，我们可以在draw中绘制粒子，但为了快速实现，就简单绘制。
-            for (let i = 0; i < count; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * spread * 8;
-                const dx = Math.cos(angle) * dist;
-                const dy = Math.sin(angle) * dist;
-                const size = 2 + Math.random() * 6;
-                ctx.fillStyle = color;
-                ctx.globalAlpha = 0.7;
-                ctx.beginPath();
-                ctx.arc(x + dx, y + dy, size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-        }
-
-        // 弹出文字
-        let popups = [];
-        function addPopup(x, y, text, color) {
-            popups.push({ x, y, text, color, life: 60, maxLife: 60, vy: -1.8 });
-        }
-
-        // 在draw中绘制popups
-        const originalDraw = draw;
-        draw = function() {
-            originalDraw();
-            // 绘制popups
-            for (let i = popups.length - 1; i >= 0; i--) {
-                const p = popups[i];
-                p.y += p.vy;
-                p.vy *= 0.97;
-                p.life--;
-                const alpha = p.life / p.maxLife;
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = p.color;
-                ctx.font = 'bold 22px "Press Start 2P", cursive';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.shadowColor = p.color + '80';
-                ctx.shadowBlur = 20;
-                ctx.fillText(p.text, p.x, p.y);
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = 1;
-                if (p.life <= 0) popups.splice(i, 1);
-            }
+        // power (roughly 0-100) maps to initial slide speed.
+        const speed = 4 + power * 0.16;
+        flying = {
+            x: coinStartX,
+            y: coinStartY,
+            vx: aimVX,
+            vy: -speed,
+            frame: 0
         };
+        document.getElementById('power').textContent = Math.floor(power);
+    }
 
-        // ============================================================
-        //  5. 触摸滑动投掷 (增强)
-        // ============================================================
-        let touchStartY = 0;
-        let touchActive = false;
+    function updateFlying() {
+        if (!flying) return;
+        const f = flying;
 
-        function handleTouchStart(e) {
-            e.preventDefault();
-            if (isThrowing) return;
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            // 允许在屏幕大部分区域滑动，但限制在硬币附近开始滑动更容易操作
-            if (Math.hypot(x - coinX, y - coinY) < 100 || y > H * 0.4) {
-                touchActive = true;
-                touchStartY = y;
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-            }
+        // trail particles
+        if (f.frame % 2 === 0) emitParticles(f.x, f.y, 2, '#ffd700', 1.2, 20);
+
+        f.x += f.vx;
+        f.y += f.vy;
+
+        // friction slide (table drag)
+        const friction = 0.965;
+        f.vx *= friction;
+        f.vy *= friction;
+
+        // side rails bounce
+        const railMargin = W * 0.06;
+        if (f.x < railMargin) { f.x = railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
+        if (f.x > W - railMargin) { f.x = W - railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
+
+        // far rail (back edge of table) - overshoot bounces back
+        const farEdge = H * 0.08;
+        if (f.y < farEdge) { f.y = farEdge; f.vy = -f.vy * 0.45; emitParticles(f.x, f.y, 8, '#ff6688', 2, 20); }
+
+        // near rail (can't come back past the player)
+        if (f.y > coinStartY + 10) { f.y = coinStartY + 10; f.vy = -f.vy * 0.3; }
+
+        f.frame++;
+
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.rotate(f.frame * 0.22);
+        drawCoin(0, 0, 0.9 + Math.sin(f.frame * 0.15) * 0.03);
+        ctx.restore();
+
+        const speed = Math.hypot(f.vx, f.vy);
+        if (speed < 0.35) {
+            landCoin(f.x, f.y);
+            flying = null;
+        }
+    }
+
+    function landCoin(x, y) {
+        const landX = Math.min(W - 6, Math.max(6, x));
+        const landY = Math.min(H - 6, Math.max(6, y));
+        coins.push({ x: landX, y: landY, landedAt: Date.now() });
+        emitParticles(landX, landY, 16, '#b8942a', 3, 26);
+
+        const d = Math.hypot(target.x - landX, target.y - landY);
+        let ringHit = null;
+        for (let i = RINGS.length - 1; i >= 0; i--) {
+            if (d < RINGS[i].radius) { ringHit = RINGS[i]; break; }
         }
 
-        function handleTouchMove(e) {
-            e.preventDefault();
-            if (!touchActive || isThrowing) return;
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const y = touch.clientY - rect.top;
-            const dy = touchStartY - y;
-            if (dy > 0) {
-                powerValue = Math.min(180, dy * 0.75);
-                document.getElementById('power').textContent = Math.floor(powerValue);
-            } else {
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-            }
-        }
+        if (ringHit) {
+            scores[ringHit.label] += ringHit.pts;
+            document.getElementById(ringHit.label).textContent = scores[ringHit.label];
 
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            if (!touchActive) return;
-            touchActive = false;
-            if (isThrowing) return;
-            if (powerValue > 10) {
-                performThrow(powerValue);
-            } else if (powerValue > 2) {
-                addPopup(coinX, coinY - 40, '👆 再滑远点!', '#ffaa44');
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                draw();
-            } else {
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                draw();
-            }
-        }
+            const now = Date.now();
+            comboCount = (now - lastHitTime < 1800) ? comboCount + 1 : 1;
+            lastHitTime = now;
 
-        // ============================================================
-        //  6. 清理桌面
-        // ============================================================
-        function cleanDesk() {
-            if (coins.length === 0) return;
-            coins.forEach(c => {
-                emitParticles(c.x, c.y, 20, '#888', 4, 30);
-            });
-            setTimeout(() => {
-                coins = [];
-                draw();
-            }, 400);
+            if (comboCount >= 2) {
+                const txt = comboCount >= 5 ? `🔥 ${comboCount}x` : comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
+                comboEl.textContent = txt;
+                comboEl.className = 'combo show';
+                clearTimeout(comboEl._timer);
+                comboEl._timer = setTimeout(() => comboEl.className = 'combo', 800);
+            }
+
+            emitParticles(landX, landY, 36, ringHit.color, 5, 42);
+            emitParticles(landX, landY, 18, '#fff', 3, 24);
+            addPopup(landX, landY - 30, `+${ringHit.pts}`, ringHit.color);
+        } else {
+            addPopup(landX, landY - 30, '✗', '#ff6666');
             comboCount = 0;
             comboEl.className = 'combo';
+            emitParticles(landX, landY, 10, '#888', 2, 18);
         }
 
-        // ============================================================
-        //  7. 初始化与事件绑定
-        // ============================================================
-        function init() {
-            resize();
-            draw();
+        setTimeout(() => {
+            isThrowing = false;
+            powerValue = 0;
+            document.getElementById('power').textContent = '0';
+            updateStateBadge();
+        }, 250);
+    }
 
-            // 触摸事件
-            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    // ============================================================
+    //  Motion-sensor throw detection
+    // ============================================================
+    const motion = {
+        supported: false,
+        active: false,
+        state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
+        baseline: 9.8,
+        steadyStreak: 0,
+        STEADY_MS: 45,      // frames-ish counted via event rate
+        THROW_DELTA: 13,    // spike above baseline to count as a throw
+        MAX_DELTA: 34,
+        lastEventTime: 0
+    };
 
-            // 鼠标备选 (桌面调试)
-            canvas.addEventListener('mousedown', (e) => {
-                const te = { preventDefault: () => e.preventDefault(), touches: [{ clientX: e.clientX, clientY: e
-                            .clientY }] };
-                handleTouchStart(te);
-            });
-            canvas.addEventListener('mousemove', (e) => {
-                if (touchActive) {
-                    const te = { preventDefault: () => e.preventDefault(), touches: [{ clientX: e.clientX, clientY: e
-                                .clientY }] };
-                    handleTouchMove(te);
-                }
-            });
-            canvas.addEventListener('mouseup', (e) => {
-                if (touchActive) {
-                    const te = { preventDefault: () => {} };
-                    handleTouchEnd(te);
-                }
-            });
-            canvas.addEventListener('mouseleave', () => {
-                if (touchActive) {
-                    const te = { preventDefault: () => {} };
-                    handleTouchEnd(te);
-                }
-            });
+    function updateStateBadge() {
+        if (isThrowing || flying) {
+            stateBadge.textContent = '🪙 飞行中…';
+            stateBadge.className = 'state-badge flying';
+        } else if (motion.state === 'ready') {
+            stateBadge.textContent = '✅ 可以投掷';
+            stateBadge.className = 'state-badge ready';
+        } else {
+            stateBadge.textContent = '🤳 稳住手机…';
+            stateBadge.className = 'state-badge wait';
+        }
+    }
 
-            // 动画循环
-            function animate() {
-                draw();
-                requestAnimationFrame(animate);
+    function handleMotion(e) {
+        const now = performance.now();
+        const dt = now - motion.lastEventTime;
+        motion.lastEventTime = now;
+
+        const a = e.acceleration && (e.acceleration.x || e.acceleration.y || e.acceleration.z)
+            ? e.acceleration
+            : e.accelerationIncludingGravity;
+        if (!a || a.x === null) return;
+
+        const mag = Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2);
+        const delta = mag - motion.baseline;
+
+        if (isThrowing || flying) return; // ignore motion while a coin is in the air
+
+        if (motion.state === 'wait' || motion.state === 'cooldown') {
+            // low-pass toward baseline while steady, count steady streak
+            if (Math.abs(delta) < 2.2) {
+                motion.baseline = motion.baseline * 0.9 + mag * 0.1;
+                motion.steadyStreak += dt;
+                if (motion.steadyStreak > 500) {
+                    motion.state = 'ready';
+                    updateStateBadge();
+                }
+            } else {
+                motion.steadyStreak = 0;
             }
-            animate();
+        } else if (motion.state === 'ready') {
+            if (delta > motion.THROW_DELTA) {
+                const clampedDelta = Math.min(delta, motion.MAX_DELTA);
+                const power = ((clampedDelta - motion.THROW_DELTA) / (motion.MAX_DELTA - motion.THROW_DELTA)) * 100;
+                const aimVX = Math.max(-6, Math.min(6, (a.x || 0) * 0.9));
+                motion.state = 'cooldown';
+                motion.steadyStreak = 0;
+                performThrow(Math.max(8, power), aimVX);
+            }
+        }
+    }
 
-            window.addEventListener('resize', () => {
-                resize();
-                generateTargets();
-                if (coinX > W) coinX = W * 0.20;
-                if (coinY > H) coinY = H * 0.82;
-                draw();
-            });
+    function startMotion() {
+        motion.supported = true;
+        motion.active = true;
+        window.addEventListener('devicemotion', handleMotion, true);
+        motion.state = 'wait';
+        updateStateBadge();
+    }
 
-            console.log('🌈 扔彩虹 · 精准投掷 已启动!');
-            console.log('👆 向上滑动投掷硬币，瞄准彩色靶心');
+    // ============================================================
+    //  Fallback: touch / mouse swipe (desktop or permission denied)
+    // ============================================================
+    let touchActive = false;
+    let touchStartY = 0;
+
+    function fallbackToTouch() {
+        motion.supported = false;
+        document.getElementById('hint').textContent = '👆 向上滑动投掷 · 松手即甩出';
+        motion.state = 'ready';
+        updateStateBadge();
+        canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
+        canvas.addEventListener('mousedown', e => onTouchStart({ preventDefault(){}, touches: [{ clientY: e.clientY }] }));
+        canvas.addEventListener('mousemove', e => { if (touchActive) onTouchMove({ preventDefault(){}, touches: [{ clientY: e.clientY }] }); });
+        window.addEventListener('mouseup', () => { if (touchActive) onTouchEnd({ preventDefault(){} }); });
+    }
+    function onTouchStart(e) {
+        e.preventDefault();
+        if (isThrowing || flying) return;
+        touchActive = true;
+        touchStartY = e.touches[0].clientY;
+        powerValue = 0;
+    }
+    function onTouchMove(e) {
+        e.preventDefault();
+        if (!touchActive || isThrowing || flying) return;
+        const dy = touchStartY - e.touches[0].clientY;
+        powerValue = Math.max(0, Math.min(100, dy * 0.5));
+    }
+    function onTouchEnd(e) {
+        e.preventDefault();
+        if (!touchActive) return;
+        touchActive = false;
+        if (isThrowing || flying) return;
+        if (powerValue > 8) {
+            performThrow(powerValue, 0);
+        } else {
+            powerValue = 0;
+        }
+    }
+
+    // ============================================================
+    //  Clean desk (only enabled once everything has settled)
+    // ============================================================
+    function isCleanReady() {
+        if (isThrowing || flying) return false;
+        if (coins.length === 0) return false;
+        return coins.every(c => Date.now() - c.landedAt > 400);
+    }
+    function updateCleanButton() {
+        cleanBtn.classList.toggle('disabled', !isCleanReady());
+    }
+    function cleanDesk() {
+        if (!isCleanReady()) return;
+        coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
+        coins = [];
+        comboCount = 0;
+        comboEl.className = 'combo';
+        updateCleanButton();
+    }
+    window.cleanDesk = cleanDesk;
+
+    // ============================================================
+    //  Main loop
+    // ============================================================
+    function frame() {
+        drawTable();
+        drawTarget();
+
+        coins.forEach(c => drawCoin(c.x, c.y, 0.82, 0));
+
+        if (flying) {
+            updateFlying();
+        } else if (!isThrowing) {
+            const glow = Math.min(powerValue / 100, 1.2);
+            drawCoin(coinStartX, coinStartY, 1 + powerValue / 500, glow);
+            if (powerValue > 10) {
+                ctx.beginPath();
+                ctx.arc(coinStartX, coinStartY, 26 + powerValue / 5, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255,215,0,${0.1 + powerValue / 300})`;
+                ctx.lineWidth = 2 + powerValue / 40;
+                ctx.setLineDash([6, 10]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            document.getElementById('power').textContent = Math.floor(powerValue);
         }
 
-        // 暴露全局
-        window.cleanDesk = cleanDesk;
+        updateAndDrawParticles();
+        updateAndDrawPopups();
+        updateCleanButton();
 
-        init();
-    </script>
+        requestAnimationFrame(frame);
+    }
+
+    // ============================================================
+    //  Init
+    // ============================================================
+    function init() {
+        layout();
+        computeRings();
+        window.addEventListener('resize', () => { layout(); computeRings(); });
+        frame();
+    }
+
+    document.getElementById('startBtn').addEventListener('click', async () => {
+        document.getElementById('startOverlay').style.display = 'none';
+        try {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                const state = await DeviceMotionEvent.requestPermission();
+                if (state === 'granted') startMotion(); else fallbackToTouch();
+            } else if (window.DeviceMotionEvent) {
+                startMotion();
+            } else {
+                fallbackToTouch();
+            }
+        } catch (err) {
+            fallbackToTouch();
+        }
+    });
+
+    init();
+</script>
 </body>
 </html>
