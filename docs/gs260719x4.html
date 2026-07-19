@@ -440,13 +440,18 @@
         supported: false,
         active: false,
         state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
+        source: null,       // 'gravity' | 'linear' - locked in once, never switched mid-session
         baseline: 9.8,
         steadyStreak: 0,
-        STEADY_MS: 45,      // frames-ish counted via event rate
-        THROW_DELTA: 13,    // spike above baseline to count as a throw
-        MAX_DELTA: 34,
-        lastEventTime: 0
+        THROW_DELTA: 7,     // spike above baseline to count as a throw
+        MAX_DELTA: 22,
+        lastEventTime: 0,
+        debug: true
     };
+
+    const debugEl = document.createElement('div');
+    debugEl.style.cssText = 'position:absolute;top:60px;right:12px;z-index:20;font-size:9px;color:#0f8;background:rgba(0,0,0,0.7);padding:5px 9px;border-radius:8px;font-family:monospace;text-align:right;';
+    document.body.appendChild(debugEl);
 
     function updateStateBadge() {
         if (isThrowing || flying) {
@@ -466,19 +471,39 @@
         const dt = now - motion.lastEventTime;
         motion.lastEventTime = now;
 
-        const a = e.acceleration && (e.acceleration.x || e.acceleration.y || e.acceleration.z)
-            ? e.acceleration
-            : e.accelerationIncludingGravity;
+        // Lock in ONE acceleration source the first time we see valid data,
+        // and never switch sources mid-session (switching mid-session was the
+        // bug: baseline gets calibrated on one scale, then compared against
+        // a different scale during the throw, so delta never crosses the
+        // threshold no matter how hard the phone is flicked).
+        if (motion.source === null) {
+            if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null) {
+                motion.source = 'gravity';
+                motion.baseline = 9.8;
+            } else if (e.acceleration && e.acceleration.x !== null) {
+                motion.source = 'linear';
+                motion.baseline = 0;
+            } else {
+                return; // no usable data yet
+            }
+        }
+
+        const a = motion.source === 'gravity' ? e.accelerationIncludingGravity : e.acceleration;
         if (!a || a.x === null) return;
 
         const mag = Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2);
         const delta = mag - motion.baseline;
 
+        if (motion.debug) {
+            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} base:${motion.baseline.toFixed(1)} Δ:${delta.toFixed(1)} st:${motion.state}`;
+        }
+
         if (isThrowing || flying) return; // ignore motion while a coin is in the air
 
         if (motion.state === 'wait' || motion.state === 'cooldown') {
             // low-pass toward baseline while steady, count steady streak
-            if (Math.abs(delta) < 2.2) {
+            const steadyBand = motion.source === 'gravity' ? 2.2 : 1.2;
+            if (Math.abs(delta) < steadyBand) {
                 motion.baseline = motion.baseline * 0.9 + mag * 0.1;
                 motion.steadyStreak += dt;
                 if (motion.steadyStreak > 500) {
