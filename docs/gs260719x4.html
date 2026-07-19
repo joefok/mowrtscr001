@@ -333,8 +333,20 @@
         isThrowing = true;
         updateStateBadge();
 
-        // power (roughly 0-100) maps to initial slide speed.
-        const speed = 4 + power * 0.16;
+        // Scale the throw distance to the ACTUAL on-screen distance between
+        // the coin's start position and the target, so it works regardless
+        // of screen size. power=0 clearly falls short; power=100 slightly
+        // overshoots the target (so max force isn't automatically a bullseye
+        // - that's the risk/reward).
+        const deskDistance = coinStartY - target.y;
+        const minDist = deskDistance * 0.30;
+        const maxDist = deskDistance * 1.18;
+        const p = Math.max(0, Math.min(100, power)) / 100;
+        const travelDist = minDist + (maxDist - minDist) * p;
+
+        const friction = 0.965;
+        const speed = travelDist * (1 - friction); // v0 such that sum(v0*friction^n) ~= travelDist
+
         flying = {
             x: coinStartX,
             y: coinStartY,
@@ -444,7 +456,7 @@
         baseline: 9.8,
         steadyStreak: 0,
         THROW_DELTA: 7,     // spike above baseline to count as a throw
-        MAX_DELTA: 22,
+        MAX_DELTA: 14,      // initial guess; self-calibrates upward to the user's strongest flick
         lastEventTime: 0,
         debug: true
     };
@@ -515,6 +527,12 @@
             }
         } else if (motion.state === 'ready') {
             if (delta > motion.THROW_DELTA) {
+                // Self-calibrate: if this flick is stronger than anything
+                // we've seen before, raise the ceiling so future power% is
+                // measured against the user's own strongest throw rather than
+                // a fixed guess that may not suit this device/person.
+                if (delta > motion.MAX_DELTA) motion.MAX_DELTA = delta * 1.05;
+
                 const clampedDelta = Math.min(delta, motion.MAX_DELTA);
                 const power = ((clampedDelta - motion.THROW_DELTA) / (motion.MAX_DELTA - motion.THROW_DELTA)) * 100;
                 const aimVX = Math.max(-6, Math.min(6, (a.x || 0) * 0.9));
