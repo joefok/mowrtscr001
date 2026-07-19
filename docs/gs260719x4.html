@@ -6,167 +6,126 @@
     <title>扔彩虹模擬器</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            background: #0a001f;
-            font-family: 'Press Start 2P', cursive;
-            color: white;
-            touch-action: none;
+            height: 100vh; width: 100vw; overflow: hidden;
+            background: #0a001f; font-family: 'Press Start 2P', cursive;
+            color: white; touch-action: none;
         }
-        canvas {
-            display: block;
-            max-width: 100%;
-            max-height: 100%;
-            image-rendering: crisp-edges;
-        }
+        canvas { display: block; }
         .hud {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(0,0,0,0.75);
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.5;
-            pointer-events: none;
-            z-index: 10;
+            position: absolute; top: 12px; left: 12px; z-index: 10;
+            background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;
+            font-size: 13px; line-height: 1.4;
         }
     </style>
 </head>
 <body>
     <div class="hud" id="hud">
-        Red: <span id="red">0</span> 
-        Green: <span id="green">0</span><br>
-        Yellow: <span id="yellow">0</span> 
-        Purple: <span id="purple">0</span><br>
-        Toss Power: <span id="power">0</span>
+        Red: <span id="red">0</span> Green: <span id="green">0</span><br>
+        Yellow: <span id="yellow">0</span> Purple: <span id="purple">0</span><br>
+        Power: <span id="power">0</span>
     </div>
     <canvas id="canvas"></canvas>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        let width, height;
+        let w, h;
 
         let coins = [];
         let scores = {red:0, green:0, yellow:0, purple:0};
+        let coinX, coinY;
         let dragging = false;
-        let startX, startY, coinX, coinY;
+        let startX, startY;
+        let tiltX = 0, tiltY = 0;
 
         function resize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
-            coinX = width * 0.2;
-            coinY = height * 0.75;
+            w = window.innerWidth;
+            h = window.innerHeight;
+            canvas.width = w;
+            canvas.height = h;
+            coinX = w * 0.18;
+            coinY = h * 0.78;
         }
 
-        function drawTarget(x, y, scale = 1) {
-            const colors = ['#ff0000', '#00ff00', '#ffff00', '#8b00ff'];
-            const size = 58 * scale;
+        function drawTarget(x, y) {
+            const colors = ['#ff0000','#00ff00','#ffff00','#8b00ff'];
             for (let i = 0; i < 4; i++) {
                 ctx.beginPath();
-                ctx.arc(x, y, size - i*13*scale, 0, Math.PI*2);
+                ctx.arc(x, y, 58 - i*14, 0, Math.PI*2);
                 ctx.fillStyle = colors[i];
                 ctx.fill();
-                ctx.strokeStyle = '#000'; ctx.lineWidth = 5*scale;
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
                 ctx.stroke();
             }
-            ctx.beginPath();
-            ctx.arc(x, y, 18*scale, 0, Math.PI*2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(x,y,19,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
         }
 
         function draw() {
-            ctx.fillStyle = '#1a0033';
-            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = '#1a0033'; ctx.fillRect(0,0,w,h);
 
-            // Rainbow floor glow
-            const grad = ctx.createLinearGradient(0, height*0.4, 0, height);
-            grad.addColorStop(0, 'rgba(255,0,255,0.15)');
-            grad.addColorStop(1, 'rgba(0,255,255,0.25)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, height*0.35, width, height);
+            // Rainbow floor
+            const g = ctx.createLinearGradient(0, h*0.45, 0, h);
+            g.addColorStop(0,'rgba(255,100,255,0.2)'); g.addColorStop(1,'rgba(100,255,255,0.3)');
+            ctx.fillStyle = g; ctx.fillRect(0, h*0.4, w, h);
 
-            // Multiple rainbow targets
-            for (let x = width*0.25; x < width*0.85; x += width*0.28) {
-                for (let y = height*0.18; y < height*0.55; y += height*0.32) {
-                    drawTarget(x, y, width > 700 ? 1 : 0.75);
-                }
+            // Targets
+            for (let x = w*0.3; x < w*0.85; x += w*0.3) {
+                for (let y = h*0.22; y < h*0.6; y += h*0.32) drawTarget(x, y);
             }
 
-            // Landed coins
             coins.forEach(c => {
-                ctx.save();
-                ctx.translate(c.x, c.y);
-                ctx.fillStyle = '#c0a040';
-                ctx.beginPath();
-                ctx.arc(0,0,16,0,Math.PI*2);
-                ctx.fill();
+                ctx.save(); ctx.translate(c.x, c.y);
+                ctx.fillStyle = '#c0a040'; ctx.beginPath(); ctx.arc(0,0,17,0,Math.PI*2); ctx.fill();
                 ctx.restore();
             });
 
             // Active coin
-            ctx.save();
-            ctx.translate(coinX, coinY);
+            ctx.save(); ctx.translate(coinX, coinY);
             ctx.fillStyle = '#ffd700';
-            ctx.beginPath();
-            ctx.arc(0,0,22,0,Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = '#b8860b';
-            ctx.font = 'bold 28px Arial';
-            ctx.fillText('🪙', -11, 11);
+            ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#b8860b'; ctx.font = 'bold 32px Arial'; ctx.fillText('🪙', -13, 12);
             ctx.restore();
         }
 
-        function throwCoin(sx, sy, ex, ey) {
-            const power = Math.min(120, Math.hypot(sx-ex, sy-ey) * 0.55);
-            document.getElementById('power').textContent = Math.floor(power);
+        function throwCoin(basePower) {
+            const power = Math.min(135, basePower + Math.abs(tiltY) * 8);
+            const angleOffset = tiltX * 0.8;
 
-            let vx = (sx - ex) * 0.09;
-            let vy = (sy - ey) * 0.09;
+            let vx = -power * 0.09 + angleOffset;
+            let vy = -power * 0.11;
 
             let x = coinX, y = coinY;
             let frame = 0;
 
             const anim = setInterval(() => {
                 draw();
-                x += vx;
-                y += vy;
-                vy += 0.48;
+                x += vx; y += vy; vy += 0.52;
 
                 ctx.save();
                 ctx.translate(x, y);
-                ctx.rotate(frame * 0.35);
+                ctx.rotate(frame * 0.4);
                 ctx.fillStyle = '#ffd700';
-                ctx.beginPath();
-                ctx.arc(0,0,22,0,Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = '#b8860b';
-                ctx.fillText('🪙', -11, 11);
+                ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#b8860b'; ctx.fillText('🪙', -13, 12);
                 ctx.restore();
 
                 frame++;
 
-                if (y > height * 0.92) {
+                if (y > h * 0.95) {
                     clearInterval(anim);
-                    coins.push({x, y: y});
+                    coins.push({x, y});
                     
-                    // Score
+                    // Scoring
                     let scored = false;
-                    for (let tx = width*0.25; tx < width*0.85; tx += width*0.28) {
-                        for (let ty = height*0.18; ty < height*0.55; ty += height*0.32) {
-                            const dist = Math.hypot(tx - x, ty - y);
-                            if (dist < 75) {
-                                if (dist < 24) scores.purple++;
-                                else if (dist < 40) scores.yellow++;
-                                else if (dist < 58) scores.green++;
+                    for (let tx = w*0.3; tx < w*0.85; tx += w*0.3) {
+                        for (let ty = h*0.22; ty < h*0.6; ty += h*0.32) {
+                            const d = Math.hypot(tx-x, ty-y);
+                            if (d < 72) {
+                                if (d < 24) scores.purple++;
+                                else if (d < 39) scores.yellow++;
+                                else if (d < 55) scores.green++;
                                 else scores.red++;
                                 scored = true;
                                 break;
@@ -174,52 +133,40 @@
                         }
                         if (scored) break;
                     }
+                    Object.keys(scores).forEach(k => document.getElementById(k).textContent = scores[k]);
 
-                    Object.keys(scores).forEach(key => {
-                        document.getElementById(key).textContent = scores[key];
-                    });
-
-                    // Reset coin
-                    setTimeout(() => {
-                        coinX = width * 0.2;
-                        coinY = height * 0.75;
-                        draw();
-                    }, 800);
+                    setTimeout(() => { coinX = w*0.18; coinY = h*0.78; draw(); }, 900);
                 }
             }, 16);
         }
 
-        // Swipe controls (mouse + touch)
-        function startDrag(e) {
-            const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX || e.touches[0].clientX - rect.left;
-            const my = e.clientY || e.touches[0].clientY - rect.top;
-            if (Math.hypot(mx - coinX, my - coinY) < 45) {
+        // Controls
+        canvas.addEventListener('pointerdown', e => {
+            if (Math.hypot(e.offsetX - coinX, e.offsetY - coinY) < 45) {
                 dragging = true;
-                startX = mx;
-                startY = my;
+                startX = e.offsetX;
+                startY = e.offsetY;
             }
-        }
-
-        function endDrag(e) {
-            if (!dragging) return;
-            dragging = false;
-            const rect = canvas.getBoundingClientRect();
-            const ex = e.clientX || e.changedTouches[0].clientX - rect.left;
-            const ey = e.clientY || e.changedTouches[0].clientY - rect.top;
-            throwCoin(startX, startY, ex, ey);
-        }
-
-        canvas.addEventListener('mousedown', startDrag);
-        canvas.addEventListener('mouseup', endDrag);
-        canvas.addEventListener('touchstart', startDrag);
-        canvas.addEventListener('touchend', endDrag);
-
-        window.addEventListener('resize', () => {
-            resize();
-            draw();
         });
 
+        canvas.addEventListener('pointerup', e => {
+            if (!dragging) return;
+            dragging = false;
+            const dx = startX - e.offsetX;
+            const dy = startY - e.offsetY;
+            const basePower = Math.hypot(dx, dy) * 0.48;
+            throwCoin(basePower);
+        });
+
+        // Device Tilt (iOS/Android)
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', e => {
+                tiltX = e.gamma || 0;   // left-right
+                tiltY = e.beta || 0;    // front-back
+            });
+        }
+
+        window.addEventListener('resize', () => { resize(); draw(); });
         resize();
         draw();
     </script>
