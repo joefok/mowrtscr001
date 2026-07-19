@@ -104,7 +104,7 @@
 </head>
 <body>
 
-<div class="overlay" id="startOverlay">
+<div class="overlay" id="startOverlay" style="display:none;">
     <h1>🌈 扔彩虹<br>甩手投掷</h1>
     <p>把手机当作真的硬币来甩：<br>手握稳，向前快速一甩，<br>硬币就会滑向桌子远端的彩虹靶。<br>力度太轻滑不到，太重会冲过头弹回来。</p>
     <button id="startBtn">📳 开始 · 授权动作感应</button>
@@ -497,6 +497,8 @@
             } else {
                 return null;
             }
+            // Real sensor data confirmed - no need to fall back to touch.
+            if (motion.autoStartTimeout) { clearTimeout(motion.autoStartTimeout); motion.autoStartTimeout = null; }
         }
         if (motion.source === 'rotation') {
             const r = e.rotationRate;
@@ -514,6 +516,19 @@
         };
     }
 
+    // Hard absolute floors, in each sensor's native units, below which a
+    // spike is NEVER treated as a throw - no matter how quiet the resting
+    // noise floor is. This is what actually distinguishes a fast intentional
+    // flick from an accidental slow tilt: a flick blows way past these
+    // numbers; a tilt doesn't get close.
+    //   rotation: deg/s from the gyroscope - a real flick is typically
+    //             200-500+ deg/s; casual tilting is well under 100.
+    //   linear:   m/s^2 gravity-free acceleration - a flick is roughly
+    //             8-15+; hand tremor/tilt is a couple at most.
+    //   gravity:  m/s^2 delta on the gravity-fused channel - this one is
+    //             inherently low-sensitivity, kept as a last-resort fallback.
+    const SOURCE_FLOOR = { rotation: 200, linear: 8, gravity: 3.5 };
+
     function handleMotion(e) {
         const now = performance.now();
         const dt = now - motion.lastEventTime;
@@ -523,12 +538,12 @@
         if (!sig) return;
         const mag = sig.mag;
 
-        // Adaptive threshold: trigger a throw @ mean + 5*stdDev above the
-        // resting noise floor, rather than a fixed physical-unit constant.
-        // This keeps working no matter which sensor/scale we ended up on.
         const stdDev = Math.sqrt(Math.max(motion.variance, 0.0001));
         const delta = mag - motion.mean;
-        const threshold = Math.max(stdDev * 5, motion.mean * 0.15 + 1);
+        const floor = SOURCE_FLOOR[motion.source] || 6;
+        // Must clear BOTH: statistically unusual for this device/session,
+        // AND above the hard absolute floor for the sensor in use.
+        const threshold = Math.max(stdDev * 8, floor);
 
         if (motion.debug) {
             debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} mean:${motion.mean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
@@ -539,7 +554,7 @@
         if (motion.state === 'wait' || motion.state === 'cooldown') {
             // low-pass mean/variance while steady, count steady streak
             const dev = mag - motion.mean;
-            const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, motion.mean * 0.25 + 2);
+            const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, floor * 0.5);
             if (looksSteady) {
                 motion.mean = motion.mean * 0.92 + mag * 0.08;
                 motion.variance = motion.variance * 0.92 + (dev * dev) * 0.08;
@@ -553,15 +568,30 @@
             }
         } else if (motion.state === 'ready') {
             if (delta > threshold) {
-                // Power scales against the biggest spike seen so far this
-                // session, so it self-calibrates to the player's own
-                // strongest throw instead of a guessed constant.
-                if (!motion.maxSeen || delta > motion.maxSeen) motion.maxSeen = delta;
-                const power = Math.max(15, Math.min(100, (delta / motion.maxSeen) * 100));
+                // Require the spike to be confirmed on the very next sample
+                // too (a real flick spans several samples at 60Hz; a single
+                // stray glitch sample won't repeat).
+                if (!motion.pendingSince) {
+                    motion.pendingSince = now;
+                    motion.pendingPeak = delta;
+                    return;
+                }
+                motion.pendingPeak = Math.max(motion.pendingPeak, delta);
+                if (now - motion.pendingSince < 40) return; // wait for confirmation sample
+
+                const confirmedDelta = motion.pendingPeak;
+                motion.pendingSince = null;
+                motion.pendingPeak = 0;
+
+                if (!motion.maxSeen || confirmedDelta > motion.maxSeen) motion.maxSeen = confirmedDelta;
+                const power = Math.max(15, Math.min(100, (confirmedDelta / motion.maxSeen) * 100));
                 const aimVX = Math.max(-6, Math.min(6, sig.aim * (motion.source === 'rotation' ? 0.06 : 0.9)));
                 motion.state = 'cooldown';
                 motion.steadyStreak = 0;
                 performThrow(power, aimVX);
+            } else {
+                motion.pendingSince = null;
+                motion.pendingPeak = 0;
             }
         }
     }
@@ -698,7 +728,33 @@
         }
     });
 
+    // On load: only iOS 13+ Safari genuinely needs a user tap before it will
+    // release sensor data (DeviceMotionEvent.requestPermission existing is
+    // the tell). Everywhere else - Android Firefox/Chrome, desktop browsers
+    // with sensors - just start listening immediately, no overlay needed.
+    // If no real sensor numbers show up within a short window (denied,
+    // unsupported, or a desktop with no sensors at all), fall back to touch
+    // controls automatically instead of leaving the player stuck.
+    function autoDetectAndStart() {
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            document.getElementById('startOverlay').style.display = 'flex';
+            return;
+        }
+        if (window.DeviceMotionEvent) {
+            startMotion();
+            motion.autoStartTimeout = setTimeout(() => {
+                if (motion.source === null) {
+                    window.removeEventListener('devicemotion', handleMotion, true);
+                    fallbackToTouch();
+                }
+            }, 1200);
+        } else {
+            fallbackToTouch();
+        }
+    }
+
     init();
+    autoDetectAndStart();
 </script>
 </body>
 </html>
