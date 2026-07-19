@@ -453,8 +453,7 @@
         active: false,
         state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
         source: null,       // 'rotation' | 'linear' | 'gravity' - locked in once, never switched mid-session
-        mean: 0,            // rolling mean of the signal while steady (noise floor)
-        variance: 1,        // rolling variance of the signal while steady
+        variance: 1,        // rolling variance (noise floor) while steady
         steadyStreak: 0,
         lastAimSign: 1,
         lastEventTime: 0,
@@ -529,6 +528,21 @@
     //             inherently low-sensitivity, kept as a last-resort fallback.
     const SOURCE_FLOOR = { rotation: 200, linear: 8, gravity: 3.5 };
 
+    // The resting/steady value for each sensor type is a known physical
+    // constant, NOT something that needs to drift over time:
+    //   rotation: gyroscope reads ~0 deg/s at rest, at ANY orientation.
+    //   linear:   gravity-free accelerometer reads ~0 at rest, at any angle.
+    //   gravity:  the gravity vector's magnitude is ~9.8 regardless of angle.
+    // Earlier this baseline was a moving average that got updated whenever
+    // motion "looked steady" - but the follow-through right after a flick
+    // (hand still settling) could get misclassified as steady and blend
+    // into that average, dragging the baseline away from truth. Repeat that
+    // over a few throws and the threshold balloons until nothing clears it,
+    // even though the sensor itself is working fine. Pinning the mean to
+    // the known constant removes the drift entirely; only the noise-floor
+    // (variance) still gets calibrated from real samples.
+    const BASE_MEAN = { rotation: 0, linear: 0, gravity: 9.8 };
+
     function handleMotion(e) {
         const now = performance.now();
         const dt = now - motion.lastEventTime;
@@ -537,27 +551,28 @@
         const sig = readSignal(e);
         if (!sig) return;
         const mag = sig.mag;
+        const baseMean = BASE_MEAN[motion.source] ?? 0;
 
         const stdDev = Math.sqrt(Math.max(motion.variance, 0.0001));
-        const delta = mag - motion.mean;
+        const delta = mag - baseMean;
         const floor = SOURCE_FLOOR[motion.source] || 6;
-        // Must clear BOTH: statistically unusual for this device/session,
-        // AND above the hard absolute floor for the sensor in use.
         const threshold = Math.max(stdDev * 8, floor);
 
         if (motion.debug) {
-            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} mean:${motion.mean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
+            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} base:${baseMean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
         }
 
         if (isThrowing || flying) return; // ignore motion while a coin is in the air
 
         if (motion.state === 'wait' || motion.state === 'cooldown') {
-            // low-pass mean/variance while steady, count steady streak
-            const dev = mag - motion.mean;
-            const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, floor * 0.5);
+            // Only the noise floor (variance) gets calibrated here - the
+            // mean itself stays pinned to the known constant above, so it
+            // can never drift no matter what the hand does during cooldown.
+            const dev = mag - baseMean;
+            const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, floor * 0.6);
             if (looksSteady) {
-                motion.mean = motion.mean * 0.92 + mag * 0.08;
-                motion.variance = motion.variance * 0.92 + (dev * dev) * 0.08;
+                const cappedVariance = Math.min(motion.variance, (floor * 0.5) ** 2); // don't let noise floor runaway
+                motion.variance = cappedVariance * 0.92 + (dev * dev) * 0.08;
                 motion.steadyStreak += dt;
                 if (motion.steadyStreak > 500) {
                     motion.state = 'ready';
