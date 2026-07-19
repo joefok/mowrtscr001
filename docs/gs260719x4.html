@@ -3,1384 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌈 倾斜桌面 · 8-bit 刷子</title>
+    <title>🌈 扔彩虹模擬器</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; touch-action:none; }
         body {
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            background: #0a001f;
-            font-family: 'Press Start 2P', cursive;
+            height: 100vh; width: 100vw; overflow: hidden;
+            background: #0a001f; font-family: 'Press Start 2P', cursive;
             color: #fff;
-            touch-action: none;
-            position: relative;
         }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            /* 将3D透视交给canvas内部绘制，不进行CSS变换 */
-        }
-
+        canvas { display: block; }
         .hud {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 20;
-            background: rgba(0, 0, 0, 0.78);
-            backdrop-filter: blur(6px);
-            padding: 10px 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 215, 0, 0.25);
-            font-size: 10px;
-            line-height: 1.5;
-            min-width: 130px;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.08);
-            pointer-events: none;
-        }
-        .hud .title {
+            position: absolute; top: 12px; left: 12px; z-index: 20;
+            background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;
             font-size: 12px;
-            color: #ffd700;
-            margin-bottom: 4px;
-            letter-spacing: 1px;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-        }
-        .hud .row {
-            display: flex;
-            justify-content: space-between;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .hud .row span {
-            min-width: 28px;
-        }
-        .hud .score-label {
-            opacity: 0.6;
-            font-size: 8px;
-        }
-        .hud .score-val {
-            font-size: 12px;
-            text-shadow: 0 0 10px currentColor;
-        }
-        .hud .score-val.red { color: #ff4466; }
-        .hud .score-val.green { color: #44ff88; }
-        .hud .score-val.yellow { color: #ffdd44; }
-        .hud .score-val.purple { color: #cc66ff; }
-        .hud .power-wrap {
-            margin-top: 4px;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            padding-top: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 9px;
-        }
-        .hud .power-wrap .power-bar {
-            flex: 1;
-            margin-left: 8px;
-            height: 5px;
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-        .hud .power-wrap .power-bar .fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #ff8800, #ffdd00);
-            border-radius: 3px;
-            transition: width 0.08s;
-        }
-        .hud .sensor-status {
-            font-size: 8px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-top: 3px;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            padding-top: 3px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .hud .sensor-status .active { color: #44ff88; }
-        .hud .sensor-status .inactive { color: #ff4466; }
-
-        .controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .controls button {
-            background: rgba(255, 215, 0, 0.12);
-            border: 2px solid rgba(255, 215, 0, 0.4);
-            color: #ffd700;
-            padding: 8px 16px;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 10px;
-            cursor: pointer;
-            border-radius: 30px;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.05);
-            letter-spacing: 0.5px;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
-            touch-action: manipulation;
-            min-height: 40px;
-        }
-        .controls button:active {
-            transform: scale(0.94);
-            background: rgba(255, 215, 0, 0.25);
-        }
-        .controls button.mute {
-            border-color: rgba(255, 255, 255, 0.15);
-            color: rgba(255, 255, 255, 0.5);
-            background: rgba(255, 255, 255, 0.05);
-            min-width: 44px;
-            padding: 8px 12px;
-        }
-        .controls .hint {
-            font-size: 8px;
-            color: rgba(255, 255, 255, 0.3);
-            padding: 4px 10px;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            text-align: center;
-            line-height: 1.4;
-        }
-        .controls .hint em { color: #ffd700; font-style: normal; }
-
-        .combo-display {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 15;
-            font-size: 44px;
-            font-family: 'Press Start 2P', cursive;
-            color: #ffdd44;
-            text-shadow: 0 0 40px rgba(255, 220, 0, 0.7), 0 0 80px rgba(255, 150, 0, 0.4);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.15s;
-            letter-spacing: 3px;
-            text-align: center;
-        }
-        .combo-display.show {
-            opacity: 1;
-            animation: comboPulse 0.5s ease-out;
-        }
-        @keyframes comboPulse {
-            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-            50% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-        }
-
-        .shake-hint {
-            position: absolute;
-            bottom: 90px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 12;
-            font-size: 13px;
-            color: rgba(255, 215, 0, 0.6);
-            font-family: 'Press Start 2P', cursive;
-            text-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
-            animation: hintPulse 2s ease-in-out infinite;
-            pointer-events: none;
-            text-align: center;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 6px 16px;
-            border-radius: 20px;
-            backdrop-filter: blur(2px);
-            border: 1px solid rgba(255, 215, 0, 0.1);
-            white-space: nowrap;
-        }
-        @keyframes hintPulse {
-            0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(0.98); }
-            50% { opacity: 0.9; transform: translateX(-50%) scale(1.04); }
-        }
-
-        @media (max-width: 500px) {
-            .hud { font-size: 8px; padding: 6px 10px; top: 6px; left: 6px; min-width: 100px; }
-            .hud .title { font-size: 10px; }
-            .hud .score-val { font-size: 10px; }
-            .controls button { font-size: 8px; padding: 6px 12px; min-height: 34px; }
-            .combo-display { font-size: 28px; }
-            .shake-hint { font-size: 10px; bottom: 74px; padding: 4px 12px; white-space: normal; }
         }
     </style>
 </head>
 <body>
-
-    <!-- HUD -->
     <div class="hud" id="hud">
-        <div class="title">✦ 倾斜桌面 ✦</div>
-        <div class="row">
-            <span><span class="score-label">🔴</span> <span class="score-val red" id="red">0</span></span>
-            <span><span class="score-label">🟢</span> <span class="score-val green" id="green">0</span></span>
-            <span><span class="score-label">🟡</span> <span class="score-val yellow" id="yellow">0</span></span>
-            <span><span class="score-label">🟣</span> <span class="score-val purple" id="purple">0</span></span>
-        </div>
-        <div class="power-wrap">
-            <span>⚡<span id="power">0</span></span>
-            <div class="power-bar"><div class="fill" id="powerFill"></div></div>
-        </div>
-        <div class="sensor-status">
-            <span>📡 <span id="sensorStatus" class="inactive">未连接</span></span>
-            <span id="shakeCount">甩动: 0</span>
-        </div>
+        Red: <span id="red">0</span> 
+        Green: <span id="green">0</span><br>
+        Yellow: <span id="yellow">0</span> 
+        Purple: <span id="purple">0</span><br>
+        Power: <span id="power">0</span>
     </div>
-
-    <div class="combo-display" id="comboDisplay"></div>
-    <div class="shake-hint" id="shakeHint">📱 甩动手机 · 或向上滑动投掷</div>
-
-    <div class="controls">
-        <button onclick="manualClean()">🧹 手动清桌</button>
-        <button class="mute" id="muteBtn" onclick="toggleMute()">🔊</button>
-    </div>
-
     <canvas id="canvas"></canvas>
 
     <script>
-        // ============================================================
-        //  1. CANVAS 基础
-        // ============================================================
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let W, H;
+
+        let coins = [];
+        let scores = {red:0, green:0, yellow:0, purple:0};
+        let coinX, coinY;
+        let dragging = false;
+        let startY = 0;
 
         function resize() {
             W = window.innerWidth;
             H = window.innerHeight;
             canvas.width = W;
             canvas.height = H;
-        }
-        resize();
-        window.addEventListener('resize', () => { resize();
-            draw(); });
-
-        // ============================================================
-        //  2. 音频引擎 (8-bit 风格)
-        // ============================================================
-        let audioCtx = null;
-        let isMuted = false;
-        let musicActive = false;
-        let melodyTimer = null;
-        let melodyIndex = 0;
-
-        const NOTES = {
-            C4: 261.63,
-            D4: 293.66,
-            E4: 329.63,
-            F4: 349.23,
-            G4: 392.00,
-            A4: 440.00,
-            B4: 493.88,
-            C5: 523.25,
-            D5: 587.33,
-            E5: 659.25,
-            F5: 698.46,
-            G5: 783.99,
-            A5: 880.00,
-            B5: 987.77,
-            C6: 1046.50,
-        };
-
-        const MELODY = [
-            { note: 'C5', dur: 140 }, { note: 'E5', dur: 140 }, { note: 'G5', dur: 140 },
-            { note: 'A5', dur: 180 }, { note: 'G5', dur: 140 }, { note: 'E5', dur: 140 },
-            { note: 'C5', dur: 180 }, { note: 'D5', dur: 140 }, { note: 'F5', dur: 140 },
-            { note: 'A5', dur: 140 }, { note: 'G5', dur: 180 }, { note: 'F5', dur: 140 },
-            { note: 'D5', dur: 140 }, { note: 'C5', dur: 220 },
-        ];
-
-        function initAudio() {
-            if (!audioCtx) {
-                try {
-                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-                } catch (e) { return; }
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
-            }
+            coinX = W * 0.25;
+            coinY = H * 0.82;
         }
 
-        function playNote(freq, duration, volume = 0.12, type = 'square') {
-            if (!audioCtx || isMuted) return;
-            try {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000 + 0.04);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration / 1000 + 0.06);
-            } catch (e) {}
-        }
-
-        function playNextMelodyNote() {
-            if (!audioCtx || isMuted || !musicActive) return;
-            const entry = MELODY[melodyIndex];
-            const freq = NOTES[entry.note];
-            if (freq) {
-                playNote(freq, entry.dur, 0.10, 'square');
-                setTimeout(() => {
-                    playNote(freq / 2, entry.dur * 0.6, 0.05, 'sawtooth');
-                }, 25);
-            }
-            melodyIndex = (melodyIndex + 1) % MELODY.length;
-            const delay = entry.dur + 45;
-            if (melodyTimer) clearTimeout(melodyTimer);
-            melodyTimer = setTimeout(playNextMelodyNote, delay);
-        }
-
-        function startMusic() {
-            if (!audioCtx) { initAudio(); if (!audioCtx) return; }
-            if (musicActive) return;
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().then(() => {
-                    musicActive = true;
-                    melodyIndex = 0;
-                    if (melodyTimer) clearTimeout(melodyTimer);
-                    playNextMelodyNote();
-                }).catch(() => {});
-            } else {
-                musicActive = true;
-                melodyIndex = 0;
-                if (melodyTimer) clearTimeout(melodyTimer);
-                playNextMelodyNote();
-            }
-        }
-
-        function stopMusic() {
-            musicActive = false;
-            if (melodyTimer) { clearTimeout(melodyTimer);
-                melodyTimer = null; }
-        }
-
-        function toggleMute() {
-            isMuted = !isMuted;
-            document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🔊';
-            if (isMuted) {
-                stopMusic();
-            } else {
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
-                startMusic();
-            }
-        }
-
-        function sfxThrow(power) {
-            if (!audioCtx || isMuted) return;
-            try {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sawtooth';
-                const baseFreq = 180 + power * 0.6;
-                osc.frequency.setValueAtTime(baseFreq * 0.4, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.6, audioCtx.currentTime + 0.16);
-                gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.22);
-            } catch (e) {}
-        }
-
-        function sfxHit(ringIndex) {
-            if (!audioCtx || isMuted) return;
-            try {
-                const freqs = [523, 659, 784, 1047];
-                const freq = freqs[Math.min(ringIndex, freqs.length - 1)] || 659;
-                playNote(freq, 110, 0.16, 'square');
-                setTimeout(() => { playNote(freq * 1.28, 70, 0.07, 'square'); }, 35);
-                const osc2 = audioCtx.createOscillator();
-                const g2 = audioCtx.createGain();
-                osc2.type = 'sawtooth';
-                osc2.frequency.setValueAtTime(freq * 0.65, audioCtx.currentTime);
-                g2.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-                osc2.connect(g2);
-                g2.connect(audioCtx.destination);
-                osc2.start();
-                osc2.stop(audioCtx.currentTime + 0.12);
-            } catch (e) {}
-        }
-
-        function sfxScore(combo) {
-            if (!audioCtx || isMuted) return;
-            try {
-                const base = 580 + combo * 25;
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        playNote(base + i * 70, 70, 0.07 - i * 0.012, 'square');
-                    }, i * 45);
-                }
-            } catch (e) {}
-        }
-
-        function sfxClean() {
-            if (!audioCtx || isMuted) return;
-            try {
-                // 8-bit 刷子音效：快速上升音阶
-                for (let i = 0; i < 6; i++) {
-                    setTimeout(() => {
-                        playNote(400 + i * 80, 50, 0.04, 'square');
-                    }, i * 40);
-                }
-            } catch (e) {}
-        }
-
-        // ============================================================
-        //  3. 游戏状态
-        // ============================================================
-        let coins = [];
-        let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
-        let coinX, coinY;
-        let powerValue = 0;
-        let isThrowing = false;
-
-        let particles = [];
-        let scorePopups = [];
-        let shakeAmount = 0;
-        let comboCount = 0;
-        let lastHitTime = 0;
-        let comboDisplayEl = document.getElementById('comboDisplay');
-        let totalShakes = 0;
-
-        // 设备倾斜角度 (弧度)
-        let tiltAngle = 0; // 绕Z轴旋转角度，根据gamma (左右倾斜)
-
-        // 自动清理相关
-        let autoCleanTimer = null;
-        let isCleaning = false;
-        let cleanProgress = 0; // 0~1
-        let cleanCoins = []; // 清理时复制coin列表
-
-        // 星星背景
-        let stars = [];
-        for (let i = 0; i < 55; i++) {
-            stars.push({
-                x: Math.random(),
-                y: Math.random(),
-                size: 0.4 + Math.random() * 1.6,
-                speed: 0.15 + Math.random() * 0.7,
-                phase: Math.random() * Math.PI * 2
-            });
-        }
-
-        // ============================================================
-        //  4. 粒子系统
-        // ============================================================
-        function emitParticles(x, y, count, color, spread = 4, life = 55, sizeRange = [2, 9]) {
-            for (let i = 0; i < count; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 1 + Math.random() * spread * 1.4;
-                particles.push({
-                    x,
-                    y,
-                    vx: Math.cos(angle) * speed * (0.4 + Math.random() * 0.8),
-                    vy: Math.sin(angle) * speed * (0.4 + Math.random() * 0.8) - 0.8,
-                    life: life * (0.5 + Math.random() * 0.5),
-                    maxLife: life,
-                    size: sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]),
-                    color: color,
-                    gravity: 0.06 + Math.random() * 0.05,
-                    decay: 0.96 + Math.random() * 0.03,
-                });
-            }
-        }
-
-        function emitTrail(x, y, count = 4) {
-            emitParticles(x, y, count, '#ffd700', 2, 30, [2, 5]);
-        }
-
-        function emitHitBurst(x, y, ringColor) {
-            const colors = ['#ff4466', '#44ff88', '#ffdd44', '#cc66ff'];
-            const c = ringColor || colors[Math.floor(Math.random() * colors.length)];
-            emitParticles(x, y, 45, c, 7, 50, [3, 13]);
-            emitParticles(x, y, 25, '#ffffff', 3, 28, [1, 5]);
-            emitParticles(x, y, 18, '#ffd700', 4, 38, [2, 9]);
-            shakeAmount = 7;
-        }
-
-        function addScorePopup(x, y, text, color = '#ffffff') {
-            scorePopups.push({
-                x,
-                y,
-                text,
-                color,
-                life: 75,
-                maxLife: 75,
-                vy: -2.0,
-                size: 20 + Math.random() * 8,
-            });
-        }
-
-        // ============================================================
-        //  5. 核心绘制 (带有桌面倾斜旋转)
-        // ============================================================
-        function getTargets() {
-            const targets = [];
-            for (let tx = W * 0.22; tx < W * 0.82; tx += W * 0.3) {
-                for (let ty = H * 0.28; ty < H * 0.55; ty += H * 0.23) {
-                    targets.push({ x: tx, y: ty });
-                }
-            }
-            return targets;
-        }
-
-        // 原始靶心坐标 (用于检测)
-        let targetOrigins = [];
-        function updateTargetOrigins() {
-            targetOrigins = [];
-            for (let tx = W * 0.22; tx < W * 0.82; tx += W * 0.3) {
-                for (let ty = H * 0.28; ty < H * 0.55; ty += H * 0.23) {
-                    targetOrigins.push({ x: tx, y: ty });
-                }
-            }
-        }
-        updateTargetOrigins();
-
-        // 应用旋转矩阵到点
-        function rotatePoint(x, y, angle, cx, cy) {
-            const dx = x - cx;
-            const dy = y - cy;
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            return {
-                x: cx + dx * cos - dy * sin,
-                y: cy + dx * sin + dy * cos
-            };
-        }
-
-        // 绘制靶心 (在旋转后的坐标系中)
-        function drawTargetRotated(x, y, angle, cx, cy) {
-            const p = rotatePoint(x, y, angle, cx, cy);
-            drawTarget(p.x, p.y, true);
-        }
-
-        function drawTarget(x, y, glow = false) {
-            const colors = ['#ff2244', '#33ff77', '#ffdd33', '#aa44ff'];
-            const radii = [55, 42, 29, 16];
+        function drawTarget(x, y) {
+            const colors = ['#ff0000','#00ff00','#ffff00','#8b00ff'];
             for (let i = 0; i < 4; i++) {
-                const r = radii[i];
                 ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                const col = colors[i];
-                ctx.fillStyle = col;
+                ctx.arc(x, y, 55 - i*13, 0, Math.PI*2);
+                ctx.fillStyle = colors[i];
                 ctx.fill();
-                if (glow) {
-                    const grad = ctx.createRadialGradient(x, y, r * 0.15, x, y, r * 1.5);
-                    grad.addColorStop(0, col + '30');
-                    grad.addColorStop(1, col + '00');
-                    ctx.beginPath();
-                    ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
-                    ctx.fillStyle = grad;
-                    ctx.fill();
-                }
-                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-                if (i === 3) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                    ctx.font = 'bold 14px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('★', x, y + 1);
-                }
-            }
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.fill();
-        }
-
-        function drawCoin(x, y, scale = 1, glowIntensity = 0, alpha = 1) {
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.translate(x, y);
-            ctx.scale(scale, scale);
-
-            if (glowIntensity > 0) {
-                const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 45 + glowIntensity * 20);
-                grad.addColorStop(0, `rgba(255,215,0,${0.15 * glowIntensity})`);
-                grad.addColorStop(1, 'rgba(255,215,0,0)');
-                ctx.beginPath();
-                ctx.arc(0, 0, 45 + glowIntensity * 20, 0, Math.PI * 2);
-                ctx.fillStyle = grad;
-                ctx.fill();
-            }
-
-            const g = ctx.createRadialGradient(-6, -8, 4, 0, 0, 26);
-            g.addColorStop(0, '#ffe066');
-            g.addColorStop(0.5, '#ffd700');
-            g.addColorStop(1, '#b8860b');
-            ctx.beginPath();
-            ctx.arc(0, 0, 24, 0, Math.PI * 2);
-            ctx.fillStyle = g;
-            ctx.fill();
-            ctx.strokeStyle = '#a67c00';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(-6, -8, 6, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.45)';
-            ctx.fill();
-
-            ctx.fillStyle = '#8a6e00';
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🪙', 0, 2);
-
-            ctx.restore();
-        }
-
-        function drawBackground(angle) {
-            // 背景星空不变 (不旋转)
-            const grad = ctx.createLinearGradient(0, 0, 0, H);
-            grad.addColorStop(0, '#0a001f');
-            grad.addColorStop(0.5, '#1a0033');
-            grad.addColorStop(1, '#0d0d2b');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, W, H);
-
-            const time = Date.now() / 1000;
-            stars.forEach(s => {
-                const x = s.x * W;
-                const y = s.y * H;
-                const flicker = 0.4 + 0.6 * Math.sin(time * s.speed + s.phase);
-                const alpha = 0.2 + 0.8 * flicker;
-                ctx.beginPath();
-                ctx.arc(x, y, s.size * (0.4 + 0.6 * flicker), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.7})`;
-                ctx.fill();
-                if (s.size > 1.2) {
-                    ctx.shadowColor = 'rgba(255,255,255,0.2)';
-                    ctx.shadowBlur = 8;
-                }
-            });
-            ctx.shadowBlur = 0;
-
-            // 桌面 (也旋转)
-            const deskY = H * 0.48;
-            const dg = ctx.createLinearGradient(0, deskY, 0, H);
-            dg.addColorStop(0, 'rgba(55,38,28,0.6)');
-            dg.addColorStop(0.3, 'rgba(35,24,18,0.8)');
-            dg.addColorStop(1, 'rgba(18,12,8,0.9)');
-            ctx.fillStyle = dg;
-            ctx.fillRect(0, deskY, W, H);
-
-            ctx.strokeStyle = 'rgba(255,255,255,0.025)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 18; i++) {
-                const y = deskY + 16 + i * 16;
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(W, y + (i % 3 - 1) * 5);
+                ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
                 ctx.stroke();
             }
-
-            const eg = ctx.createLinearGradient(0, deskY, 0, deskY + 28);
-            eg.addColorStop(0, 'rgba(255,200,100,0.06)');
-            eg.addColorStop(1, 'rgba(255,200,100,0)');
-            ctx.fillStyle = eg;
-            ctx.fillRect(0, deskY, W, 28);
+            ctx.beginPath(); ctx.arc(x,y,18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
         }
 
         function draw() {
-            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = '#0a001f'; ctx.fillRect(0,0,W,H);
 
-            // 应用旋转 (绕画布中心)
-            const cx = W / 2,
-                cy = H / 2;
-            const angle = tiltAngle; // 弧度
+            // Desk with depth
+            ctx.fillStyle = '#2a1a0f';
+            ctx.fillRect(0, H*0.42, W, H);
 
-            // 绘制背景 (不旋转)
-            drawBackground(angle);
+            // Rainbow floor gradient
+            const g = ctx.createLinearGradient(0, H*0.4, 0, H);
+            g.addColorStop(0, 'rgba(255,100,255,0.25)');
+            g.addColorStop(1, 'rgba(100,255,255,0.3)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, H*0.4, W, H);
 
-            // 保存上下文，应用旋转
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.translate(-cx, -cy);
+            // Rainbow targets (3-meter zone)
+            for (let x = W*0.22; x < W*0.82; x += W*0.29) {
+                for (let y = H*0.26; y < H*0.52; y += H*0.23) {
+                    drawTarget(x, y);
+                }
+            }
 
-            // 绘制靶心 (旋转后)
-            const targets = getTargets();
-            targets.forEach(t => drawTargetRotated(t.x, t.y, angle, cx, cy));
-
-            // 绘制已落地的硬币 (旋转后)
+            // Landed coins
             coins.forEach(c => {
-                const p = rotatePoint(c.x, c.y, angle, cx, cy);
-                // 如果是清理动画中，根据进度调整透明度
-                let alpha = 1;
-                if (isCleaning) {
-                    // 计算每个硬币的清理进度
-                    const idx = coins.indexOf(c);
-                    const total = coins.length;
-                    const progress = (idx / total) * 0.6 + cleanProgress * 0.4;
-                    alpha = Math.max(0, 1 - progress * 1.2);
-                }
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.globalAlpha = alpha;
-                const g = ctx.createRadialGradient(-4, -4, 4, 0, 0, 20);
-                g.addColorStop(0, '#ddcc88');
-                g.addColorStop(0.5, '#b8942a');
-                g.addColorStop(1, '#7a6210');
-                ctx.beginPath();
-                ctx.arc(0, 0, 18, 0, Math.PI * 2);
-                ctx.fillStyle = g;
-                ctx.fill();
-                ctx.strokeStyle = '#5a4a0a';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(-4, -6, 4, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255,255,220,0.25)';
-                ctx.fill();
-                ctx.restore();
+                ctx.fillStyle = '#c0a040';
+                ctx.beginPath(); ctx.arc(c.x, c.y, 16, 0, Math.PI*2); ctx.fill();
             });
 
-            // 绘制投掷中的硬币 (不旋转，因为物理坐标是屏幕坐标，但我们需要旋转绘制以匹配)
-            if (!isThrowing && !isCleaning) {
-                const p = rotatePoint(coinX, coinY, angle, cx, cy);
-                const glow = powerValue / 120;
-                drawCoin(p.x, p.y, 1 + powerValue / 550, Math.min(glow, 1.5));
-                if (powerValue > 15) {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, 30 + powerValue / 14, 0, Math.PI * 2);
-                    const alpha = 0.15 + powerValue / 400;
-                    ctx.strokeStyle = `rgba(255,215,0,${Math.min(alpha, 0.5)})`;
-                    ctx.lineWidth = 2 + powerValue / 55;
-                    ctx.setLineDash([5, 10]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-            }
-
-            // 绘制粒子 (旋转)
-            particles.forEach(p => {
-                const pp = rotatePoint(p.x, p.y, angle, cx, cy);
-                const alpha = p.life / p.maxLife;
-                ctx.globalAlpha = alpha;
-                ctx.beginPath();
-                ctx.arc(pp.x, pp.y, p.size * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
-                ctx.fillStyle = p.color;
-                ctx.shadowColor = p.color + '50';
-                ctx.shadowBlur = 10;
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            });
-            ctx.globalAlpha = 1;
-
-            // 得分弹出 (旋转)
-            scorePopups.forEach(p => {
-                const pp = rotatePoint(p.x, p.y, angle, cx, cy);
-                const alpha = p.life / p.maxLife;
-                ctx.globalAlpha = alpha;
-                ctx.fillStyle = p.color;
-                ctx.font = `bold ${p.size}px 'Press Start 2P', cursive`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.shadowColor = p.color + '80';
-                ctx.shadowBlur = 18;
-                ctx.fillText(p.text, pp.x, pp.y);
-                ctx.shadowBlur = 0;
-            });
-            ctx.globalAlpha = 1;
-
-            ctx.restore(); // 恢复旋转
-
-            // 屏幕震动 (不受旋转影响)
-            if (shakeAmount > 0.1) {
-                const sx = (Math.random() - 0.5) * shakeAmount * 1.3;
-                const sy = (Math.random() - 0.5) * shakeAmount * 1.3;
-                canvas.style.transform = `translate(${sx}px, ${sy}px)`;
-                shakeAmount *= 0.9;
-            } else {
-                canvas.style.transform = 'translate(0,0)';
-                shakeAmount = 0;
-            }
-
-            updateParticles();
-
-            // 如果正在清理，绘制刷子
-            if (isCleaning) {
-                drawBrush(cx, cy, angle);
-            }
+            // Throwing coin
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath(); ctx.arc(coinX, coinY, 24, 0, Math.PI*2); ctx.fill();
         }
 
-        // 绘制8-bit刷子
-        function drawBrush(cx, cy, angle) {
-            const progress = cleanProgress; // 0~1
-            const brushX = 50 + progress * (W - 100);
-            const brushY = H * 0.6 + Math.sin(progress * 20) * 15;
+        function throwCoin(power) {
+            let vx = (Math.random() * 3 - 1.5);
+            let vy = -power * 0.14;       // upward arc
+            let forwardSpeed = power * 0.105; // forward distance
 
-            // 刷子由8x8像素块组成
-            const size = 12;
-            const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bff'];
-            ctx.save();
-            // 旋转刷子使其随桌面倾斜
-            ctx.translate(cx, cy);
-            ctx.rotate(angle);
-            ctx.translate(-cx, -cy);
-
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 8; j++) {
-                    const x = brushX + i * size - 4 * size;
-                    const y = brushY + j * size - 4 * size;
-                    const idx = (i + j) % colors.length;
-                    ctx.fillStyle = colors[idx];
-                    ctx.fillRect(x, y, size, size);
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(x, y, size, size);
-                }
-            }
-            // 刷子手柄
-            ctx.fillStyle = '#8B7355';
-            ctx.fillRect(brushX + 4 * size - 2, brushY + 4 * size, 6, 40);
-            ctx.restore();
-        }
-
-        function updateParticles() {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += p.gravity;
-                p.vx *= 0.99;
-                p.vy *= 0.99;
-                p.life--;
-                p.size *= 0.995;
-                if (p.life <= 0 || p.size < 0.2) {
-                    particles.splice(i, 1);
-                }
-            }
-            for (let i = scorePopups.length - 1; i >= 0; i--) {
-                const p = scorePopups[i];
-                p.y += p.vy;
-                p.vy *= 0.97;
-                p.life--;
-                if (p.life <= 0) {
-                    scorePopups.splice(i, 1);
-                }
-            }
-        }
-
-        // ============================================================
-        //  6. 投掷核心逻辑 (带边界反弹)
-        // ============================================================
-        function performThrow(power) {
-            if (isThrowing) return;
-            if (power < 8) {
-                addScorePopup(coinX, coinY - 40, '💪 再用力!', '#ffaa44');
-                return;
-            }
-
-            isThrowing = true;
-            sfxThrow(power);
-
-            let vx = (Math.random() * 4 - 2);
-            let vy = -power * 0.13 - 1.5;
-            let x = coinX,
-                y = coinY;
+            let x = coinX, y = coinY;
             let frame = 0;
-            const gravity = 0.42;
-            let bounced = false;
-
-            const trailInterval = setInterval(() => {
-                if (frame % 2 === 0) emitTrail(x, y, 2);
-            }, 30);
 
             const anim = setInterval(() => {
+                draw();
                 x += vx;
                 y += vy;
-                vy += gravity;
+                forwardSpeed *= 0.975;
+                vy += 0.46; // gravity
 
-                if (x < 0) { x = 0;
-                    vx = -vx * 0.7;
-                    emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
-                    bounced = true; }
-                if (x > W) { x = W;
-                    vx = -vx * 0.7;
-                    emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
-                    bounced = true; }
-                if (y > H) { y = H;
-                    vy = -vy * 0.5;
-                    if (Math.abs(vy) < 1.0) vy = 0;
-                    emitParticles(x, H, 10, '#aa8866', 3, 25, [2, 7]);
-                    bounced = true; }
-
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(frame * 0.2);
-                drawCoin(0, 0, 0.9 + Math.sin(frame * 0.15) * 0.04);
-                ctx.restore();
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath(); ctx.arc(x, y - forwardSpeed*0.7, 24, 0, Math.PI*2); ctx.fill();
 
                 frame++;
 
-                const isNearGround = y > H * 0.85;
-                const isSlow = Math.abs(vy) < 0.3 && Math.abs(vx) < 0.3;
-
-                if ((isNearGround && isSlow && bounced) || (y > H * 0.92 && vy >= 0)) {
+                if (y > H * 0.88 || forwardSpeed < 5) {
                     clearInterval(anim);
-                    clearInterval(trailInterval);
+                    const landY = Math.min(H * 0.85, y);
+                    coins.push({x, y: landY});
 
-                    const landX = Math.max(5, Math.min(W - 5, x));
-                    const landY = Math.min(H * 0.92, y);
-                    coins.push({ x: landX, y: landY });
-
-                    emitParticles(landX, landY, 20, '#b8942a', 3, 32, [2, 8]);
-
-                    // 得分检测 (使用逆旋转)
-                    const cx = W / 2,
-                        cy = H / 2;
-                    const angle = tiltAngle;
-                    // 将落点坐标逆旋转到原始坐标系
-                    const invP = rotatePoint(landX, landY, -angle, cx, cy);
-                    const invX = invP.x,
-                        invY = invP.y;
-
-                    let scored = false;
-                    let ringIndex = -1;
-                    // 使用原始靶心坐标 (targetOrigins)
-                    for (let t of targetOrigins) {
-                        const d = Math.hypot(t.x - invX, t.y - invY);
-                        if (d < 78) {
-                            const rings = [
-                                { r: 55, label: 'red', pts: 1, color: '#ff4466' },
-                                { r: 42, label: 'green', pts: 2, color: '#44ff88' },
-                                { r: 29, label: 'yellow', pts: 3, color: '#ffdd44' },
-                                { r: 16, label: 'purple', pts: 5, color: '#cc66ff' },
-                            ];
-                            for (let ri = 0; ri < rings.length; ri++) {
-                                if (d < rings[ri].r) {
-                                    ringIndex = ri;
-                                    const r = rings[ri];
-                                    scores[r.label] += r.pts;
-                                    document.getElementById(r.label).textContent = scores[r.label];
-                                    scored = true;
-
-                                    const now = Date.now();
-                                    if (now - lastHitTime < 1500) comboCount++;
-                                    else comboCount = 1;
-                                    lastHitTime = now;
-
-                                    if (comboCount >= 2) {
-                                        const comboText = comboCount >= 5 ? `🔥 ${comboCount}x` :
-                                            comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
-                                        comboDisplayEl.textContent = comboText;
-                                        comboDisplayEl.className = 'combo-display show';
-                                        clearTimeout(comboDisplayEl._hideTimer);
-                                        comboDisplayEl._hideTimer = setTimeout(() => {
-                                            comboDisplayEl.className = 'combo-display';
-                                        }, 800);
-                                        sfxScore(comboCount);
-                                    } else {
-                                        sfxHit(ri);
-                                    }
-
-                                    emitHitBurst(landX, landY, r.color);
-                                    const label = ['+1', '+2', '+3', '+5'][ri];
-                                    addScorePopup(landX, landY - 30, label, r.color);
-                                    document.getElementById('power').textContent = '💥';
-                                    break;
-                                }
+                    // Score
+                    let hit = false;
+                    for (let tx = W*0.22; tx < W*0.82; tx += W*0.29) {
+                        for (let ty = H*0.26; ty < H*0.52; ty += H*0.23) {
+                            if (Math.hypot(tx - x, ty - landY) < 72) {
+                                scores.red++;
+                                document.getElementById('red').textContent = scores.red;
+                                hit = true;
+                                break;
                             }
-                            break;
                         }
+                        if (hit) break;
                     }
 
-                    if (!scored) {
-                        addScorePopup(landX, landY - 30, '✗', '#ff6666');
-                        comboCount = 0;
-                        comboDisplayEl.className = 'combo-display';
-                        emitParticles(landX, landY, 14, '#888888', 2, 22, [2, 5]);
-                    }
-
-                    // 投掷结束，重置状态
                     setTimeout(() => {
                         coinX = W * 0.25;
-                        coinY = H * 0.85;
-                        powerValue = 0;
-                        document.getElementById('power').textContent = '0';
-                        document.getElementById('powerFill').style.width = '0%';
-                        isThrowing = false;
+                        coinY = H * 0.82;
                         draw();
-                        // 启动自动清理 (延迟1.5秒)
-                        if (autoCleanTimer) clearTimeout(autoCleanTimer);
-                        autoCleanTimer = setTimeout(() => {
-                            startAutoClean();
-                        }, 1500);
-                    }, 350);
+                    }, 800);
                 }
             }, 16);
         }
 
-        // ============================================================
-        //  7. 自动清理 (8-bit 刷子)
-        // ============================================================
-        function startAutoClean() {
-            if (isCleaning || coins.length === 0) return;
-            isCleaning = true;
-            cleanProgress = 0;
-            sfxClean();
-
-            const duration = 800; // ms
-            const startTime = performance.now();
-
-            function animateClean(time) {
-                const elapsed = time - startTime;
-                cleanProgress = Math.min(1, elapsed / duration);
-                draw();
-                if (cleanProgress < 1) {
-                    requestAnimationFrame(animateClean);
-                } else {
-                    // 清理完毕，移除所有硬币
-                    coins = [];
-                    isCleaning = false;
-                    cleanProgress = 0;
-                    draw();
-                }
-            }
-            requestAnimationFrame(animateClean);
-        }
-
-        // 手动清理 (也触发刷子动画)
-        function manualClean() {
-            if (isCleaning) return;
-            if (coins.length === 0) {
-                // 没有硬币，直接退出
-                return;
-            }
-            // 取消自动清理定时器
-            if (autoCleanTimer) clearTimeout(autoCleanTimer);
-            startAutoClean();
-        }
-
-        // ============================================================
-        //  8. 传感器 (倾斜 + 甩动)
-        // ============================================================
-        let sensorActive = false;
-        let lastAccel = { x: 0, y: 0, z: 0 };
-        let accelHistory = [];
-        let shakeDetectThreshold = 12;
-        let shakeCooldown = false;
-        let shakeCooldownTimer = null;
-        let sensorStatusEl = document.getElementById('sensorStatus');
-        let shakeCountEl = document.getElementById('shakeCount');
-
-        // 监听设备方向 (倾斜)
-        function handleOrientation(event) {
-            const gamma = event.gamma || 0; // 左右倾斜 -90~90
-            // 将角度映射到旋转弧度，限制范围 -45° ~ 45°
-            const angleDeg = Math.max(-45, Math.min(45, gamma));
-            tiltAngle = angleDeg * Math.PI / 180;
-            // 不需要重绘，动画循环会处理
-        }
-
-        // 设备运动 (甩动)
-        function handleDeviceMotion(event) {
-            const acc = event.accelerationIncludingGravity || event.acceleration;
-            if (!acc) return;
-
-            if (!sensorActive) {
-                sensorActive = true;
-                sensorStatusEl.textContent = '🟢 已连接';
-                sensorStatusEl.className = 'active';
-                if (!isMuted && !musicActive) {
-                    startMusic();
-                }
-            }
-
-            const ax = acc.x || 0;
-            const ay = acc.y || 0;
-            const az = acc.z || 0;
-
-            const delta = Math.sqrt(
-                Math.pow(ax - lastAccel.x, 2) +
-                Math.pow(ay - lastAccel.y, 2) +
-                Math.pow(az - lastAccel.z, 2)
-            );
-
-            accelHistory.push(delta);
-            if (accelHistory.length > 10) accelHistory.shift();
-
-            let avgDelta = 0;
-            if (accelHistory.length > 0) {
-                const sum = accelHistory.reduce((a, b) => a + b, 0);
-                avgDelta = sum / accelHistory.length;
-            }
-
-            if (!isThrowing && avgDelta > 3) {
-                const mappedPower = Math.min(180, avgDelta * 5.5);
-                powerValue = Math.max(powerValue, mappedPower * 0.3);
-                if (powerValue > 5) {
-                    document.getElementById('power').textContent = Math.floor(powerValue);
-                    document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
-                }
-            }
-
-            if (!shakeCooldown && !isThrowing && avgDelta > shakeDetectThreshold) {
-                const power = Math.min(180, avgDelta * 5);
-                if (power > 8) {
-                    totalShakes++;
-                    shakeCountEl.textContent = '甩动: ' + totalShakes;
-                    performThrow(power);
-                    shakeCooldown = true;
-                    if (shakeCooldownTimer) clearTimeout(shakeCooldownTimer);
-                    shakeCooldownTimer = setTimeout(() => {
-                        shakeCooldown = false;
-                    }, 500);
-                }
-            }
-
-            lastAccel = { x: ax, y: ay, z: az };
-
-            if (!isThrowing && powerValue > 0 && avgDelta < 2) {
-                powerValue *= 0.96;
-                if (powerValue < 1) {
-                    powerValue = 0;
-                    document.getElementById('power').textContent = '0';
-                    document.getElementById('powerFill').style.width = '0%';
-                } else {
-                    document.getElementById('power').textContent = Math.floor(powerValue);
-                    document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
-                }
-            }
-        }
-
-        function requestSensorPermission() {
-            // 倾斜
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', handleOrientation);
-            }
-            // 运动
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission()
-                    .then(state => {
-                        if (state === 'granted') {
-                            window.addEventListener('devicemotion', handleDeviceMotion);
-                            sensorStatusEl.textContent = '🟢 已授权';
-                            sensorStatusEl.className = 'active';
-                        } else {
-                            sensorStatusEl.textContent = '⛔ 权限被拒';
-                            sensorStatusEl.className = 'inactive';
-                        }
-                    })
-                    .catch(err => {
-                        console.warn('传感器权限请求失败:', err);
-                        try {
-                            window.addEventListener('devicemotion', handleDeviceMotion);
-                        } catch (e) {}
-                    });
-            } else {
-                try {
-                    window.addEventListener('devicemotion', handleDeviceMotion);
-                    setTimeout(() => {
-                        if (!sensorActive) {
-                            sensorStatusEl.textContent = '⏳ 等待传感器...';
-                        }
-                    }, 2000);
-                } catch (e) {
-                    sensorStatusEl.textContent = '❌ 不支持';
-                    sensorStatusEl.className = 'inactive';
-                }
-            }
-        }
-
-        // ============================================================
-        //  9. 触摸投掷 (滑动)
-        // ============================================================
-        let touchStartY = 0;
-        let touchActive = false;
-
-        function getCanvasPos(e) {
+        // Swipe UP to throw outward
+        canvas.addEventListener('touchstart', e => {
+            const touch = e.touches[0];
             const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-            if (e.touches) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            if (Math.hypot(x - coinX, y - coinY) < 55) {
+                dragging = true;
+                startY = y;
             }
-            return { x: clientX - rect.left, y: clientY - rect.top };
-        }
+        });
 
-        function handleTouchStart(e) {
-            e.preventDefault();
-            if (isThrowing || isCleaning) return;
-            const pos = getCanvasPos(e);
-            if (pos.y > H * 0.4) {
-                touchActive = true;
-                touchStartY = pos.y;
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                document.getElementById('powerFill').style.width = '0%';
-                if (!audioCtx) {
-                    initAudio();
-                    if (audioCtx) {
-                        audioCtx.resume().then(() => {
-                            if (!isMuted) startMusic();
-                        }).catch(() => {});
-                    }
-                }
-                if (!musicActive && !isMuted) {
-                    startMusic();
-                }
+        canvas.addEventListener('touchend', e => {
+            if (!dragging) return;
+            dragging = false;
+            const touch = e.changedTouches[0];
+            const rect = canvas.getBoundingClientRect();
+            const endY = touch.clientY - rect.top;
+            const swipeUpDistance = startY - endY;
+
+            if (swipeUpDistance > 35) {
+                const power = Math.min(165, swipeUpDistance * 0.82);
+                document.getElementById('power').textContent = Math.floor(power);
+                throwCoin(power);
             }
-        }
+        });
 
-        function handleTouchMove(e) {
-            e.preventDefault();
-            if (!touchActive || isThrowing || isCleaning) return;
-            const pos = getCanvasPos(e);
-            const dy = touchStartY - pos.y;
-            if (dy > 0) {
-                powerValue = Math.min(180, dy * 0.7);
-                document.getElementById('power').textContent = Math.floor(powerValue);
-                document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
-                if (powerValue > 15 && Math.random() < 0.25) {
-                    emitTrail(coinX, coinY, 1);
-                }
-                draw();
-            } else {
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                document.getElementById('powerFill').style.width = '0%';
-                draw();
-            }
-        }
-
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            if (!touchActive) return;
-            touchActive = false;
-            if (isThrowing || isCleaning) return;
-
-            if (powerValue > 8) {
-                performThrow(powerValue);
-            } else if (powerValue > 2) {
-                addScorePopup(coinX, coinY - 40, '👆 再滑远点!', '#ffaa44');
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                document.getElementById('powerFill').style.width = '0%';
-                draw();
-            } else {
-                powerValue = 0;
-                document.getElementById('power').textContent = '0';
-                document.getElementById('powerFill').style.width = '0%';
-                draw();
-            }
-        }
-
-        // ============================================================
-        //  10. 初始化
-        // ============================================================
-        function init() {
-            coinX = W * 0.25;
-            coinY = H * 0.85;
-            updateTargetOrigins();
-            draw();
-
-            requestSensorPermission();
-
-            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-
-            canvas.addEventListener('mousedown', (e) => {
-                const touchEvent = {
-                    preventDefault: () => e.preventDefault(),
-                    touches: [{ clientX: e.clientX, clientY: e.clientY }]
-                };
-                handleTouchStart(touchEvent);
-            });
-            canvas.addEventListener('mousemove', (e) => {
-                if (touchActive) {
-                    const touchEvent = {
-                        preventDefault: () => e.preventDefault(),
-                        touches: [{ clientX: e.clientX, clientY: e.clientY }]
-                    };
-                    handleTouchMove(touchEvent);
-                }
-            });
-            canvas.addEventListener('mouseup', (e) => {
-                if (touchActive) {
-                    const touchEvent = { preventDefault: () => {} };
-                    handleTouchEnd(touchEvent);
-                }
-            });
-            canvas.addEventListener('mouseleave', () => {
-                if (touchActive) {
-                    const touchEvent = { preventDefault: () => {} };
-                    handleTouchEnd(touchEvent);
-                }
-            });
-
-            function animate() {
-                if (!isThrowing && !isCleaning) {
-                    draw();
-                } else {
-                    // 投掷或清理中，也持续绘制
-                    draw();
-                }
-                requestAnimationFrame(animate);
-            }
-            animate();
-
-            window.addEventListener('resize', () => {
-                resize();
-                if (coinX > W) coinX = W * 0.25;
-                if (coinY > H) coinY = H * 0.85;
-                updateTargetOrigins();
-                draw();
-            });
-
-            document.addEventListener('click', () => {
-                if (!audioCtx) {
-                    initAudio();
-                    if (audioCtx) {
-                        audioCtx.resume().then(() => {
-                            if (!isMuted) startMusic();
-                        }).catch(() => {});
-                    }
-                }
-            }, { once: false });
-
-            console.log('🌈 倾斜桌面 · 8-bit 刷子 已启动!');
-            console.log('📱 甩动手机或向上滑动投掷，硬币稳定后自动用8-bit刷子清理');
-        }
-
-        // 暴露全局
-        window.manualClean = manualClean;
-        window.toggleMute = toggleMute;
-
-        init();
+        window.addEventListener('resize', () => { resize(); draw(); });
+        resize();
+        draw();
     </script>
 </body>
 </html>
