@@ -452,11 +452,11 @@
         supported: false,
         active: false,
         state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
-        source: null,       // 'gravity' | 'linear' - locked in once, never switched mid-session
-        baseline: 9.8,
+        source: null,       // 'rotation' | 'linear' | 'gravity' - locked in once, never switched mid-session
+        mean: 0,            // rolling mean of the signal while steady (noise floor)
+        variance: 1,        // rolling variance of the signal while steady
         steadyStreak: 0,
-        THROW_DELTA: 7,     // spike above baseline to count as a throw
-        MAX_DELTA: 14,      // initial guess; self-calibrates upward to the user's strongest flick
+        lastAimSign: 1,
         lastEventTime: 0,
         debug: true
     };
@@ -478,45 +478,71 @@
         }
     }
 
+    // Pulls a magnitude + a lateral-aim value out of whichever sensor signal
+    // we lock onto. rotationRate (gyroscope) is tried first: a throwing
+    // flick is fundamentally a rotation of the wrist, so it reliably
+    // produces a huge spike (tens to hundreds of deg/s) on virtually any
+    // device. accelerationIncludingGravity, by contrast, is often produced
+    // by a heavily low-pass "gravity" virtual sensor that's built to ignore
+    // fast transient motion - which is why it barely moved even at full
+    // force. acceleration (gravity-free) is a middle-ground fallback.
+    function readSignal(e) {
+        if (motion.source === null) {
+            if (e.rotationRate && (e.rotationRate.alpha !== null || e.rotationRate.beta !== null || e.rotationRate.gamma !== null)) {
+                motion.source = 'rotation';
+            } else if (e.acceleration && e.acceleration.x !== null) {
+                motion.source = 'linear';
+            } else if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null) {
+                motion.source = 'gravity';
+            } else {
+                return null;
+            }
+        }
+        if (motion.source === 'rotation') {
+            const r = e.rotationRate;
+            if (!r || r.alpha === null) return null;
+            return {
+                mag: Math.sqrt((r.alpha || 0) ** 2 + (r.beta || 0) ** 2 + (r.gamma || 0) ** 2),
+                aim: r.gamma || 0
+            };
+        }
+        const a = motion.source === 'linear' ? e.acceleration : e.accelerationIncludingGravity;
+        if (!a || a.x === null) return null;
+        return {
+            mag: Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2),
+            aim: a.x || 0
+        };
+    }
+
     function handleMotion(e) {
         const now = performance.now();
         const dt = now - motion.lastEventTime;
         motion.lastEventTime = now;
 
-        // Lock in ONE acceleration source the first time we see valid data,
-        // and never switch sources mid-session (switching mid-session was the
-        // bug: baseline gets calibrated on one scale, then compared against
-        // a different scale during the throw, so delta never crosses the
-        // threshold no matter how hard the phone is flicked).
-        if (motion.source === null) {
-            if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x !== null) {
-                motion.source = 'gravity';
-                motion.baseline = 9.8;
-            } else if (e.acceleration && e.acceleration.x !== null) {
-                motion.source = 'linear';
-                motion.baseline = 0;
-            } else {
-                return; // no usable data yet
-            }
-        }
+        const sig = readSignal(e);
+        if (!sig) return;
+        const mag = sig.mag;
 
-        const a = motion.source === 'gravity' ? e.accelerationIncludingGravity : e.acceleration;
-        if (!a || a.x === null) return;
-
-        const mag = Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2);
-        const delta = mag - motion.baseline;
+        // Adaptive threshold: trigger a throw @ mean + 5*stdDev above the
+        // resting noise floor, rather than a fixed physical-unit constant.
+        // This keeps working no matter which sensor/scale we ended up on.
+        const stdDev = Math.sqrt(Math.max(motion.variance, 0.0001));
+        const delta = mag - motion.mean;
+        const threshold = Math.max(stdDev * 5, motion.mean * 0.15 + 1);
 
         if (motion.debug) {
-            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} base:${motion.baseline.toFixed(1)} Δ:${delta.toFixed(1)} st:${motion.state}`;
+            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} mean:${motion.mean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
         }
 
         if (isThrowing || flying) return; // ignore motion while a coin is in the air
 
         if (motion.state === 'wait' || motion.state === 'cooldown') {
-            // low-pass toward baseline while steady, count steady streak
-            const steadyBand = motion.source === 'gravity' ? 2.2 : 1.2;
-            if (Math.abs(delta) < steadyBand) {
-                motion.baseline = motion.baseline * 0.9 + mag * 0.1;
+            // low-pass mean/variance while steady, count steady streak
+            const dev = mag - motion.mean;
+            const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, motion.mean * 0.25 + 2);
+            if (looksSteady) {
+                motion.mean = motion.mean * 0.92 + mag * 0.08;
+                motion.variance = motion.variance * 0.92 + (dev * dev) * 0.08;
                 motion.steadyStreak += dt;
                 if (motion.steadyStreak > 500) {
                     motion.state = 'ready';
@@ -526,19 +552,16 @@
                 motion.steadyStreak = 0;
             }
         } else if (motion.state === 'ready') {
-            if (delta > motion.THROW_DELTA) {
-                // Self-calibrate: if this flick is stronger than anything
-                // we've seen before, raise the ceiling so future power% is
-                // measured against the user's own strongest throw rather than
-                // a fixed guess that may not suit this device/person.
-                if (delta > motion.MAX_DELTA) motion.MAX_DELTA = delta * 1.05;
-
-                const clampedDelta = Math.min(delta, motion.MAX_DELTA);
-                const power = ((clampedDelta - motion.THROW_DELTA) / (motion.MAX_DELTA - motion.THROW_DELTA)) * 100;
-                const aimVX = Math.max(-6, Math.min(6, (a.x || 0) * 0.9));
+            if (delta > threshold) {
+                // Power scales against the biggest spike seen so far this
+                // session, so it self-calibrates to the player's own
+                // strongest throw instead of a guessed constant.
+                if (!motion.maxSeen || delta > motion.maxSeen) motion.maxSeen = delta;
+                const power = Math.max(15, Math.min(100, (delta / motion.maxSeen) * 100));
+                const aimVX = Math.max(-6, Math.min(6, sig.aim * (motion.source === 'rotation' ? 0.06 : 0.9)));
                 motion.state = 'cooldown';
                 motion.steadyStreak = 0;
-                performThrow(Math.max(8, power), aimVX);
+                performThrow(power, aimVX);
             }
         }
     }
