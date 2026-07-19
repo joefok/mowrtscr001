@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌈 扔彩虹 · 8-bit 狂想</title>
+    <title>🌈 甩动投掷 · 彩虹模拟器</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         * {
@@ -32,41 +32,42 @@
         /* HUD - 霓虹风格 */
         .hud {
             position: absolute;
-            top: 14px;
-            left: 14px;
+            top: 12px;
+            left: 12px;
             z-index: 20;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.78);
             backdrop-filter: blur(6px);
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 12px;
-            border: 1px solid rgba(255, 215, 0, 0.3);
-            font-size: 11px;
-            line-height: 1.6;
-            min-width: 140px;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            font-size: 10px;
+            line-height: 1.5;
+            min-width: 130px;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.08);
             pointer-events: none;
         }
         .hud .title {
-            font-size: 13px;
+            font-size: 12px;
             color: #ffd700;
-            margin-bottom: 6px;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
         }
         .hud .row {
             display: flex;
             justify-content: space-between;
-            gap: 14px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .hud .row span {
-            min-width: 30px;
+            min-width: 28px;
         }
         .hud .score-label {
-            opacity: 0.7;
-            font-size: 9px;
+            opacity: 0.6;
+            font-size: 8px;
         }
         .hud .score-val {
-            font-size: 13px;
+            font-size: 12px;
             text-shadow: 0 0 10px currentColor;
         }
         .hud .score-val.red {
@@ -83,84 +84,116 @@
         }
         .hud .power-wrap {
             margin-top: 4px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             padding-top: 4px;
             display: flex;
             justify-content: space-between;
-            font-size: 10px;
+            align-items: center;
+            font-size: 9px;
         }
         .hud .power-wrap .power-bar {
             flex: 1;
             margin-left: 8px;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 4px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 3px;
             overflow: hidden;
-            position: relative;
-            top: 4px;
         }
         .hud .power-wrap .power-bar .fill {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #ff8800, #ffdd00);
-            border-radius: 4px;
-            transition: width 0.1s;
+            border-radius: 3px;
+            transition: width 0.08s;
+        }
+        .hud .sensor-status {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 3px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding-top: 3px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .hud .sensor-status .active {
+            color: #44ff88;
+        }
+        .hud .sensor-status .inactive {
+            color: #ff4466;
         }
 
         /* 控制按钮 */
         .controls {
             position: absolute;
-            bottom: 24px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 20;
             display: flex;
-            gap: 14px;
+            gap: 12px;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .controls button {
-            background: rgba(255, 215, 0, 0.15);
-            border: 2px solid #ffd700;
+            background: rgba(255, 215, 0, 0.12);
+            border: 2px solid rgba(255, 215, 0, 0.4);
             color: #ffd700;
-            padding: 10px 20px;
+            padding: 8px 16px;
             font-family: 'Press Start 2P', cursive;
-            font-size: 11px;
+            font-size: 10px;
             cursor: pointer;
             border-radius: 30px;
             backdrop-filter: blur(4px);
             transition: all 0.2s;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.1);
-            letter-spacing: 1px;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.05);
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
             touch-action: manipulation;
+            min-height: 40px;
         }
         .controls button:active {
-            transform: scale(0.93);
-            background: rgba(255, 215, 0, 0.3);
+            transform: scale(0.94);
+            background: rgba(255, 215, 0, 0.25);
         }
         .controls button.mute {
-            border-color: rgba(255, 255, 255, 0.2);
-            color: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.5);
             background: rgba(255, 255, 255, 0.05);
-            min-width: 52px;
-            padding: 10px 14px;
+            min-width: 44px;
+            padding: 8px 12px;
+        }
+        .controls .hint {
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.3);
+            padding: 4px 10px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            text-align: center;
+            line-height: 1.4;
+        }
+        .controls .hint em {
+            color: #ffd700;
+            font-style: normal;
         }
 
-        /* 连击提示 */
+        /* 连击显示 */
         .combo-display {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 15;
-            font-size: 52px;
+            font-size: 44px;
             font-family: 'Press Start 2P', cursive;
             color: #ffdd44;
-            text-shadow: 0 0 40px rgba(255, 220, 0, 0.8), 0 0 80px rgba(255, 150, 0, 0.5);
+            text-shadow: 0 0 40px rgba(255, 220, 0, 0.7), 0 0 80px rgba(255, 150, 0, 0.4);
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.2s;
-            letter-spacing: 4px;
+            transition: opacity 0.15s;
+            letter-spacing: 3px;
+            text-align: center;
         }
         .combo-display.show {
             opacity: 1;
@@ -168,11 +201,11 @@
         }
         @keyframes comboPulse {
             0% {
-                transform: translate(-50%, -50%) scale(0.4);
+                transform: translate(-50%, -50%) scale(0.3);
                 opacity: 0;
             }
             50% {
-                transform: translate(-50%, -50%) scale(1.3);
+                transform: translate(-50%, -50%) scale(1.25);
                 opacity: 1;
             }
             100% {
@@ -181,43 +214,66 @@
             }
         }
 
-        /* 得分弹出 (由canvas绘制，但这里保留样式备用) */
-        .toast {
+        /* 投掷提示动画 */
+        .shake-hint {
             position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            font-size: 13px;
+            color: rgba(255, 215, 0, 0.6);
             font-family: 'Press Start 2P', cursive;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
+            animation: hintPulse 2s ease-in-out infinite;
             pointer-events: none;
-            z-index: 10;
-            font-size: 18px;
-            animation: floatUp 1s ease-out forwards;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 6px 16px;
+            border-radius: 20px;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            white-space: nowrap;
         }
-        @keyframes floatUp {
-            0% {
-                opacity: 1;
-                transform: translateY(0) scale(0.5);
-            }
+        @keyframes hintPulse {
+            0%,
             100% {
-                opacity: 0;
-                transform: translateY(-80px) scale(1.4);
+                opacity: 0.4;
+                transform: translateX(-50%) scale(0.98);
+            }
+            50% {
+                opacity: 0.9;
+                transform: translateX(-50%) scale(1.04);
             }
         }
 
         @media (max-width: 500px) {
             .hud {
-                font-size: 9px;
-                padding: 8px 12px;
-                top: 8px;
-                left: 8px;
-                min-width: 110px;
+                font-size: 8px;
+                padding: 6px 10px;
+                top: 6px;
+                left: 6px;
+                min-width: 100px;
             }
             .hud .title {
                 font-size: 10px;
             }
+            .hud .score-val {
+                font-size: 10px;
+            }
             .controls button {
-                font-size: 9px;
-                padding: 8px 14px;
+                font-size: 8px;
+                padding: 6px 12px;
+                min-height: 34px;
             }
             .combo-display {
-                font-size: 32px;
+                font-size: 28px;
+            }
+            .shake-hint {
+                font-size: 10px;
+                bottom: 74px;
+                padding: 4px 12px;
+                white-space: normal;
             }
         }
     </style>
@@ -226,7 +282,7 @@
 
     <!-- HUD -->
     <div class="hud" id="hud">
-        <div class="title">✦ 扔彩虹 ✦</div>
+        <div class="title">✦ 甩动投掷 ✦</div>
         <div class="row">
             <span><span class="score-label">🔴</span> <span class="score-val red" id="red">0</span></span>
             <span><span class="score-label">🟢</span> <span class="score-val green" id="green">0</span></span>
@@ -237,10 +293,17 @@
             <span>⚡<span id="power">0</span></span>
             <div class="power-bar"><div class="fill" id="powerFill"></div></div>
         </div>
+        <div class="sensor-status">
+            <span>📡 <span id="sensorStatus" class="inactive">未连接</span></span>
+            <span id="shakeCount">甩动: 0</span>
+        </div>
     </div>
 
     <!-- 连击显示 -->
     <div class="combo-display" id="comboDisplay"></div>
+
+    <!-- 甩动提示 -->
+    <div class="shake-hint" id="shakeHint">📱 甩动手机 · 力度投掷</div>
 
     <!-- 控制区 -->
     <div class="controls">
@@ -272,11 +335,11 @@
         //  2. 音频引擎 (Web Audio API)
         // ============================================================
         let audioCtx = null;
-        let musicInterval = null;
         let isMuted = false;
         let musicActive = false;
+        let melodyTimer = null;
+        let melodyIndex = 0;
 
-        // 音符频率 (C大调)
         const NOTES = {
             C4: 261.63,
             D4: 293.66,
@@ -295,87 +358,68 @@
             C6: 1046.50,
         };
 
-        // 旋律序列 (音符名, 持续时间ms)
         const MELODY = [
-            { note: 'C5', dur: 150 },
-            { note: 'E5', dur: 150 },
-            { note: 'G5', dur: 150 },
-            { note: 'A5', dur: 200 },
-            { note: 'G5', dur: 150 },
-            { note: 'E5', dur: 150 },
-            { note: 'C5', dur: 200 },
-            { note: 'D5', dur: 150 },
-            { note: 'F5', dur: 150 },
-            { note: 'A5', dur: 150 },
-            { note: 'G5', dur: 200 },
-            { note: 'F5', dur: 150 },
-            { note: 'D5', dur: 150 },
-            { note: 'C5', dur: 250 },
+            { note: 'C5', dur: 140 },
+            { note: 'E5', dur: 140 },
+            { note: 'G5', dur: 140 },
+            { note: 'A5', dur: 180 },
+            { note: 'G5', dur: 140 },
+            { note: 'E5', dur: 140 },
+            { note: 'C5', dur: 180 },
+            { note: 'D5', dur: 140 },
+            { note: 'F5', dur: 140 },
+            { note: 'A5', dur: 140 },
+            { note: 'G5', dur: 180 },
+            { note: 'F5', dur: 140 },
+            { note: 'D5', dur: 140 },
+            { note: 'C5', dur: 220 },
         ];
-
-        let melodyIndex = 0;
-        let melodyTimer = null;
 
         function initAudio() {
             if (!audioCtx) {
                 try {
                     audioCtx = new(window.AudioContext || window.webkitAudioContext)();
-                } catch (e) {
-                    console.warn('Web Audio not supported');
-                    return;
-                }
+                } catch (e) { return; }
             }
             if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
+                audioCtx.resume().catch(() => {});
             }
         }
 
-        // 播放一个音符 (方波, 带包络)
-        function playNote(freq, duration, volume = 0.15, type = 'square') {
+        function playNote(freq, duration, volume = 0.12, type = 'square') {
             if (!audioCtx || isMuted) return;
             try {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = type;
                 osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-
                 gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000);
-
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration / 1000 + 0.04);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-                osc.stop(audioCtx.currentTime + duration / 1000 + 0.05);
-            } catch (e) { /* 静默忽略 */ }
+                osc.stop(audioCtx.currentTime + duration / 1000 + 0.06);
+            } catch (e) {}
         }
 
-        // 播放旋律下一个音符
         function playNextMelodyNote() {
             if (!audioCtx || isMuted || !musicActive) return;
             const entry = MELODY[melodyIndex];
             const freq = NOTES[entry.note];
             if (freq) {
-                // 主旋律
-                playNote(freq, entry.dur, 0.12, 'square');
-                // 加一个八度低音 (更厚)
+                playNote(freq, entry.dur, 0.10, 'square');
                 setTimeout(() => {
-                    playNote(freq / 2, entry.dur * 0.7, 0.06, 'sawtooth');
-                }, 20);
+                    playNote(freq / 2, entry.dur * 0.6, 0.05, 'sawtooth');
+                }, 25);
             }
             melodyIndex = (melodyIndex + 1) % MELODY.length;
-
-            // 定时播放下一个
-            const delay = entry.dur + 40;
+            const delay = entry.dur + 45;
             if (melodyTimer) clearTimeout(melodyTimer);
             melodyTimer = setTimeout(playNextMelodyNote, delay);
         }
 
-        // 启动/停止背景音乐
         function startMusic() {
-            if (!audioCtx) {
-                initAudio();
-                if (!audioCtx) return;
-            }
+            if (!audioCtx) { initAudio(); if (!audioCtx) return; }
             if (musicActive) return;
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume().then(() => {
@@ -394,10 +438,8 @@
 
         function stopMusic() {
             musicActive = false;
-            if (melodyTimer) {
-                clearTimeout(melodyTimer);
-                melodyTimer = null;
-            }
+            if (melodyTimer) { clearTimeout(melodyTimer);
+                melodyTimer = null; }
         }
 
         function toggleMute() {
@@ -413,44 +455,37 @@
             }
         }
 
-        // ============================================================
-        //  3. 音效
-        // ============================================================
+        // 音效
         function sfxThrow(power) {
             if (!audioCtx || isMuted) return;
             try {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = 'sawtooth';
-                const baseFreq = 200 + power * 0.8;
-                osc.frequency.setValueAtTime(baseFreq * 0.5, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.5, audioCtx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+                const baseFreq = 180 + power * 0.6;
+                osc.frequency.setValueAtTime(baseFreq * 0.4, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.6, audioCtx.currentTime + 0.16);
+                gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.2);
+                osc.stop(audioCtx.currentTime + 0.22);
             } catch (e) {}
         }
 
         function sfxHit(ringIndex) {
             if (!audioCtx || isMuted) return;
             try {
-                const freqs = [523, 659, 784, 1047]; // C5, E5, G5, C6
+                const freqs = [523, 659, 784, 1047];
                 const freq = freqs[Math.min(ringIndex, freqs.length - 1)] || 659;
-                // 主音
-                playNote(freq, 120, 0.18, 'square');
-                // 泛音
-                setTimeout(() => {
-                    playNote(freq * 1.25, 80, 0.08, 'square');
-                }, 40);
-                // 噪声短促
+                playNote(freq, 110, 0.16, 'square');
+                setTimeout(() => { playNote(freq * 1.28, 70, 0.07, 'square'); }, 35);
                 const osc2 = audioCtx.createOscillator();
                 const g2 = audioCtx.createGain();
                 osc2.type = 'sawtooth';
-                osc2.frequency.setValueAtTime(freq * 0.7, audioCtx.currentTime);
-                g2.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                osc2.frequency.setValueAtTime(freq * 0.65, audioCtx.currentTime);
+                g2.gain.setValueAtTime(0.05, audioCtx.currentTime);
                 g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
                 osc2.connect(g2);
                 g2.connect(audioCtx.destination);
@@ -462,24 +497,23 @@
         function sfxScore(combo) {
             if (!audioCtx || isMuted) return;
             try {
-                const base = 600 + combo * 30;
+                const base = 580 + combo * 25;
                 for (let i = 0; i < 3; i++) {
                     setTimeout(() => {
-                        playNote(base + i * 80, 80, 0.08 - i * 0.015, 'square');
-                    }, i * 50);
+                        playNote(base + i * 70, 70, 0.07 - i * 0.012, 'square');
+                    }, i * 45);
                 }
             } catch (e) {}
         }
 
         // ============================================================
-        //  4. 游戏状态
+        //  3. 游戏状态
         // ============================================================
         let coins = [];
         let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
         let coinX, coinY;
-        let dragging = false;
-        let startX, startY;
         let powerValue = 0;
+        let isThrowing = false;
 
         // 粒子系统
         let particles = [];
@@ -488,74 +522,70 @@
         let comboCount = 0;
         let lastHitTime = 0;
         let comboDisplayEl = document.getElementById('comboDisplay');
+        let totalShakes = 0;
 
         // 星星背景
         let stars = [];
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 55; i++) {
             stars.push({
                 x: Math.random(),
                 y: Math.random(),
-                size: 0.5 + Math.random() * 1.5,
-                speed: 0.2 + Math.random() * 0.8,
+                size: 0.4 + Math.random() * 1.6,
+                speed: 0.15 + Math.random() * 0.7,
                 phase: Math.random() * Math.PI * 2
             });
         }
 
         // ============================================================
-        //  5. 粒子系统
+        //  4. 粒子系统
         // ============================================================
-        function emitParticles(x, y, count, color, spread = 4, life = 60, sizeRange = [3, 10]) {
+        function emitParticles(x, y, count, color, spread = 4, life = 55, sizeRange = [2, 9]) {
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const speed = 1 + Math.random() * spread * 1.5;
+                const speed = 1 + Math.random() * spread * 1.4;
                 particles.push({
                     x,
                     y,
-                    vx: Math.cos(angle) * speed * (0.5 + Math.random() * 0.8),
-                    vy: Math.sin(angle) * speed * (0.5 + Math.random() * 0.8) - 1,
+                    vx: Math.cos(angle) * speed * (0.4 + Math.random() * 0.8),
+                    vy: Math.sin(angle) * speed * (0.4 + Math.random() * 0.8) - 0.8,
                     life: life * (0.5 + Math.random() * 0.5),
                     maxLife: life,
                     size: sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]),
                     color: color,
-                    gravity: 0.08 + Math.random() * 0.06,
-                    decay: 0.97 + Math.random() * 0.02,
+                    gravity: 0.06 + Math.random() * 0.05,
+                    decay: 0.96 + Math.random() * 0.03,
                 });
             }
         }
 
-        function emitTrail(x, y, count = 5) {
-            emitParticles(x, y, count, '#ffd700', 2, 35, [2, 6]);
+        function emitTrail(x, y, count = 4) {
+            emitParticles(x, y, count, '#ffd700', 2, 30, [2, 5]);
         }
 
         function emitHitBurst(x, y, ringColor) {
             const colors = ['#ff4466', '#44ff88', '#ffdd44', '#cc66ff'];
             const c = ringColor || colors[Math.floor(Math.random() * colors.length)];
-            emitParticles(x, y, 40, c, 6, 55, [3, 12]);
-            emitParticles(x, y, 20, '#ffffff', 3, 30, [1, 4]);
-            // 额外金色
-            emitParticles(x, y, 15, '#ffd700', 4, 40, [2, 8]);
-            // 屏幕震动
-            shakeAmount = 6;
+            emitParticles(x, y, 45, c, 7, 50, [3, 13]);
+            emitParticles(x, y, 25, '#ffffff', 3, 28, [1, 5]);
+            emitParticles(x, y, 18, '#ffd700', 4, 38, [2, 9]);
+            shakeAmount = 7;
         }
 
-        // ============================================================
-        //  6. 得分弹出
-        // ============================================================
         function addScorePopup(x, y, text, color = '#ffffff') {
             scorePopups.push({
                 x,
                 y,
                 text,
                 color,
-                life: 80,
-                maxLife: 80,
-                vy: -2.2,
-                size: 22 + Math.random() * 8,
+                life: 75,
+                maxLife: 75,
+                vy: -2.0,
+                size: 20 + Math.random() * 8,
             });
         }
 
         // ============================================================
-        //  7. 核心游戏逻辑
+        //  5. 核心游戏逻辑
         // ============================================================
         function getTargets() {
             const targets = [];
@@ -570,8 +600,6 @@
         function drawTarget(x, y, glow = false) {
             const colors = ['#ff2244', '#33ff77', '#ffdd33', '#aa44ff'];
             const radii = [55, 42, 29, 16];
-            const labels = ['+1', '+2', '+3', '+5'];
-
             for (let i = 0; i < 4; i++) {
                 const r = radii[i];
                 ctx.beginPath();
@@ -579,54 +607,50 @@
                 const col = colors[i];
                 ctx.fillStyle = col;
                 ctx.fill();
-                // 发光
                 if (glow) {
-                    const grad = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 1.4);
-                    grad.addColorStop(0, col + '40');
+                    const grad = ctx.createRadialGradient(x, y, r * 0.15, x, y, r * 1.5);
+                    grad.addColorStop(0, col + '30');
                     grad.addColorStop(1, col + '00');
                     ctx.beginPath();
-                    ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
+                    ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
                     ctx.fillStyle = grad;
                     ctx.fill();
                 }
-                ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 1.5;
                 ctx.stroke();
-
-                // 内圈小标签
                 if (i === 3) {
-                    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                    ctx.font = 'bold 14px Arial';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('★', x, y + 1);
                 }
             }
-            // 中心白点
             ctx.beginPath();
-            ctx.arc(x, y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
             ctx.fill();
         }
 
-        function drawCoin(x, y, scale = 1) {
+        function drawCoin(x, y, scale = 1, glowIntensity = 0) {
             ctx.save();
             ctx.translate(x, y);
             ctx.scale(scale, scale);
 
-            // 光晕
-            const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 38);
-            grad.addColorStop(0, 'rgba(255,215,0,0.3)');
-            grad.addColorStop(1, 'rgba(255,215,0,0)');
-            ctx.beginPath();
-            ctx.arc(0, 0, 38, 0, Math.PI * 2);
-            ctx.fillStyle = grad;
-            ctx.fill();
+            if (glowIntensity > 0) {
+                const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, 45 + glowIntensity * 20);
+                grad.addColorStop(0, `rgba(255,215,0,${0.15 * glowIntensity})`);
+                grad.addColorStop(1, 'rgba(255,215,0,0)');
+                ctx.beginPath();
+                ctx.arc(0, 0, 45 + glowIntensity * 20, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+            }
 
-            // 本体
             const g = ctx.createRadialGradient(-6, -8, 4, 0, 0, 26);
             g.addColorStop(0, '#ffe066');
-            g.addColorStop(0.6, '#ffd700');
+            g.addColorStop(0.5, '#ffd700');
             g.addColorStop(1, '#b8860b');
             ctx.beginPath();
             ctx.arc(0, 0, 24, 0, Math.PI * 2);
@@ -636,13 +660,11 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // 高光
             ctx.beginPath();
             ctx.arc(-6, -8, 6, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
             ctx.fill();
 
-            // 文字
             ctx.fillStyle = '#8a6e00';
             ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
@@ -653,7 +675,6 @@
         }
 
         function drawBackground() {
-            // 深空渐变
             const grad = ctx.createLinearGradient(0, 0, 0, H);
             grad.addColorStop(0, '#0a001f');
             grad.addColorStop(0.5, '#1a0033');
@@ -661,60 +682,52 @@
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, W, H);
 
-            // 星星
             const time = Date.now() / 1000;
             stars.forEach(s => {
                 const x = s.x * W;
                 const y = s.y * H;
-                const flicker = 0.5 + 0.5 * Math.sin(time * s.speed + s.phase);
-                const alpha = 0.3 + 0.7 * flicker;
+                const flicker = 0.4 + 0.6 * Math.sin(time * s.speed + s.phase);
+                const alpha = 0.2 + 0.8 * flicker;
                 ctx.beginPath();
-                ctx.arc(x, y, s.size * (0.5 + 0.5 * flicker), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.8})`;
+                ctx.arc(x, y, s.size * (0.4 + 0.6 * flicker), 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.7})`;
                 ctx.fill();
-                // 星芒
                 if (s.size > 1.2) {
-                    ctx.shadowColor = 'rgba(255,255,255,0.3)';
-                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(255,255,255,0.2)';
+                    ctx.shadowBlur = 8;
                 }
             });
             ctx.shadowBlur = 0;
 
-            // 桌面
             const deskY = H * 0.48;
             const dg = ctx.createLinearGradient(0, deskY, 0, H);
-            dg.addColorStop(0, 'rgba(60,40,30,0.6)');
-            dg.addColorStop(0.3, 'rgba(40,28,20,0.8)');
-            dg.addColorStop(1, 'rgba(20,14,10,0.9)');
+            dg.addColorStop(0, 'rgba(55,38,28,0.6)');
+            dg.addColorStop(0.3, 'rgba(35,24,18,0.8)');
+            dg.addColorStop(1, 'rgba(18,12,8,0.9)');
             ctx.fillStyle = dg;
             ctx.fillRect(0, deskY, W, H);
 
-            // 桌面纹理线
-            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.025)';
             ctx.lineWidth = 1;
-            for (let i = 0; i < 20; i++) {
-                const y = deskY + 20 + i * 18;
+            for (let i = 0; i < 18; i++) {
+                const y = deskY + 16 + i * 16;
                 ctx.beginPath();
                 ctx.moveTo(0, y);
-                ctx.lineTo(W, y + (i % 3 - 1) * 6);
+                ctx.lineTo(W, y + (i % 3 - 1) * 5);
                 ctx.stroke();
             }
 
-            // 桌面边缘发光
-            const eg = ctx.createLinearGradient(0, deskY, 0, deskY + 30);
-            eg.addColorStop(0, 'rgba(255,200,100,0.08)');
+            const eg = ctx.createLinearGradient(0, deskY, 0, deskY + 28);
+            eg.addColorStop(0, 'rgba(255,200,100,0.06)');
             eg.addColorStop(1, 'rgba(255,200,100,0)');
             ctx.fillStyle = eg;
-            ctx.fillRect(0, deskY, W, 30);
+            ctx.fillRect(0, deskY, W, 28);
         }
 
         function draw() {
             ctx.clearRect(0, 0, W, H);
-
-            // 背景
             drawBackground();
 
-            // 目标 (带发光)
             const targets = getTargets();
             targets.forEach(t => drawTarget(t.x, t.y, true));
 
@@ -733,30 +746,28 @@
                 ctx.strokeStyle = '#5a4a0a';
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
-                // 高光
                 ctx.beginPath();
                 ctx.arc(-4, -6, 4, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(255,255,220,0.3)';
+                ctx.fillStyle = 'rgba(255,255,220,0.25)';
                 ctx.fill();
                 ctx.restore();
             });
 
-            // 投掷中的硬币
-            if (!dragging || powerValue < 5) {
-                drawCoin(coinX, coinY, 1);
-            } else {
-                // 蓄力时放大 + 发光
-                const scale = 1 + powerValue / 600;
-                drawCoin(coinX, coinY, scale);
-                // 蓄力指示光圈
-                ctx.beginPath();
-                ctx.arc(coinX, coinY, 32 + powerValue / 12, 0, Math.PI * 2);
-                const alpha = 0.2 + powerValue / 500;
-                ctx.strokeStyle = `rgba(255,215,0,${Math.min(alpha, 0.6)})`;
-                ctx.lineWidth = 2 + powerValue / 60;
-                ctx.setLineDash([4, 8]);
-                ctx.stroke();
-                ctx.setLineDash([]);
+            // 投掷中的硬币 (非投掷状态显示)
+            if (!isThrowing) {
+                const glow = powerValue / 120;
+                drawCoin(coinX, coinY, 1 + powerValue / 550, Math.min(glow, 1.5));
+                // 蓄力指示
+                if (powerValue > 15) {
+                    ctx.beginPath();
+                    ctx.arc(coinX, coinY, 30 + powerValue / 14, 0, Math.PI * 2);
+                    const alpha = 0.15 + powerValue / 400;
+                    ctx.strokeStyle = `rgba(255,215,0,${Math.min(alpha, 0.5)})`;
+                    ctx.lineWidth = 2 + powerValue / 55;
+                    ctx.setLineDash([5, 10]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
             }
 
             // 粒子
@@ -766,8 +777,8 @@
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
-                ctx.shadowColor = p.color + '60';
-                ctx.shadowBlur = 12;
+                ctx.shadowColor = p.color + '50';
+                ctx.shadowBlur = 10;
                 ctx.fill();
                 ctx.shadowBlur = 0;
             });
@@ -782,7 +793,7 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.shadowColor = p.color + '80';
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = 18;
                 ctx.fillText(p.text, p.x, p.y);
                 ctx.shadowBlur = 0;
             });
@@ -790,16 +801,15 @@
 
             // 屏幕震动
             if (shakeAmount > 0.1) {
-                const sx = (Math.random() - 0.5) * shakeAmount * 1.2;
-                const sy = (Math.random() - 0.5) * shakeAmount * 1.2;
+                const sx = (Math.random() - 0.5) * shakeAmount * 1.3;
+                const sy = (Math.random() - 0.5) * shakeAmount * 1.3;
                 canvas.style.transform = `translate(${sx}px, ${sy}px)`;
-                shakeAmount *= 0.92;
+                shakeAmount *= 0.9;
             } else {
                 canvas.style.transform = 'translate(0,0)';
                 shakeAmount = 0;
             }
 
-            // 更新粒子
             updateParticles();
         }
 
@@ -813,14 +823,14 @@
                 p.vy *= 0.99;
                 p.life--;
                 p.size *= 0.995;
-                if (p.life <= 0 || p.size < 0.3) {
+                if (p.life <= 0 || p.size < 0.2) {
                     particles.splice(i, 1);
                 }
             }
             for (let i = scorePopups.length - 1; i >= 0; i--) {
                 const p = scorePopups[i];
                 p.y += p.vy;
-                p.vy *= 0.98;
+                p.vy *= 0.97;
                 p.life--;
                 if (p.life <= 0) {
                     scorePopups.splice(i, 1);
@@ -829,18 +839,28 @@
         }
 
         // ============================================================
-        //  8. 投掷逻辑
+        //  6. 投掷逻辑 (由传感器或触摸触发)
         // ============================================================
-        function throwCoin(power) {
+        function performThrow(power) {
+            if (isThrowing) return;
+            if (power < 20) {
+                // 力度太小，只给提示
+                addScorePopup(coinX, coinY - 40, '💪 再用力!', '#ffaa44');
+                return;
+            }
+
+            isThrowing = true;
+            sfxThrow(power);
+
             const vx = (Math.random() * 4 - 2);
-            const vy = -power * 0.13 - 2;
-            let forward = power * 0.10 + 3;
+            const vy = -power * 0.13 - 1.5;
+            let forward = power * 0.10 + 2;
 
             let x = coinX,
                 y = coinY;
             let frame = 0;
             const trailInterval = setInterval(() => {
-                if (frame % 2 === 0) emitTrail(x, y, 3);
+                if (frame % 2 === 0) emitTrail(x, y, 2);
             }, 30);
 
             const anim = setInterval(() => {
@@ -848,18 +868,17 @@
                 x += vx;
                 y += vy;
                 forward *= 0.975;
-                vy += 0.45;
+                vy += 0.42;
 
-                // 绘制飞行中的硬币
                 ctx.save();
-                ctx.translate(x, y - forward * 0.6);
-                ctx.rotate(frame * 0.4 + power * 0.01);
-                drawCoin(0, 0, 0.9 + Math.sin(frame * 0.2) * 0.05);
+                ctx.translate(x, y - forward * 0.55);
+                ctx.rotate(frame * 0.38 + power * 0.008);
+                drawCoin(0, 0, 0.85 + Math.sin(frame * 0.18) * 0.04);
                 ctx.restore();
 
                 frame++;
 
-                if (y > H * 0.92 || forward < 2 || x < -50 || x > W + 50) {
+                if (y > H * 0.92 || forward < 1.8 || x < -50 || x > W + 50) {
                     clearInterval(anim);
                     clearInterval(trailInterval);
 
@@ -867,10 +886,8 @@
                     const landX = Math.max(10, Math.min(W - 10, x));
                     coins.push({ x: landX, y: landY });
 
-                    // 落地粒子
-                    emitParticles(landX, landY, 18, '#b8942a', 3, 35, [2, 7]);
+                    emitParticles(landX, landY, 20, '#b8942a', 3, 32, [2, 8]);
 
-                    // 检测得分
                     let scored = false;
                     let ringIndex = -1;
                     const targets = getTargets();
@@ -892,7 +909,6 @@
                                         document.getElementById(r.label).textContent = scores[r.label];
                                         scored = true;
 
-                                        // 连击
                                         const now = Date.now();
                                         if (now - lastHitTime < 1500) {
                                             comboCount++;
@@ -901,7 +917,6 @@
                                         }
                                         lastHitTime = now;
 
-                                        // 连击显示
                                         if (comboCount >= 2) {
                                             const comboText = comboCount >= 5 ? `🔥 ${comboCount}x` :
                                                 comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
@@ -916,13 +931,9 @@
                                             sfxHit(ri);
                                         }
 
-                                        // 爆炸粒子
                                         emitHitBurst(landX, landY, r.color);
-                                        // 得分弹出
                                         const label = ['+1', '+2', '+3', '+5'][ri];
                                         addScorePopup(landX, landY - 30, label, r.color);
-
-                                        // 更新HUD
                                         document.getElementById('power').textContent = '💥';
                                         break;
                                     }
@@ -934,58 +945,184 @@
                     }
 
                     if (!scored) {
-                        // 未命中
                         addScorePopup(landX, landY - 30, '✗', '#ff6666');
                         comboCount = 0;
                         comboDisplayEl.className = 'combo-display';
-                        // 落点灰粒子
-                        emitParticles(landX, landY, 12, '#888888', 2, 25, [2, 5]);
+                        emitParticles(landX, landY, 14, '#888888', 2, 22, [2, 5]);
                     }
 
-                    // 重置硬币位置
                     setTimeout(() => {
                         coinX = W * 0.25;
                         coinY = H * 0.85;
+                        powerValue = 0;
                         document.getElementById('power').textContent = '0';
                         document.getElementById('powerFill').style.width = '0%';
+                        isThrowing = false;
                         draw();
-                    }, 400);
+                    }, 350);
                 }
             }, 16);
         }
 
         // ============================================================
-        //  9. 交互 (触摸 + 鼠标)
+        //  7. 传感器投掷 (DeviceMotion)
         // ============================================================
-        function getPos(e) {
-            if (e.touches) {
-                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        let sensorActive = false;
+        let lastAccel = { x: 0, y: 0, z: 0 };
+        let accelHistory = [];
+        let shakeDetectThreshold = 18;
+        let shakeCooldown = false;
+        let shakeCooldownTimer = null;
+        let sensorStatusEl = document.getElementById('sensorStatus');
+        let shakeCountEl = document.getElementById('shakeCount');
+
+        function handleDeviceMotion(event) {
+            const acc = event.accelerationIncludingGravity || event.acceleration;
+            if (!acc) return;
+
+            if (!sensorActive) {
+                sensorActive = true;
+                sensorStatusEl.textContent = '🟢 已连接';
+                sensorStatusEl.className = 'active';
+                // 启动音乐 (如果用户允许)
+                if (!isMuted && !musicActive) {
+                    startMusic();
+                }
             }
-            return { x: e.clientX, y: e.clientY };
+
+            const ax = acc.x || 0;
+            const ay = acc.y || 0;
+            const az = acc.z || 0;
+
+            // 计算加速度变化量
+            const delta = Math.sqrt(
+                Math.pow(ax - lastAccel.x, 2) +
+                Math.pow(ay - lastAccel.y, 2) +
+                Math.pow(az - lastAccel.z, 2)
+            );
+
+            // 更新历史
+            accelHistory.push(delta);
+            if (accelHistory.length > 10) accelHistory.shift();
+
+            // 计算平均变化率 (平滑)
+            let avgDelta = 0;
+            if (accelHistory.length > 0) {
+                const sum = accelHistory.reduce((a, b) => a + b, 0);
+                avgDelta = sum / accelHistory.length;
+            }
+
+            // 更新力度显示 (实时反馈)
+            if (!isThrowing && avgDelta > 3) {
+                const mappedPower = Math.min(180, avgDelta * 5.5);
+                powerValue = Math.max(powerValue, mappedPower * 0.3);
+                if (powerValue > 5) {
+                    document.getElementById('power').textContent = Math.floor(powerValue);
+                    document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
+                }
+            }
+
+            // 甩动检测
+            if (!shakeCooldown && !isThrowing && avgDelta > shakeDetectThreshold) {
+                // 检测到甩动！
+                const power = Math.min(180, avgDelta * 5);
+                if (power > 25) {
+                    totalShakes++;
+                    shakeCountEl.textContent = '甩动: ' + totalShakes;
+                    performThrow(power);
+                    // 冷却，防止连续触发
+                    shakeCooldown = true;
+                    if (shakeCooldownTimer) clearTimeout(shakeCooldownTimer);
+                    shakeCooldownTimer = setTimeout(() => {
+                        shakeCooldown = false;
+                    }, 500);
+                }
+            }
+
+            lastAccel = { x: ax, y: ay, z: az };
+
+            // 如果长时间没有活动，重置力度
+            if (!isThrowing && powerValue > 0 && avgDelta < 2) {
+                powerValue *= 0.96;
+                if (powerValue < 1) {
+                    powerValue = 0;
+                    document.getElementById('power').textContent = '0';
+                    document.getElementById('powerFill').style.width = '0%';
+                } else {
+                    document.getElementById('power').textContent = Math.floor(powerValue);
+                    document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
+                }
+            }
         }
+
+        // 请求传感器权限 (iOS 13+)
+        function requestSensorPermission() {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                // iOS 13+ 需要用户手势触发权限请求
+                DeviceMotionEvent.requestPermission()
+                    .then(state => {
+                        if (state === 'granted') {
+                            window.addEventListener('devicemotion', handleDeviceMotion);
+                            sensorStatusEl.textContent = '🟢 已授权';
+                            sensorStatusEl.className = 'active';
+                        } else {
+                            sensorStatusEl.textContent = '⛔ 权限被拒';
+                            sensorStatusEl.className = 'inactive';
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('传感器权限请求失败:', err);
+                        // 尝试直接监听 (可能在某些浏览器上工作)
+                        try {
+                            window.addEventListener('devicemotion', handleDeviceMotion);
+                        } catch (e) {}
+                    });
+            } else {
+                // 非iOS或旧版本，直接监听
+                try {
+                    window.addEventListener('devicemotion', handleDeviceMotion);
+                    // 如果一段时间后没有数据，显示提示
+                    setTimeout(() => {
+                        if (!sensorActive) {
+                            sensorStatusEl.textContent = '⏳ 等待传感器...';
+                        }
+                    }, 2000);
+                } catch (e) {
+                    sensorStatusEl.textContent = '❌ 不支持';
+                    sensorStatusEl.className = 'inactive';
+                }
+            }
+        }
+
+        // ============================================================
+        //  8. 触摸投掷 (备选)
+        // ============================================================
+        let touchStartX = 0,
+            touchStartY = 0;
+        let touchDragging = false;
+        let touchCoin = false;
 
         function getCanvasPos(e) {
             const rect = canvas.getBoundingClientRect();
-            const pos = getPos(e);
-            return {
-                x: pos.x - rect.left,
-                y: pos.y - rect.top
-            };
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
         }
 
         function isOnCoin(pos) {
             const dx = pos.x - coinX;
             const dy = pos.y - coinY;
-            return (dx * dx + dy * dy) < 3600; // 60px radius
+            return (dx * dx + dy * dy) < 4000;
         }
 
-        function handlePointerDown(e) {
+        function handleTouchDown(e) {
             e.preventDefault();
+            if (isThrowing) return;
             if (!audioCtx) {
                 initAudio();
                 if (audioCtx) {
                     audioCtx.resume().then(() => {
-                        startMusic();
+                        if (!isMuted) startMusic();
                     }).catch(() => {});
                 }
             }
@@ -995,158 +1132,182 @@
 
             const pos = getCanvasPos(e);
             if (isOnCoin(pos)) {
-                dragging = true;
-                startX = pos.x;
-                startY = pos.y;
+                touchCoin = true;
+                touchDragging = true;
+                touchStartX = pos.x;
+                touchStartY = pos.y;
                 powerValue = 0;
                 document.getElementById('power').textContent = '0';
                 document.getElementById('powerFill').style.width = '0%';
+                // 提醒用户可以使用传感器
+                document.getElementById('shakeHint').style.opacity = '0.3';
             }
         }
 
-        function handlePointerMove(e) {
+        function handleTouchMove(e) {
             e.preventDefault();
-            if (!dragging) return;
+            if (!touchDragging || !touchCoin || isThrowing) return;
             const pos = getCanvasPos(e);
-            const dy = startY - pos.y;
-            powerValue = Math.min(180, Math.max(0, dy * 0.7));
+            const dy = touchStartY - pos.y;
+            powerValue = Math.min(180, Math.max(0, dy * 0.65));
             document.getElementById('power').textContent = Math.floor(powerValue);
             document.getElementById('powerFill').style.width = (powerValue / 180 * 100) + '%';
-            // 拖动时粒子尾迹
-            if (powerValue > 20 && Math.random() < 0.3) {
+            if (powerValue > 15 && Math.random() < 0.25) {
                 emitTrail(coinX, coinY, 1);
             }
             draw();
         }
 
-        function handlePointerUp(e) {
+        function handleTouchUp(e) {
             e.preventDefault();
-            if (!dragging) return;
-            dragging = false;
-            if (powerValue > 35) {
-                sfxThrow(powerValue);
-                throwCoin(powerValue);
-                document.getElementById('power').textContent = '⚡';
+            if (!touchDragging || !touchCoin) {
+                touchDragging = false;
+                touchCoin = false;
+                return;
+            }
+            touchDragging = false;
+            touchCoin = false;
+            if (isThrowing) return;
+
+            if (powerValue > 30) {
+                performThrow(powerValue);
+            } else if (powerValue > 5) {
+                addScorePopup(coinX, coinY - 40, '👆 再滑远点!', '#ffaa44');
+                powerValue = 0;
+                document.getElementById('power').textContent = '0';
+                document.getElementById('powerFill').style.width = '0%';
+                draw();
             } else {
+                powerValue = 0;
                 document.getElementById('power').textContent = '0';
                 document.getElementById('powerFill').style.width = '0%';
                 draw();
             }
-            powerValue = 0;
         }
 
-        // 鼠标事件
-        canvas.addEventListener('mousedown', handlePointerDown);
-        canvas.addEventListener('mousemove', handlePointerMove);
-        canvas.addEventListener('mouseup', handlePointerUp);
-        canvas.addEventListener('mouseleave', (e) => {
-            if (dragging) handlePointerUp(e);
-        });
-
-        // 触摸事件
-        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
-        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
-        canvas.addEventListener('touchend', handlePointerUp, { passive: false });
-        canvas.addEventListener('touchcancel', handlePointerUp, { passive: false });
-
         // ============================================================
-        //  10. 清理桌面
+        //  9. 清理桌面
         // ============================================================
         function cleanDesk() {
-            if (coins.length === 0) return;
-            // 清空粒子
-            particles = [];
-            // 动画清空
+            if (coins.length === 0 && particles.length === 0) return;
             coins.forEach(c => {
-                emitParticles(c.x, c.y, 20, '#888888', 4, 30, [2, 6]);
+                emitParticles(c.x, c.y, 18, '#888888', 4, 28, [2, 7]);
             });
             setTimeout(() => {
                 coins = [];
+                particles = particles.filter(p => p.life > 10);
                 draw();
             }, 300);
-            // 重置连击
             comboCount = 0;
             comboDisplayEl.className = 'combo-display';
-            // 小音效
             if (!isMuted && audioCtx) {
                 try {
-                    playNote(440, 80, 0.06, 'square');
-                    setTimeout(() => playNote(330, 80, 0.06, 'square'), 120);
+                    playNote(440, 70, 0.05, 'square');
+                    setTimeout(() => playNote(330, 70, 0.05, 'square'), 110);
                 } catch (e) {}
             }
         }
 
-        // 暴露到全局
-        window.cleanDesk = cleanDesk;
-        window.toggleMute = toggleMute;
-
         // ============================================================
-        //  11. 初始化和动画循环
+        //  10. 初始化
         // ============================================================
         function init() {
             coinX = W * 0.25;
             coinY = H * 0.85;
             draw();
 
-            // 初始星星装饰
-            for (let i = 0; i < 20; i++) {
-                setTimeout(() => {
-                    if (!dragging) {
-                        const x = W * 0.1 + Math.random() * W * 0.8;
-                        const y = H * 0.05 + Math.random() * H * 0.35;
-                        emitParticles(x, y, 2, '#ffd700', 1, 40, [1, 3]);
-                    }
-                }, i * 200);
-            }
+            // 请求传感器权限
+            requestSensorPermission();
 
-            // 启动动画循环
+            // 触摸事件
+            canvas.addEventListener('touchstart', handleTouchDown, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchUp, { passive: false });
+            canvas.addEventListener('touchcancel', handleTouchUp, { passive: false });
+
+            // 鼠标事件 (桌面备选)
+            canvas.addEventListener('mousedown', (e) => {
+                // 模拟触摸
+                const touchEvent = {
+                    preventDefault: () => e.preventDefault(),
+                    touches: [{ clientX: e.clientX, clientY: e.clientY }]
+                };
+                handleTouchDown(touchEvent);
+            });
+            canvas.addEventListener('mousemove', (e) => {
+                if (touchDragging) {
+                    const touchEvent = {
+                        preventDefault: () => e.preventDefault(),
+                        touches: [{ clientX: e.clientX, clientY: e.clientY }]
+                    };
+                    handleTouchMove(touchEvent);
+                }
+            });
+            canvas.addEventListener('mouseup', (e) => {
+                if (touchDragging) {
+                    const touchEvent = {
+                        preventDefault: () => e.preventDefault(),
+                    };
+                    handleTouchUp(touchEvent);
+                }
+            });
+            canvas.addEventListener('mouseleave', () => {
+                if (touchDragging) {
+                    const touchEvent = { preventDefault: () => {} };
+                    handleTouchUp(touchEvent);
+                }
+            });
+
+            // 显示传感器提示
+            setTimeout(() => {
+                if (!sensorActive) {
+                    sensorStatusEl.textContent = '📱 甩动手机';
+                    sensorStatusEl.className = 'inactive';
+                }
+            }, 3000);
+
+            // 动画循环
             function animate() {
-                if (!dragging) {
+                if (!isThrowing) {
                     draw();
                 }
-                // 持续更新粒子
                 if (particles.length > 0 || scorePopups.length > 0) {
-                    if (!dragging) draw();
+                    if (!isThrowing) draw();
                 }
                 requestAnimationFrame(animate);
             }
             animate();
 
-            // 自动启动音乐 (需要用户交互，但首次点击会触发)
-            // 加一个提示
-            setTimeout(() => {
+            // 窗口变化
+            window.addEventListener('resize', () => {
+                resize();
+                if (coinX > W) coinX = W * 0.25;
+                if (coinY > H) coinY = H * 0.85;
+                draw();
+            });
+
+            // 点击页面启动音频
+            document.addEventListener('click', () => {
                 if (!audioCtx) {
-                    // 显示提示
+                    initAudio();
+                    if (audioCtx) {
+                        audioCtx.resume().then(() => {
+                            if (!isMuted) startMusic();
+                        }).catch(() => {});
+                    }
                 }
-            }, 1000);
+            }, { once: false });
+
+            console.log('🌈 甩动投掷 · 彩虹模拟器 已启动!');
+            console.log('📱 甩动手机投掷硬币 | 触摸拖拽也可投掷');
         }
 
-        // 处理窗口变化
-        window.addEventListener('resize', () => {
-            resize();
-            // 调整硬币位置
-            if (coinX > W) coinX = W * 0.25;
-            if (coinY > H) coinY = H * 0.85;
-            draw();
-        });
+        // 暴露全局
+        window.cleanDesk = cleanDesk;
+        window.toggleMute = toggleMute;
 
         // 启动
         init();
-
-        // 如果用户点击页面任何地方，尝试启动音频
-        document.addEventListener('click', () => {
-            if (!audioCtx) {
-                initAudio();
-                if (audioCtx) {
-                    audioCtx.resume().then(() => {
-                        if (!isMuted) startMusic();
-                    }).catch(() => {});
-                }
-            }
-        }, { once: false });
-
-        // 防浏览器休眠
-        console.log('🌈 扔彩虹 · 8-bit 狂想版 loaded!');
     </script>
 </body>
 </html>
