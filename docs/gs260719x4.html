@@ -452,6 +452,7 @@
         supported: false,
         active: false,
         state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
+        locked: false,      // once true, variance/maxSeen freeze - no more recalibration after first success
         source: null,       // 'rotation' | 'linear' | 'gravity' - locked in once, never switched mid-session
         variance: 1,        // rolling variance (noise floor) while steady
         steadyStreak: 0,
@@ -571,8 +572,10 @@
             const dev = mag - baseMean;
             const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, floor * 0.6);
             if (looksSteady) {
-                const cappedVariance = Math.min(motion.variance, (floor * 0.5) ** 2); // don't let noise floor runaway
-                motion.variance = cappedVariance * 0.92 + (dev * dev) * 0.08;
+                if (!motion.locked) {
+                    const cappedVariance = Math.min(motion.variance, (floor * 0.5) ** 2); // don't let noise floor runaway
+                    motion.variance = cappedVariance * 0.92 + (dev * dev) * 0.08;
+                }
                 motion.steadyStreak += dt;
                 if (motion.steadyStreak > 500) {
                     motion.state = 'ready';
@@ -598,7 +601,10 @@
                 motion.pendingSince = null;
                 motion.pendingPeak = 0;
 
-                if (!motion.maxSeen || confirmedDelta > motion.maxSeen) motion.maxSeen = confirmedDelta;
+                if (!motion.locked) {
+                    if (!motion.maxSeen || confirmedDelta > motion.maxSeen) motion.maxSeen = confirmedDelta;
+                    motion.locked = true; // first successful throw - freeze calibration from here on
+                }
                 const power = Math.max(15, Math.min(100, (confirmedDelta / motion.maxSeen) * 100));
                 const aimVX = Math.max(-6, Math.min(6, sig.aim * (motion.source === 'rotation' ? 0.06 : 0.9)));
                 motion.state = 'cooldown';
