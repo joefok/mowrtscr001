@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌈 甩动投掷 · 彩虹模拟器</title>
+    <title>🌈 弹跳投掷 · 彩虹模拟器</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         * {
@@ -29,7 +29,6 @@
             height: 100%;
         }
 
-        /* HUD */
         .hud {
             position: absolute;
             top: 12px;
@@ -227,7 +226,7 @@
 
     <!-- HUD -->
     <div class="hud" id="hud">
-        <div class="title">✦ 甩动投掷 ✦</div>
+        <div class="title">✦ 弹跳投掷 ✦</div>
         <div class="row">
             <span><span class="score-label">🔴</span> <span class="score-val red" id="red">0</span></span>
             <span><span class="score-label">🟢</span> <span class="score-val green" id="green">0</span></span>
@@ -763,11 +762,10 @@
         }
 
         // ============================================================
-        //  6. 投掷核心逻辑 (修复关键)
+        //  6. 投掷核心逻辑 (带边界反弹)
         // ============================================================
         function performThrow(power) {
             if (isThrowing) return;
-            // 降低最小投掷力度阈值，从20降至8，更容易触发
             if (power < 8) {
                 addScorePopup(coinX, coinY - 40, '💪 再用力!', '#ffaa44');
                 return;
@@ -776,42 +774,77 @@
             isThrowing = true;
             sfxThrow(power);
 
-            const vx = (Math.random() * 4 - 2);
-            const vy = -power * 0.13 - 1.5;
-            let forward = power * 0.10 + 2;
-
+            // 初始速度
+            let vx = (Math.random() * 4 - 2);
+            let vy = -power * 0.13 - 1.5;
             let x = coinX,
                 y = coinY;
             let frame = 0;
+            const gravity = 0.42;
+            let bounced = false; // 是否已经反弹过
+
+            // 尾迹定时器
             const trailInterval = setInterval(() => {
                 if (frame % 2 === 0) emitTrail(x, y, 2);
             }, 30);
 
             const anim = setInterval(() => {
-                draw();
+                // 更新物理
                 x += vx;
                 y += vy;
-                forward *= 0.975;
-                vy += 0.42;
+                vy += gravity;
 
+                // 左右边界反弹
+                if (x < 0) {
+                    x = 0;
+                    vx = -vx * 0.7;
+                    emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
+                    bounced = true;
+                } else if (x > W) {
+                    x = W;
+                    vx = -vx * 0.7;
+                    emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
+                    bounced = true;
+                }
+
+                // 底部反弹 (地面)
+                if (y > H) {
+                    y = H;
+                    vy = -vy * 0.5; // 损失能量
+                    // 如果速度很小，直接停止
+                    if (Math.abs(vy) < 1.0) {
+                        vy = 0;
+                    }
+                    emitParticles(x, H, 10, '#aa8866', 3, 25, [2, 7]);
+                    bounced = true;
+                }
+
+                // 如果vy几乎为0且y接近地面，停止
+                const isNearGround = y > H * 0.85;
+                const isSlow = Math.abs(vy) < 0.3 && Math.abs(vx) < 0.3;
+
+                // 绘制飞行中的硬币
                 ctx.save();
-                ctx.translate(x, y - forward * 0.55);
-                ctx.rotate(frame * 0.38 + power * 0.008);
-                drawCoin(0, 0, 0.85 + Math.sin(frame * 0.18) * 0.04);
+                ctx.translate(x, y);
+                ctx.rotate(frame * 0.2);
+                drawCoin(0, 0, 0.9 + Math.sin(frame * 0.15) * 0.04);
                 ctx.restore();
 
                 frame++;
 
-                if (y > H * 0.92 || forward < 1.8 || x < -50 || x > W + 50) {
+                // 停止条件：在地面附近且速度很小，并且已经至少反弹过一次（防止初始就停）
+                if ((isNearGround && isSlow && bounced) || (y > H * 0.92 && vy >= 0)) {
                     clearInterval(anim);
                     clearInterval(trailInterval);
 
-                    const landY = Math.min(H * 0.88, y);
-                    const landX = Math.max(10, Math.min(W - 10, x));
+                    // 最终落点
+                    const landX = Math.max(5, Math.min(W - 5, x));
+                    const landY = Math.min(H * 0.92, y);
                     coins.push({ x: landX, y: landY });
 
                     emitParticles(landX, landY, 20, '#b8942a', 3, 32, [2, 8]);
 
+                    // 得分检测
                     let scored = false;
                     let ringIndex = -1;
                     const targets = getTargets();
@@ -875,6 +908,7 @@
                         emitParticles(landX, landY, 14, '#888888', 2, 22, [2, 5]);
                     }
 
+                    // 重置投掷状态
                     setTimeout(() => {
                         coinX = W * 0.25;
                         coinY = H * 0.85;
@@ -889,12 +923,12 @@
         }
 
         // ============================================================
-        //  7. 传感器投掷 (修复：降低阈值，提高灵敏度)
+        //  7. 传感器投掷
         // ============================================================
         let sensorActive = false;
         let lastAccel = { x: 0, y: 0, z: 0 };
         let accelHistory = [];
-        let shakeDetectThreshold = 12; // 从18降低到12
+        let shakeDetectThreshold = 12;
         let shakeCooldown = false;
         let shakeCooldownTimer = null;
         let sensorStatusEl = document.getElementById('sensorStatus');
@@ -943,7 +977,7 @@
 
             if (!shakeCooldown && !isThrowing && avgDelta > shakeDetectThreshold) {
                 const power = Math.min(180, avgDelta * 5);
-                if (power > 8) { // 最小投掷力度同步降低
+                if (power > 8) {
                     totalShakes++;
                     shakeCountEl.textContent = '甩动: ' + totalShakes;
                     performThrow(power);
@@ -1005,7 +1039,7 @@
         }
 
         // ============================================================
-        //  8. 触摸投掷 (修复：扩大触发区域，任意滑动)
+        //  8. 触摸投掷 (滑动)
         // ============================================================
         let touchStartY = 0;
         let touchActive = false;
@@ -1023,20 +1057,16 @@
             return { x: clientX - rect.left, y: clientY - rect.top };
         }
 
-        // 简化触摸交互：从屏幕下半部分向上滑动即可投掷
         function handleTouchStart(e) {
             e.preventDefault();
             if (isThrowing) return;
             const pos = getCanvasPos(e);
-            // 只检测屏幕下半部分的触摸开始 (避免误触上半部分)
             if (pos.y > H * 0.4) {
                 touchActive = true;
                 touchStartY = pos.y;
-                // 初始化力度显示
                 powerValue = 0;
                 document.getElementById('power').textContent = '0';
                 document.getElementById('powerFill').style.width = '0%';
-                // 音频启动
                 if (!audioCtx) {
                     initAudio();
                     if (audioCtx) {
@@ -1125,16 +1155,13 @@
             coinY = H * 0.85;
             draw();
 
-            // 传感器
             requestSensorPermission();
 
-            // 触摸事件 (绑定到canvas)
             canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
             canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
             canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
             canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-            // 鼠标备选 (桌面调试)
             canvas.addEventListener('mousedown', (e) => {
                 const touchEvent = {
                     preventDefault: () => e.preventDefault(),
@@ -1164,7 +1191,6 @@
                 }
             });
 
-            // 动画循环
             function animate() {
                 if (!isThrowing) {
                     draw();
@@ -1194,8 +1220,8 @@
                 }
             }, { once: false });
 
-            console.log('🌈 甩动投掷 · 彩虹模拟器 (修复版) 已启动!');
-            console.log('📱 甩动手机 或 向上滑动屏幕投掷硬币');
+            console.log('🌈 弹跳投掷 · 彩虹模拟器 (反弹版) 已启动!');
+            console.log('📱 甩动手机 或 向上滑动屏幕投掷，硬币会反弹并最终落在桌面上');
         }
 
         window.cleanDesk = cleanDesk;
