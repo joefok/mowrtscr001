@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🌈 弹跳投掷 · 彩虹模拟器</title>
+    <title>🌈 倾斜桌面 · 8-bit 刷子</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         * {
@@ -27,6 +27,7 @@
             display: block;
             width: 100%;
             height: 100%;
+            /* 将3D透视交给canvas内部绘制，不进行CSS变换 */
         }
 
         .hud {
@@ -226,7 +227,7 @@
 
     <!-- HUD -->
     <div class="hud" id="hud">
-        <div class="title">✦ 弹跳投掷 ✦</div>
+        <div class="title">✦ 倾斜桌面 ✦</div>
         <div class="row">
             <span><span class="score-label">🔴</span> <span class="score-val red" id="red">0</span></span>
             <span><span class="score-label">🟢</span> <span class="score-val green" id="green">0</span></span>
@@ -247,7 +248,7 @@
     <div class="shake-hint" id="shakeHint">📱 甩动手机 · 或向上滑动投掷</div>
 
     <div class="controls">
-        <button onclick="cleanDesk()">🧹 清桌</button>
+        <button onclick="manualClean()">🧹 手动清桌</button>
         <button class="mute" id="muteBtn" onclick="toggleMute()">🔊</button>
     </div>
 
@@ -436,6 +437,18 @@
             } catch (e) {}
         }
 
+        function sfxClean() {
+            if (!audioCtx || isMuted) return;
+            try {
+                // 8-bit 刷子音效：快速上升音阶
+                for (let i = 0; i < 6; i++) {
+                    setTimeout(() => {
+                        playNote(400 + i * 80, 50, 0.04, 'square');
+                    }, i * 40);
+                }
+            } catch (e) {}
+        }
+
         // ============================================================
         //  3. 游戏状态
         // ============================================================
@@ -452,6 +465,15 @@
         let lastHitTime = 0;
         let comboDisplayEl = document.getElementById('comboDisplay');
         let totalShakes = 0;
+
+        // 设备倾斜角度 (弧度)
+        let tiltAngle = 0; // 绕Z轴旋转角度，根据gamma (左右倾斜)
+
+        // 自动清理相关
+        let autoCleanTimer = null;
+        let isCleaning = false;
+        let cleanProgress = 0; // 0~1
+        let cleanCoins = []; // 清理时复制coin列表
 
         // 星星背景
         let stars = [];
@@ -514,7 +536,7 @@
         }
 
         // ============================================================
-        //  5. 核心绘制
+        //  5. 核心绘制 (带有桌面倾斜旋转)
         // ============================================================
         function getTargets() {
             const targets = [];
@@ -524,6 +546,36 @@
                 }
             }
             return targets;
+        }
+
+        // 原始靶心坐标 (用于检测)
+        let targetOrigins = [];
+        function updateTargetOrigins() {
+            targetOrigins = [];
+            for (let tx = W * 0.22; tx < W * 0.82; tx += W * 0.3) {
+                for (let ty = H * 0.28; ty < H * 0.55; ty += H * 0.23) {
+                    targetOrigins.push({ x: tx, y: ty });
+                }
+            }
+        }
+        updateTargetOrigins();
+
+        // 应用旋转矩阵到点
+        function rotatePoint(x, y, angle, cx, cy) {
+            const dx = x - cx;
+            const dy = y - cy;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: cx + dx * cos - dy * sin,
+                y: cy + dx * sin + dy * cos
+            };
+        }
+
+        // 绘制靶心 (在旋转后的坐标系中)
+        function drawTargetRotated(x, y, angle, cx, cy) {
+            const p = rotatePoint(x, y, angle, cx, cy);
+            drawTarget(p.x, p.y, true);
         }
 
         function drawTarget(x, y, glow = false) {
@@ -562,8 +614,9 @@
             ctx.fill();
         }
 
-        function drawCoin(x, y, scale = 1, glowIntensity = 0) {
+        function drawCoin(x, y, scale = 1, glowIntensity = 0, alpha = 1) {
             ctx.save();
+            ctx.globalAlpha = alpha;
             ctx.translate(x, y);
             ctx.scale(scale, scale);
 
@@ -603,7 +656,8 @@
             ctx.restore();
         }
 
-        function drawBackground() {
+        function drawBackground(angle) {
+            // 背景星空不变 (不旋转)
             const grad = ctx.createLinearGradient(0, 0, 0, H);
             grad.addColorStop(0, '#0a001f');
             grad.addColorStop(0.5, '#1a0033');
@@ -628,6 +682,7 @@
             });
             ctx.shadowBlur = 0;
 
+            // 桌面 (也旋转)
             const deskY = H * 0.48;
             const dg = ctx.createLinearGradient(0, deskY, 0, H);
             dg.addColorStop(0, 'rgba(55,38,28,0.6)');
@@ -655,14 +710,40 @@
 
         function draw() {
             ctx.clearRect(0, 0, W, H);
-            drawBackground();
 
+            // 应用旋转 (绕画布中心)
+            const cx = W / 2,
+                cy = H / 2;
+            const angle = tiltAngle; // 弧度
+
+            // 绘制背景 (不旋转)
+            drawBackground(angle);
+
+            // 保存上下文，应用旋转
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.translate(-cx, -cy);
+
+            // 绘制靶心 (旋转后)
             const targets = getTargets();
-            targets.forEach(t => drawTarget(t.x, t.y, true));
+            targets.forEach(t => drawTargetRotated(t.x, t.y, angle, cx, cy));
 
+            // 绘制已落地的硬币 (旋转后)
             coins.forEach(c => {
+                const p = rotatePoint(c.x, c.y, angle, cx, cy);
+                // 如果是清理动画中，根据进度调整透明度
+                let alpha = 1;
+                if (isCleaning) {
+                    // 计算每个硬币的清理进度
+                    const idx = coins.indexOf(c);
+                    const total = coins.length;
+                    const progress = (idx / total) * 0.6 + cleanProgress * 0.4;
+                    alpha = Math.max(0, 1 - progress * 1.2);
+                }
                 ctx.save();
-                ctx.translate(c.x, c.y);
+                ctx.translate(p.x, p.y);
+                ctx.globalAlpha = alpha;
                 const g = ctx.createRadialGradient(-4, -4, 4, 0, 0, 20);
                 g.addColorStop(0, '#ddcc88');
                 g.addColorStop(0.5, '#b8942a');
@@ -681,12 +762,14 @@
                 ctx.restore();
             });
 
-            if (!isThrowing) {
+            // 绘制投掷中的硬币 (不旋转，因为物理坐标是屏幕坐标，但我们需要旋转绘制以匹配)
+            if (!isThrowing && !isCleaning) {
+                const p = rotatePoint(coinX, coinY, angle, cx, cy);
                 const glow = powerValue / 120;
-                drawCoin(coinX, coinY, 1 + powerValue / 550, Math.min(glow, 1.5));
+                drawCoin(p.x, p.y, 1 + powerValue / 550, Math.min(glow, 1.5));
                 if (powerValue > 15) {
                     ctx.beginPath();
-                    ctx.arc(coinX, coinY, 30 + powerValue / 14, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, 30 + powerValue / 14, 0, Math.PI * 2);
                     const alpha = 0.15 + powerValue / 400;
                     ctx.strokeStyle = `rgba(255,215,0,${Math.min(alpha, 0.5)})`;
                     ctx.lineWidth = 2 + powerValue / 55;
@@ -696,11 +779,13 @@
                 }
             }
 
+            // 绘制粒子 (旋转)
             particles.forEach(p => {
+                const pp = rotatePoint(p.x, p.y, angle, cx, cy);
                 const alpha = p.life / p.maxLife;
                 ctx.globalAlpha = alpha;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
+                ctx.arc(pp.x, pp.y, p.size * (0.3 + 0.7 * alpha), 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
                 ctx.shadowColor = p.color + '50';
                 ctx.shadowBlur = 10;
@@ -709,7 +794,9 @@
             });
             ctx.globalAlpha = 1;
 
+            // 得分弹出 (旋转)
             scorePopups.forEach(p => {
+                const pp = rotatePoint(p.x, p.y, angle, cx, cy);
                 const alpha = p.life / p.maxLife;
                 ctx.globalAlpha = alpha;
                 ctx.fillStyle = p.color;
@@ -718,11 +805,14 @@
                 ctx.textBaseline = 'middle';
                 ctx.shadowColor = p.color + '80';
                 ctx.shadowBlur = 18;
-                ctx.fillText(p.text, p.x, p.y);
+                ctx.fillText(p.text, pp.x, pp.y);
                 ctx.shadowBlur = 0;
             });
             ctx.globalAlpha = 1;
 
+            ctx.restore(); // 恢复旋转
+
+            // 屏幕震动 (不受旋转影响)
             if (shakeAmount > 0.1) {
                 const sx = (Math.random() - 0.5) * shakeAmount * 1.3;
                 const sy = (Math.random() - 0.5) * shakeAmount * 1.3;
@@ -734,6 +824,44 @@
             }
 
             updateParticles();
+
+            // 如果正在清理，绘制刷子
+            if (isCleaning) {
+                drawBrush(cx, cy, angle);
+            }
+        }
+
+        // 绘制8-bit刷子
+        function drawBrush(cx, cy, angle) {
+            const progress = cleanProgress; // 0~1
+            const brushX = 50 + progress * (W - 100);
+            const brushY = H * 0.6 + Math.sin(progress * 20) * 15;
+
+            // 刷子由8x8像素块组成
+            const size = 12;
+            const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#ff6bff'];
+            ctx.save();
+            // 旋转刷子使其随桌面倾斜
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.translate(-cx, -cy);
+
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const x = brushX + i * size - 4 * size;
+                    const y = brushY + j * size - 4 * size;
+                    const idx = (i + j) % colors.length;
+                    ctx.fillStyle = colors[idx];
+                    ctx.fillRect(x, y, size, size);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, size, size);
+                }
+            }
+            // 刷子手柄
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(brushX + 4 * size - 2, brushY + 4 * size, 6, 40);
+            ctx.restore();
         }
 
         function updateParticles() {
@@ -774,56 +902,37 @@
             isThrowing = true;
             sfxThrow(power);
 
-            // 初始速度
             let vx = (Math.random() * 4 - 2);
             let vy = -power * 0.13 - 1.5;
             let x = coinX,
                 y = coinY;
             let frame = 0;
             const gravity = 0.42;
-            let bounced = false; // 是否已经反弹过
+            let bounced = false;
 
-            // 尾迹定时器
             const trailInterval = setInterval(() => {
                 if (frame % 2 === 0) emitTrail(x, y, 2);
             }, 30);
 
             const anim = setInterval(() => {
-                // 更新物理
                 x += vx;
                 y += vy;
                 vy += gravity;
 
-                // 左右边界反弹
-                if (x < 0) {
-                    x = 0;
+                if (x < 0) { x = 0;
                     vx = -vx * 0.7;
                     emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
-                    bounced = true;
-                } else if (x > W) {
-                    x = W;
+                    bounced = true; }
+                if (x > W) { x = W;
                     vx = -vx * 0.7;
                     emitParticles(x, y, 6, '#ffaa66', 2, 20, [2, 5]);
-                    bounced = true;
-                }
-
-                // 底部反弹 (地面)
-                if (y > H) {
-                    y = H;
-                    vy = -vy * 0.5; // 损失能量
-                    // 如果速度很小，直接停止
-                    if (Math.abs(vy) < 1.0) {
-                        vy = 0;
-                    }
+                    bounced = true; }
+                if (y > H) { y = H;
+                    vy = -vy * 0.5;
+                    if (Math.abs(vy) < 1.0) vy = 0;
                     emitParticles(x, H, 10, '#aa8866', 3, 25, [2, 7]);
-                    bounced = true;
-                }
+                    bounced = true; }
 
-                // 如果vy几乎为0且y接近地面，停止
-                const isNearGround = y > H * 0.85;
-                const isSlow = Math.abs(vy) < 0.3 && Math.abs(vx) < 0.3;
-
-                // 绘制飞行中的硬币
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(frame * 0.2);
@@ -832,73 +941,76 @@
 
                 frame++;
 
-                // 停止条件：在地面附近且速度很小，并且已经至少反弹过一次（防止初始就停）
+                const isNearGround = y > H * 0.85;
+                const isSlow = Math.abs(vy) < 0.3 && Math.abs(vx) < 0.3;
+
                 if ((isNearGround && isSlow && bounced) || (y > H * 0.92 && vy >= 0)) {
                     clearInterval(anim);
                     clearInterval(trailInterval);
 
-                    // 最终落点
                     const landX = Math.max(5, Math.min(W - 5, x));
                     const landY = Math.min(H * 0.92, y);
                     coins.push({ x: landX, y: landY });
 
                     emitParticles(landX, landY, 20, '#b8942a', 3, 32, [2, 8]);
 
-                    // 得分检测
+                    // 得分检测 (使用逆旋转)
+                    const cx = W / 2,
+                        cy = H / 2;
+                    const angle = tiltAngle;
+                    // 将落点坐标逆旋转到原始坐标系
+                    const invP = rotatePoint(landX, landY, -angle, cx, cy);
+                    const invX = invP.x,
+                        invY = invP.y;
+
                     let scored = false;
                     let ringIndex = -1;
-                    const targets = getTargets();
-                    for (let tx = W * 0.22; tx < W * 0.82; tx += W * 0.3) {
-                        for (let ty = H * 0.28; ty < H * 0.55; ty += H * 0.23) {
-                            const d = Math.hypot(tx - landX, ty - landY);
-                            if (d < 78) {
-                                const rings = [
-                                    { r: 55, label: 'red', pts: 1, color: '#ff4466' },
-                                    { r: 42, label: 'green', pts: 2, color: '#44ff88' },
-                                    { r: 29, label: 'yellow', pts: 3, color: '#ffdd44' },
-                                    { r: 16, label: 'purple', pts: 5, color: '#cc66ff' },
-                                ];
-                                for (let ri = 0; ri < rings.length; ri++) {
-                                    if (d < rings[ri].r) {
-                                        ringIndex = ri;
-                                        const r = rings[ri];
-                                        scores[r.label] += r.pts;
-                                        document.getElementById(r.label).textContent = scores[r.label];
-                                        scored = true;
+                    // 使用原始靶心坐标 (targetOrigins)
+                    for (let t of targetOrigins) {
+                        const d = Math.hypot(t.x - invX, t.y - invY);
+                        if (d < 78) {
+                            const rings = [
+                                { r: 55, label: 'red', pts: 1, color: '#ff4466' },
+                                { r: 42, label: 'green', pts: 2, color: '#44ff88' },
+                                { r: 29, label: 'yellow', pts: 3, color: '#ffdd44' },
+                                { r: 16, label: 'purple', pts: 5, color: '#cc66ff' },
+                            ];
+                            for (let ri = 0; ri < rings.length; ri++) {
+                                if (d < rings[ri].r) {
+                                    ringIndex = ri;
+                                    const r = rings[ri];
+                                    scores[r.label] += r.pts;
+                                    document.getElementById(r.label).textContent = scores[r.label];
+                                    scored = true;
 
-                                        const now = Date.now();
-                                        if (now - lastHitTime < 1500) {
-                                            comboCount++;
-                                        } else {
-                                            comboCount = 1;
-                                        }
-                                        lastHitTime = now;
+                                    const now = Date.now();
+                                    if (now - lastHitTime < 1500) comboCount++;
+                                    else comboCount = 1;
+                                    lastHitTime = now;
 
-                                        if (comboCount >= 2) {
-                                            const comboText = comboCount >= 5 ? `🔥 ${comboCount}x` :
-                                                comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
-                                            comboDisplayEl.textContent = comboText;
-                                            comboDisplayEl.className = 'combo-display show';
-                                            clearTimeout(comboDisplayEl._hideTimer);
-                                            comboDisplayEl._hideTimer = setTimeout(() => {
-                                                comboDisplayEl.className = 'combo-display';
-                                            }, 800);
-                                            sfxScore(comboCount);
-                                        } else {
-                                            sfxHit(ri);
-                                        }
-
-                                        emitHitBurst(landX, landY, r.color);
-                                        const label = ['+1', '+2', '+3', '+5'][ri];
-                                        addScorePopup(landX, landY - 30, label, r.color);
-                                        document.getElementById('power').textContent = '💥';
-                                        break;
+                                    if (comboCount >= 2) {
+                                        const comboText = comboCount >= 5 ? `🔥 ${comboCount}x` :
+                                            comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
+                                        comboDisplayEl.textContent = comboText;
+                                        comboDisplayEl.className = 'combo-display show';
+                                        clearTimeout(comboDisplayEl._hideTimer);
+                                        comboDisplayEl._hideTimer = setTimeout(() => {
+                                            comboDisplayEl.className = 'combo-display';
+                                        }, 800);
+                                        sfxScore(comboCount);
+                                    } else {
+                                        sfxHit(ri);
                                     }
+
+                                    emitHitBurst(landX, landY, r.color);
+                                    const label = ['+1', '+2', '+3', '+5'][ri];
+                                    addScorePopup(landX, landY - 30, label, r.color);
+                                    document.getElementById('power').textContent = '💥';
+                                    break;
                                 }
-                                break;
                             }
+                            break;
                         }
-                        if (scored) break;
                     }
 
                     if (!scored) {
@@ -908,7 +1020,7 @@
                         emitParticles(landX, landY, 14, '#888888', 2, 22, [2, 5]);
                     }
 
-                    // 重置投掷状态
+                    // 投掷结束，重置状态
                     setTimeout(() => {
                         coinX = W * 0.25;
                         coinY = H * 0.85;
@@ -917,13 +1029,59 @@
                         document.getElementById('powerFill').style.width = '0%';
                         isThrowing = false;
                         draw();
+                        // 启动自动清理 (延迟1.5秒)
+                        if (autoCleanTimer) clearTimeout(autoCleanTimer);
+                        autoCleanTimer = setTimeout(() => {
+                            startAutoClean();
+                        }, 1500);
                     }, 350);
                 }
             }, 16);
         }
 
         // ============================================================
-        //  7. 传感器投掷
+        //  7. 自动清理 (8-bit 刷子)
+        // ============================================================
+        function startAutoClean() {
+            if (isCleaning || coins.length === 0) return;
+            isCleaning = true;
+            cleanProgress = 0;
+            sfxClean();
+
+            const duration = 800; // ms
+            const startTime = performance.now();
+
+            function animateClean(time) {
+                const elapsed = time - startTime;
+                cleanProgress = Math.min(1, elapsed / duration);
+                draw();
+                if (cleanProgress < 1) {
+                    requestAnimationFrame(animateClean);
+                } else {
+                    // 清理完毕，移除所有硬币
+                    coins = [];
+                    isCleaning = false;
+                    cleanProgress = 0;
+                    draw();
+                }
+            }
+            requestAnimationFrame(animateClean);
+        }
+
+        // 手动清理 (也触发刷子动画)
+        function manualClean() {
+            if (isCleaning) return;
+            if (coins.length === 0) {
+                // 没有硬币，直接退出
+                return;
+            }
+            // 取消自动清理定时器
+            if (autoCleanTimer) clearTimeout(autoCleanTimer);
+            startAutoClean();
+        }
+
+        // ============================================================
+        //  8. 传感器 (倾斜 + 甩动)
         // ============================================================
         let sensorActive = false;
         let lastAccel = { x: 0, y: 0, z: 0 };
@@ -934,6 +1092,16 @@
         let sensorStatusEl = document.getElementById('sensorStatus');
         let shakeCountEl = document.getElementById('shakeCount');
 
+        // 监听设备方向 (倾斜)
+        function handleOrientation(event) {
+            const gamma = event.gamma || 0; // 左右倾斜 -90~90
+            // 将角度映射到旋转弧度，限制范围 -45° ~ 45°
+            const angleDeg = Math.max(-45, Math.min(45, gamma));
+            tiltAngle = angleDeg * Math.PI / 180;
+            // 不需要重绘，动画循环会处理
+        }
+
+        // 设备运动 (甩动)
         function handleDeviceMotion(event) {
             const acc = event.accelerationIncludingGravity || event.acceleration;
             if (!acc) return;
@@ -1005,6 +1173,11 @@
         }
 
         function requestSensorPermission() {
+            // 倾斜
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+            // 运动
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(state => {
@@ -1039,7 +1212,7 @@
         }
 
         // ============================================================
-        //  8. 触摸投掷 (滑动)
+        //  9. 触摸投掷 (滑动)
         // ============================================================
         let touchStartY = 0;
         let touchActive = false;
@@ -1059,7 +1232,7 @@
 
         function handleTouchStart(e) {
             e.preventDefault();
-            if (isThrowing) return;
+            if (isThrowing || isCleaning) return;
             const pos = getCanvasPos(e);
             if (pos.y > H * 0.4) {
                 touchActive = true;
@@ -1083,7 +1256,7 @@
 
         function handleTouchMove(e) {
             e.preventDefault();
-            if (!touchActive || isThrowing) return;
+            if (!touchActive || isThrowing || isCleaning) return;
             const pos = getCanvasPos(e);
             const dy = touchStartY - pos.y;
             if (dy > 0) {
@@ -1106,7 +1279,7 @@
             e.preventDefault();
             if (!touchActive) return;
             touchActive = false;
-            if (isThrowing) return;
+            if (isThrowing || isCleaning) return;
 
             if (powerValue > 8) {
                 performThrow(powerValue);
@@ -1125,34 +1298,12 @@
         }
 
         // ============================================================
-        //  9. 清理桌面
-        // ============================================================
-        function cleanDesk() {
-            if (coins.length === 0 && particles.length === 0) return;
-            coins.forEach(c => {
-                emitParticles(c.x, c.y, 18, '#888888', 4, 28, [2, 7]);
-            });
-            setTimeout(() => {
-                coins = [];
-                particles = particles.filter(p => p.life > 10);
-                draw();
-            }, 300);
-            comboCount = 0;
-            comboDisplayEl.className = 'combo-display';
-            if (!isMuted && audioCtx) {
-                try {
-                    playNote(440, 70, 0.05, 'square');
-                    setTimeout(() => playNote(330, 70, 0.05, 'square'), 110);
-                } catch (e) {}
-            }
-        }
-
-        // ============================================================
         //  10. 初始化
         // ============================================================
         function init() {
             coinX = W * 0.25;
             coinY = H * 0.85;
+            updateTargetOrigins();
             draw();
 
             requestSensorPermission();
@@ -1192,11 +1343,11 @@
             });
 
             function animate() {
-                if (!isThrowing) {
+                if (!isThrowing && !isCleaning) {
                     draw();
-                }
-                if (particles.length > 0 || scorePopups.length > 0) {
-                    if (!isThrowing) draw();
+                } else {
+                    // 投掷或清理中，也持续绘制
+                    draw();
                 }
                 requestAnimationFrame(animate);
             }
@@ -1206,6 +1357,7 @@
                 resize();
                 if (coinX > W) coinX = W * 0.25;
                 if (coinY > H) coinY = H * 0.85;
+                updateTargetOrigins();
                 draw();
             });
 
@@ -1220,11 +1372,12 @@
                 }
             }, { once: false });
 
-            console.log('🌈 弹跳投掷 · 彩虹模拟器 (反弹版) 已启动!');
-            console.log('📱 甩动手机 或 向上滑动屏幕投掷，硬币会反弹并最终落在桌面上');
+            console.log('🌈 倾斜桌面 · 8-bit 刷子 已启动!');
+            console.log('📱 甩动手机或向上滑动投掷，硬币稳定后自动用8-bit刷子清理');
         }
 
-        window.cleanDesk = cleanDesk;
+        // 暴露全局
+        window.manualClean = manualClean;
         window.toggleMute = toggleMute;
 
         init();
