@@ -710,22 +710,33 @@
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    // 檢查硬幣是否完全在某個環內（不碰到任何邊界）
-    // 條件：硬幣中心到靶心的桌面距離 + 硬幣桌面半徑 < 環的半徑
-    // 硬幣桌面半徑 = COIN_DRAW_RADIUS * COIN_LANDED_SCALE * getPerspectiveScale(landY)
-    // 這與視覺上硬幣在桌面坐標系中的大小完全一致
+    // 檢查硬幣是否「完全落在單一顏色的色帶內」，不可跨越任何邊界
+    // 每個環的色帶範圍是 [innerBoundary, outerBoundary)：
+    //   red:    [green半徑, red半徑)
+    //   green:  [yellow半徑, green半徑)
+    //   yellow: [purple半徑, yellow半徑)
+    //   purple: [0, purple半徑)
+    // 硬幣必須整個落在其中一個色帶內（不可觸碰內側或外側邊界），
+    // 否則視為「壓線／跨兩色」，不計分。
     function checkCoinInRing(landX, landY) {
         const centerDist = getDistanceToTarget(landX, landY);
         const coinRadius = getCoinCollisionRadius(landY);
 
-        // 從內到外檢查（紫色最內，紅色最外）
-        for (let i = RINGS.length - 1; i >= 0; i--) {
-            // 硬幣必須完全在環內，不碰到邊界
-            if (centerDist + coinRadius < RINGS[i].radius) {
+        // RINGS 順序為外到內：red, green, yellow, purple
+        for (let i = 0; i < RINGS.length; i++) {
+            const outerBoundary = RINGS[i].radius;
+            const innerBoundary = (i + 1 < RINGS.length) ? RINGS[i + 1].radius : 0;
+
+            const clearsOuterEdge = (centerDist + coinRadius) < outerBoundary;
+            const clearsInnerEdge = innerBoundary === 0
+                ? true
+                : (centerDist - coinRadius) > innerBoundary;
+
+            if (clearsOuterEdge && clearsInnerEdge) {
                 return RINGS[i];
             }
         }
-        return null;
+        return null; // touching a border between two colors, or off the target entirely
     }
 
     function landCoin(x, y) {
@@ -737,7 +748,7 @@
         coins.push({ x: landX, y: landY, landedAt: Date.now() });
         emitParticles(landX, landY, 16, '#b8942a', 3, 26);
 
-        // 使用「完全在環內」的判定（碰撞半徑與視覺一致）
+        // 必須完全落在單一色帶內，壓線／跨兩色一律不計分
         const ringHit = checkCoinInRing(landX, landY);
 
         if (ringHit) {
