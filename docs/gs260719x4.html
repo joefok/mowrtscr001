@@ -366,11 +366,11 @@
     // 透視壓縮
     const PERSPECTIVE_SQUASH = 0.55;
 
-    // 硬幣在世界坐標中的半徑（碰撞檢測用）
-    const COIN_WORLD_RADIUS = 16;
-
-    // 硬幣繪製基礎半徑（視覺用，稍大）
+    // 硬幣繪製基礎半徑
     const COIN_DRAW_RADIUS = 18;
+
+    // 硬幣落地後的繪製 scale 參數
+    const COIN_LANDED_SCALE = 0.82;
 
     // 桌子邊界（梯形）
     function getDeskBoundsAtY(y) {
@@ -485,8 +485,7 @@
         }
 
         // 中心：整個紫色（最內環顏色延伸到中心，沒有白色圓點）
-        // 已經由 purple 環覆蓋到中心，不需要額外繪製
-        // 但加一個微妙的中心高光
+        // 加一個微妙的中心高光
         ctx.beginPath();
         ctx.arc(0, 0, RINGS[RINGS.length - 1].radius * 0.25, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
@@ -512,6 +511,12 @@
         const farY = target.y;
         const t = Math.max(0, Math.min(1, (nearY - y) / (nearY - farY)));
         return 1.0 - t * 0.42;
+    }
+
+    // 計算硬幣在桌面坐標系中的半徑（用於碰撞檢測）
+    // 這與視覺上硬幣在桌面坐標系中的大小一致
+    function getCoinCollisionRadius(y) {
+        return COIN_DRAW_RADIUS * COIN_LANDED_SCALE * getPerspectiveScale(y);
     }
 
     // 將點限制在桌子範圍內
@@ -698,21 +703,25 @@
     }
 
     // 計算硬幣中心到靶心的桌面坐標系距離
+    // 桌面坐標系中，y 方向被拉伸（逆壓縮）
     function getDistanceToTarget(px, py) {
         const dx = px - target.x;
         const dy = (py - target.y) / PERSPECTIVE_SQUASH;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    // 檢查硬幣是否完全在某個環內
-    // 條件：硬幣中心到靶心的桌面距離 + 硬幣世界半徑 < 環的半徑
+    // 檢查硬幣是否完全在某個環內（不碰到任何邊界）
+    // 條件：硬幣中心到靶心的桌面距離 + 硬幣桌面半徑 < 環的半徑
+    // 硬幣桌面半徑 = COIN_DRAW_RADIUS * COIN_LANDED_SCALE * getPerspectiveScale(landY)
+    // 這與視覺上硬幣在桌面坐標系中的大小完全一致
     function checkCoinInRing(landX, landY) {
         const centerDist = getDistanceToTarget(landX, landY);
+        const coinRadius = getCoinCollisionRadius(landY);
 
         // 從內到外檢查（紫色最內，紅色最外）
         for (let i = RINGS.length - 1; i >= 0; i--) {
-            // 硬幣必須完全在環內
-            if (centerDist + COIN_WORLD_RADIUS < RINGS[i].radius) {
+            // 硬幣必須完全在環內，不碰到邊界
+            if (centerDist + coinRadius < RINGS[i].radius) {
                 return RINGS[i];
             }
         }
@@ -728,7 +737,7 @@
         coins.push({ x: landX, y: landY, landedAt: Date.now() });
         emitParticles(landX, landY, 16, '#b8942a', 3, 26);
 
-        // 使用「完全在環內」的判定
+        // 使用「完全在環內」的判定（碰撞半徑與視覺一致）
         const ringHit = checkCoinInRing(landX, landY);
 
         if (ringHit) {
