@@ -91,9 +91,10 @@
     .corner-status.wait { color: #ff88aa; border: 1px solid rgba(255,102,170,0.3); }
     .corner-status.flying { color: #ffdd44; border: 1px solid rgba(255,221,68,0.4); }
 
+    /* Combo stays center - it's the frequent, quick-flash element */
     .combo {
         position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-        z-index: 15; font-size: 40px; color: #ffdd44;
+        z-index: 15; font-size: 34px; color: #ffdd44;
         text-shadow: 0 0 40px rgba(255,220,0,0.6);
         pointer-events: none; opacity: 0;
         transition: opacity 0.2s;
@@ -132,13 +133,48 @@
     .overlay button:active { transform: scale(0.96); }
     .overlay .sub { font-size: 9px; color: rgba(255,255,255,0.4); }
 
+    /* Event banner: moved to a small top pill, NOT centered on screen,
+       so it never collides with the combo text or the boss banner. */
+    .event-banner {
+        position: absolute; top: 56px; left: 50%;
+        transform: translateX(-50%) translateY(-10px);
+        z-index: 21; font-size: 10px; color: #ffe066;
+        text-shadow: 0 0 16px rgba(255,220,0,0.5);
+        pointer-events: none; opacity: 0;
+        background: rgba(0,0,0,0.7); padding: 8px 16px;
+        border-radius: 20px; border: 1px solid rgba(255,215,0,0.35);
+        white-space: nowrap;
+        transition: opacity 0.3s, transform 0.3s;
+    }
+    .event-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Boss banner: upper-middle, clearly above the combo's center position */
+    .boss-banner {
+        position: absolute; top: 26%; left: 50%; transform: translate(-50%,-50%) scale(0.6);
+        z-index: 40; font-size: 15px; color: #ff4444;
+        text-shadow: 0 0 40px rgba(255,68,68,0.8);
+        pointer-events: none; opacity: 0;
+        background: rgba(0,0,0,0.8); padding: 14px 26px;
+        border-radius: 16px; border: 3px solid rgba(255,68,68,0.5);
+        white-space: nowrap;
+    }
+    .boss-banner.show { opacity: 1; animation: bossAppear 2s ease-out; }
+    @keyframes bossAppear {
+        0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+        20% { transform: translate(-50%,-50%) scale(1.15); opacity: 1; }
+        80% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+        100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+    }
+
     @media (max-width:500px) {
         .hud { font-size: 9px; padding: 6px 10px; }
         .hud .row { gap: 6px; }
         .corner-status { font-size: 8px; padding: 4px 8px; top: 14px; }
-        .combo { font-size: 28px; }
+        .combo { font-size: 24px; }
         .hint { font-size: 9px; bottom: 18px; white-space: normal; }
         .overlay h1 { font-size: 13px; }
+        .event-banner { font-size: 9px; padding: 6px 12px; top: 50px; }
+        .boss-banner { font-size: 12px; padding: 10px 18px; }
     }
 </style>
 </head>
@@ -164,23 +200,23 @@
     </div>
     <div class="power-wrap">
         <span>⚡ <span id="power">0</span></span>
+        <span>💰 <span id="totalScore">0</span></span>
     </div>
 </div>
 
 <div class="combo" id="comboDisplay"></div>
+<div class="event-banner" id="eventBanner"></div>
+<div class="boss-banner" id="bossBanner"></div>
 <div class="hint" id="hint">🤳 稳住手机 2 秒 → 快速向前甩动投掷</div>
 
 <canvas id="canvas"></canvas>
 
 <script>
-    // ============================================================
-    //  Canvas & basic setup
-    // ============================================================
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     let W, H;
     let coinStartX, coinStartY;
-    let target = { x: 0, y: 0 };
+    let target = { x: 0, y: 0, vx: 0 };
 
     function layout() {
         W = window.innerWidth;
@@ -189,9 +225,109 @@
         canvas.height = H;
         coinStartX = W * 0.5;
         coinStartY = H * 0.90;
-        target.x = W * 0.5;
         target.y = H * 0.22;
+        if (target.x === 0) target.x = W * 0.5;
     }
+
+    // ============================================================
+    //  Procedural audio (missing entirely before - Web Audio + speech synth)
+    // ============================================================
+    let audioCtx = null;
+    let bgmOn = true;
+    let bgmTimer = null;
+    let bgmIndex = 0;
+    const BGM_NOTES = [262, 330, 392, 330, 294, 370, 440, 370];
+
+    function getAudioCtx() {
+        if (!audioCtx) {
+            try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+            catch (e) { return null; }
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        return audioCtx;
+    }
+    function playTone(freq, dur, type = 'sine', vol = 0.15, delay = 0) {
+        const ctxA = getAudioCtx();
+        if (!ctxA) return;
+        const t0 = ctxA.currentTime + delay;
+        const osc = ctxA.createOscillator();
+        const gain = ctxA.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(vol, t0 + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        osc.connect(gain);
+        gain.connect(ctxA.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+    }
+    function playNoiseBurst(dur = 0.2, vol = 0.2) {
+        const ctxA = getAudioCtx();
+        if (!ctxA) return;
+        const bufferSize = Math.floor(ctxA.sampleRate * dur);
+        const buffer = ctxA.createBuffer(1, bufferSize, ctxA.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        const src = ctxA.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctxA.createGain();
+        gain.gain.value = vol;
+        src.connect(gain);
+        gain.connect(ctxA.destination);
+        src.start();
+    }
+    function playCoinSpin() { playTone(1100 + Math.random() * 350, 0.05, 'square', 0.025); }
+    function playSlide() { playNoiseBurst(0.07, 0.04); }
+    function playHit(ringLabel) {
+        const freqs = { red: 440, green: 554, yellow: 659, purple: 880, boss: 330 };
+        const f = freqs[ringLabel] || 500;
+        playTone(f, 0.18, 'triangle', 0.18);
+        playTone(f * 1.5, 0.15, 'sine', 0.08, 0.02);
+    }
+    function playGold() {
+        [660, 880, 1100, 1320].forEach((f, i) => playTone(f, 0.2, 'square', 0.14, i * 0.045));
+        playNoiseBurst(0.25, 0.12);
+    }
+    function playPerfect() {
+        [880, 1108, 1318, 1760].forEach((f, i) => playTone(f, 0.28, 'sine', 0.18, i * 0.05));
+        playNoiseBurst(0.35, 0.16);
+    }
+    function playCritical() {
+        playTone(220, 0.3, 'sawtooth', 0.15);
+        playTone(880, 0.15, 'square', 0.1, 0.05);
+    }
+    function playMiss() { playTone(160, 0.18, 'sawtooth', 0.08); }
+    function playSparkle() {
+        [1046, 1318, 1568].forEach((f, i) => playTone(f, 0.2, 'sine', 0.1, i * 0.06));
+    }
+    function playBossSpawn() {
+        playTone(110, 0.4, 'sawtooth', 0.15);
+        playTone(220, 0.3, 'square', 0.1, 0.15);
+    }
+    function playBossDefeat() {
+        [523, 659, 784, 1046].forEach((f, i) => playTone(f, 0.22, 'square', 0.15, i * 0.08));
+    }
+    function speak(text) {
+        try {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.rate = 1.15; u.pitch = 1.3; u.volume = 0.85;
+            window.speechSynthesis.speak(u);
+        } catch (e) {}
+    }
+    function startBGM() {
+        if (bgmTimer) return;
+        bgmTimer = setInterval(() => {
+            if (!bgmOn || isThrowing || flying) return;
+            playTone(BGM_NOTES[bgmIndex % BGM_NOTES.length], 0.16, 'square', 0.02);
+            bgmIndex++;
+        }, 280);
+    }
+    function unlockAudioOnce() { getAudioCtx(); startBGM(); }
+    window.addEventListener('touchstart', unlockAudioOnce, { once: true });
+    window.addEventListener('click', unlockAudioOnce, { once: true });
 
     // ============================================================
     //  8-bit Retro Background System
@@ -243,14 +379,11 @@
     function drawPixelMountains() {
         const mountainY = H * 0.42;
         const mountainColors = ['#0d0520', '#140830', '#1a0d3a', '#0f0825'];
-
         for (let layer = 0; layer < 4; layer++) {
             const layerY = mountainY - layer * 18;
             const baseHeight = 35 + layer * 22;
             const pixelSize = 4 + layer * 2;
-
             ctx.fillStyle = mountainColors[layer];
-
             for (let x = 0; x < W + pixelSize; x += pixelSize) {
                 const noise = Math.sin(x * 0.003 + layer * 2.5) * 0.5 +
                              Math.sin(x * 0.007 + layer * 1.3) * 0.3 +
@@ -265,7 +398,6 @@
     function drawNeonGrid() {
         const gridTop = H * 0.45;
         const gridBottom = H;
-
         ctx.strokeStyle = 'rgba(255, 0, 255, 0.12)';
         ctx.lineWidth = 1;
         for (let i = 0; i < 14; i++) {
@@ -276,10 +408,8 @@
             ctx.lineTo(W, y);
             ctx.stroke();
         }
-
         const centerX = W / 2;
         const vanishY = H * 0.30;
-
         ctx.strokeStyle = 'rgba(0, 255, 255, 0.10)';
         for (let i = -10; i <= 10; i++) {
             const angle = i * 0.065;
@@ -290,7 +420,6 @@
             ctx.lineTo(x2, H);
             ctx.stroke();
         }
-
         ctx.strokeStyle = 'rgba(255, 100, 200, 0.25)';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -322,7 +451,6 @@
             const alpha = 0.35 + 0.3 * Math.sin(bgTime * 0.002 + d.phase);
             ctx.fillStyle = d.color;
             ctx.globalAlpha = alpha;
-
             if (d.type === 'star') {
                 const s = d.size;
                 ctx.fillRect(Math.floor(d.x - s/2), Math.floor(floatY - s/6), s, Math.max(1, s/3));
@@ -336,21 +464,21 @@
         }
     }
 
-    // ============================================================
-    //  Game state
-    // ============================================================
     let coins = [];
     let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
+    let totalScore = 0;
     let powerValue = 0;
     let isThrowing = false;
     let comboCount = 0;
     let lastHitTime = 0;
+    let totalThrows = 0;
     const comboEl = document.getElementById('comboDisplay');
     const statusBar = document.getElementById('statusBar');
     const statusBorder = document.getElementById('statusBorder');
     const cornerStatus = document.getElementById('cornerStatus');
+    const eventBanner = document.getElementById('eventBanner');
+    const bossBanner = document.getElementById('bossBanner');
 
-    // 彩虹靶定義 - 更大
     const RING_DEFS = [
         { label: 'red',    pts: 1, color: '#ff2244', frac: 0.34 },
         { label: 'green',  pts: 2, color: '#33ff77', frac: 0.25 },
@@ -363,16 +491,10 @@
         RINGS = RING_DEFS.map(r => ({ ...r, radius: base * r.frac }));
     }
 
-    // 透視壓縮
     const PERSPECTIVE_SQUASH = 0.55;
-
-    // 硬幣繪製基礎半徑
     const COIN_DRAW_RADIUS = 18;
-
-    // 硬幣落地後的繪製 scale 參數
     const COIN_LANDED_SCALE = 0.82;
 
-    // 桌子邊界（梯形）
     function getDeskBoundsAtY(y) {
         const deskTop = H * 0.10;
         const topHalf = W * 0.28;
@@ -382,13 +504,252 @@
         return { left: W/2 - half, right: W/2 + half };
     }
 
-    // ============================================================
-    //  Status visual update
-    // ============================================================
+    let targetMovePhase = 0;
+    let targetMoveSpeed = 0.0015;
+    let targetMoveRange = 0.15;
+
+    // FIX: target position is now clamped to the desk's trapezoid bounds
+    // (accounting for the target's current radius, which can grow up to
+    // 1.6x during the Giant Target event) - previously it could drift the
+    // target visually off the edge of the desk.
+    function updateTargetPosition() {
+        targetMovePhase += targetMoveSpeed * 16;
+        const offset = Math.sin(targetMovePhase) * W * targetMoveRange;
+        let x = W * 0.5 + offset;
+        const bounds = getDeskBoundsAtY(target.y);
+        const outerR = (RINGS.length ? RINGS[0].radius : W * 0.1) * targetScale;
+        const margin = outerR + 10;
+        x = Math.max(bounds.left + margin, Math.min(bounds.right - margin, x));
+        target.x = x;
+    }
+
+    let isGoldenCoin = false;
+    let goldenCoinTimer = 0;
+    const GOLDEN_CHANCE = 0.08;
+
+    function checkGoldenCoin() {
+        isGoldenCoin = Math.random() < GOLDEN_CHANCE;
+        goldenCoinTimer = isGoldenCoin ? 120 : 0;
+    }
+
+    let cameraShake = { x: 0, y: 0, intensity: 0 };
+    let slowMotion = 1.0;
+
+    function triggerCameraShake(intensity) {
+        cameraShake.intensity = intensity;
+    }
+
+    function updateCameraShake() {
+        if (cameraShake.intensity > 0) {
+            cameraShake.x = (Math.random() - 0.5) * cameraShake.intensity;
+            cameraShake.y = (Math.random() - 0.5) * cameraShake.intensity;
+            cameraShake.intensity *= 0.92;
+            if (cameraShake.intensity < 0.5) cameraShake.intensity = 0;
+        } else {
+            cameraShake.x = 0;
+            cameraShake.y = 0;
+        }
+    }
+
+    // FIX: the old table [1,1,2,3,5,8,13,21] hit a 21x multiplier at a
+    // combo of just 7-8, which is very achievable and blew every score
+    // number (and the boss thresholds tuned against them) way out of
+    // proportion. Capped at a much saner 3x ceiling.
+    const COMBO_MULTIPLIERS = [1, 1, 1.5, 2, 2.5, 3];
+    function getComboMultiplier() {
+        if (comboCount <= 1) return 1;
+        return COMBO_MULTIPLIERS[Math.min(comboCount - 1, COMBO_MULTIPLIERS.length - 1)];
+    }
+
+    let isCriticalThrow = false;
+    let criticalTrail = [];
+    const CRITICAL_THRESHOLD = 85;
+
+    let activeEvent = null;
+    let nextEventTime = Date.now() + 20000 + Math.random() * 10000;
+    let eventTimer = 0;
+
+    const EVENTS = [
+        { name: '🔥 雙倍分數', duration: 15000, apply: () => { eventMultiplier = 2; }, remove: () => { eventMultiplier = 1; }, color: '#ff6600' },
+        { name: '🎯 巨大靶心', duration: 12000, apply: () => { targetScale = 1.6; }, remove: () => { targetScale = 1.0; }, color: '#00ff66' },
+        { name: '🎯 迷你靶心', duration: 10000, apply: () => { targetScale = 0.6; }, remove: () => { targetScale = 1.0; }, color: '#ff3366' },
+        { name: '💨 強風', duration: 8000, apply: () => { windForce = (Math.random() < 0.5 ? -1 : 1) * 0.3; }, remove: () => { windForce = 0; }, color: '#66ccff' },
+        { name: '🧊 冰面', duration: 10000, apply: () => { frictionOverride = 0.985; }, remove: () => { frictionOverride = null; }, color: '#aaddff' },
+        { name: '🧲 磁力靶', duration: 12000, apply: () => { magneticTarget = true; }, remove: () => { magneticTarget = false; }, color: '#ff66ff' }
+    ];
+
+    let eventMultiplier = 1;
+    let targetScale = 1.0;
+    let windForce = 0;
+    let frictionOverride = null;
+    let magneticTarget = false;
+
+    function checkEvents() {
+        const now = Date.now();
+        if (activeEvent) {
+            if (now > eventTimer) {
+                activeEvent.remove();
+                activeEvent = null;
+                nextEventTime = now + 20000 + Math.random() * 10000;
+            }
+        } else if (now > nextEventTime) {
+            activeEvent = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+            activeEvent.apply();
+            eventTimer = now + activeEvent.duration;
+            showEventBanner(activeEvent.name, activeEvent.color);
+            playSparkle();
+        }
+    }
+
+    function showEventBanner(text, color) {
+        eventBanner.textContent = text;
+        eventBanner.style.borderColor = color;
+        eventBanner.style.textShadow = `0 0 16px ${color}80`;
+        eventBanner.className = 'event-banner show';
+        clearTimeout(eventBanner._timer);
+        eventBanner._timer = setTimeout(() => { eventBanner.className = 'event-banner'; }, 1500);
+    }
+
+    let bossMode = null;
+    let bossHealth = 0;
+    let bossMaxHealth = 0;
+
+    // FIX: hit-radius is now responsive (scales with screen size like
+    // everything else) instead of a hardcoded 50px that made difficulty
+    // wildly inconsistent across phone sizes.
+    function getBossHitRadius() {
+        return Math.min(W, H) * 0.135 * targetScale;
+    }
+
+    const BOSSES = [
+        { 
+            name: '🛸 UFO', 
+            color: '#00ff88', 
+            behavior: 'hover',
+            // FIX: removed the extra "* PERSPECTIVE_SQUASH" here - drawTarget()
+            // already squashes the context once before calling this; squashing
+            // again flattened every boss to ~30% height instead of the
+            // intended 55%.
+            draw: (ctx, x, y, scale, time) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+                ctx.fillStyle = '#444';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 60, 20, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#88ccff';
+                ctx.beginPath();
+                ctx.arc(0, -10, 25, Math.PI, 0);
+                ctx.fill();
+                for (let i = -2; i <= 2; i++) {
+                    ctx.fillStyle = `hsl(${(time * 0.2 + i * 60) % 360}, 100%, 60%)`;
+                    ctx.beginPath();
+                    ctx.arc(i * 20, 5, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        },
+        { 
+            name: '📦 寶箱', 
+            color: '#ffaa00', 
+            behavior: 'pulse',
+            draw: (ctx, x, y, scale, time) => {
+                ctx.save();
+                ctx.translate(x, y);
+                const pulse = 1 + Math.sin(time * 0.003) * 0.1;
+                ctx.scale(scale * pulse, scale * pulse);
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(-40, -30, 80, 60);
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(-40, -30, 80, 60);
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        },
+        { 
+            name: '👁️ 龍眼', 
+            color: '#ff3333', 
+            behavior: 'track',
+            draw: (ctx, x, y, scale, time) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+                ctx.fillStyle = '#220000';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 50, 35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#ff3333';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                const irisX = Math.sin(time * 0.002) * 10;
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(irisX, 0, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(irisX, 0, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        },
+        { 
+            name: '🌀 傳送門', 
+            color: '#aa44ff', 
+            behavior: 'spin',
+            draw: (ctx, x, y, scale, time) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+                for (let i = 3; i >= 0; i--) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 20 + i * 15, 0, Math.PI * 2);
+                    ctx.strokeStyle = `hsl(${(time * 0.1 + i * 30) % 360}, 80%, 60%)`;
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+    ];
+
+    function checkBossMode() {
+        if (!bossMode && totalScore >= 50 && totalScore % 50 < 10) {
+            bossMode = BOSSES[Math.floor(Math.random() * BOSSES.length)];
+            bossHealth = 3;
+            bossMaxHealth = 3;
+            showBossBanner(bossMode.name + ' 出現!');
+            playBossSpawn();
+            speak(bossMode.name.replace(/[^\u4e00-\u9fa5a-zA-Z]/g, ''));
+        } else if (bossMode && bossHealth <= 0) {
+            showBossBanner(bossMode.name + ' 擊敗!');
+            playBossDefeat();
+            bossMode = null;
+            totalScore += 20;
+            updateTotalScore();
+        }
+    }
+
+    function showBossBanner(text) {
+        bossBanner.textContent = text;
+        bossBanner.className = 'boss-banner show';
+        clearTimeout(bossBanner._timer);
+        bossBanner._timer = setTimeout(() => { bossBanner.className = 'boss-banner'; }, 2000);
+    }
+
     function updateStatusVisuals() {
         let stateClass = 'wait';
         let cornerText = '🤳 穩住';
-
         if (isThrowing || flying) {
             stateClass = 'flying';
             cornerText = '🪙 飛行中';
@@ -396,20 +757,19 @@
             stateClass = 'ready';
             cornerText = '✅ 投擲!';
         }
-
         statusBar.className = 'status-bar ' + stateClass;
         statusBorder.className = 'status-border ' + stateClass;
         cornerStatus.className = 'corner-status ' + stateClass;
         cornerStatus.textContent = cornerText;
     }
 
-    // ============================================================
-    //  Drawing helpers
-    // ============================================================
+    // FIX: no longer shakes its own tiny save/restore block - the shake
+    // offset is now applied ONCE around the entire frame (see frame()),
+    // so the target, coins, and particle explosions all shake together
+    // instead of only the background.
     function drawTable() {
         ctx.fillStyle = '#0a001f';
         ctx.fillRect(0, 0, W, H);
-
         drawStars();
         drawPixelMountains();
         drawNeonGrid();
@@ -453,59 +813,65 @@
         ctx.fillStyle = glow;
         ctx.fillRect(0, deskTop, W, H - deskTop);
 
+        if (frictionOverride) {
+            ctx.fillStyle = 'rgba(170, 220, 255, 0.1)';
+            ctx.fillRect(0, deskTop, W, H - deskTop);
+        }
+
         drawScanlines();
         drawRetroTint();
     }
 
-    // 繪製平放在桌面上的彩虹靶（透視橢圓）
-    // 中心是整個紫色（最內環延伸到中心，沒有白色圓點）
     function drawTarget() {
         ctx.save();
         ctx.translate(target.x, target.y);
         ctx.scale(1, PERSPECTIVE_SQUASH);
+        const scale = targetScale;
 
-        // 外圈光暈
-        for (let i = 0; i < RINGS.length; i++) {
-            const r = RINGS[i];
+        if (bossMode) {
+            bossMode.draw(ctx, 0, 0, scale, bgTime);
+            if (bossHealth > 0) {
+                const barWidth = 80;
+                const barHeight = 6;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-barWidth/2, -70, barWidth, barHeight);
+                ctx.fillStyle = bossMode.color;
+                ctx.fillRect(-barWidth/2, -70, barWidth * (bossHealth / bossMaxHealth), barHeight);
+            }
+        } else {
+            for (let i = 0; i < RINGS.length; i++) {
+                const r = RINGS[i];
+                ctx.beginPath();
+                ctx.arc(0, 0, r.radius * scale + 6, 0, Math.PI * 2);
+                ctx.fillStyle = r.color + '10';
+                ctx.fill();
+            }
+            for (let i = 0; i < RINGS.length; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, RINGS[i].radius * scale, 0, Math.PI * 2);
+                ctx.fillStyle = RINGS[i].color;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
             ctx.beginPath();
-            ctx.arc(0, 0, r.radius + 6, 0, Math.PI * 2);
-            ctx.fillStyle = r.color + '10';
+            ctx.arc(0, 0, RINGS[RINGS.length - 1].radius * scale * 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(0, 0, RINGS[0].radius * scale + 18, 0, Math.PI * 2);
+            const targetGlow = ctx.createRadialGradient(0, 0, RINGS[RINGS.length-1].radius * scale,
+                                                         0, 0, RINGS[0].radius * scale + 18);
+            targetGlow.addColorStop(0, 'rgba(170,68,255,0.08)');
+            targetGlow.addColorStop(0.5, 'rgba(255,255,255,0.04)');
+            targetGlow.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = targetGlow;
             ctx.fill();
         }
-
-        // 彩虹環（從外到內）
-        for (let i = 0; i < RINGS.length; i++) {
-            ctx.beginPath();
-            ctx.arc(0, 0, RINGS[i].radius, 0, Math.PI * 2);
-            ctx.fillStyle = RINGS[i].color;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
-
-        // 中心：整個紫色（最內環顏色延伸到中心，沒有白色圓點）
-        // 加一個微妙的中心高光
-        ctx.beginPath();
-        ctx.arc(0, 0, RINGS[RINGS.length - 1].radius * 0.25, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        ctx.fill();
-
-        // 整體發光
-        ctx.beginPath();
-        ctx.arc(0, 0, RINGS[0].radius + 18, 0, Math.PI * 2);
-        const targetGlow = ctx.createRadialGradient(0, 0, RINGS[RINGS.length-1].radius,
-                                                     0, 0, RINGS[0].radius + 18);
-        targetGlow.addColorStop(0, 'rgba(170,68,255,0.08)');
-        targetGlow.addColorStop(0.5, 'rgba(255,255,255,0.04)');
-        targetGlow.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.fillStyle = targetGlow;
-        ctx.fill();
-
         ctx.restore();
     }
 
-    // 計算硬幣在當前位置的透視縮放
     function getPerspectiveScale(y) {
         const nearY = coinStartY;
         const farY = target.y;
@@ -513,13 +879,10 @@
         return 1.0 - t * 0.42;
     }
 
-    // 計算硬幣在桌面坐標系中的半徑（用於碰撞檢測）
-    // 這與視覺上硬幣在桌面坐標系中的大小一致
     function getCoinCollisionRadius(y) {
         return COIN_DRAW_RADIUS * COIN_LANDED_SCALE * getPerspectiveScale(y);
     }
 
-    // 將點限制在桌子範圍內
     function clampToDesk(x, y) {
         const bounds = getDeskBoundsAtY(y);
         return {
@@ -531,11 +894,11 @@
     function drawCoin(x, y, scale = 1, glow = 0) {
         const perspectiveScale = getPerspectiveScale(y);
         const finalScale = scale * perspectiveScale;
-
         ctx.save();
         ctx.translate(x, y);
         ctx.scale(finalScale, finalScale * PERSPECTIVE_SQUASH);
-        if (glow > 0) {
+
+        if (isGoldenCoin && glow > 0) {
             const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 40 + glow * 15);
             g.addColorStop(0, `rgba(255,215,0,${0.12 * glow})`);
             g.addColorStop(1, 'rgba(255,215,0,0)');
@@ -544,17 +907,33 @@
             ctx.fillStyle = g;
             ctx.fill();
         }
+
         const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, COIN_DRAW_RADIUS);
-        grad.addColorStop(0, '#ffe066');
-        grad.addColorStop(0.6, '#ffd700');
-        grad.addColorStop(1, '#b8860b');
+        if (isGoldenCoin) {
+            grad.addColorStop(0, '#fff5aa');
+            grad.addColorStop(0.6, '#ffd700');
+            grad.addColorStop(1, '#ffaa00');
+        } else {
+            grad.addColorStop(0, '#ffe066');
+            grad.addColorStop(0.6, '#ffd700');
+            grad.addColorStop(1, '#b8860b');
+        }
         ctx.beginPath();
         ctx.arc(0, 0, COIN_DRAW_RADIUS, 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
-        ctx.strokeStyle = '#a67c00';
+        ctx.strokeStyle = isGoldenCoin ? '#ff8800' : '#a67c00';
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        if (isGoldenCoin) {
+            ctx.fillStyle = '#ff8800';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('★', 0, 0);
+        }
+
         ctx.beginPath();
         ctx.arc(-5, -7, 5, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
@@ -573,10 +952,28 @@
             });
         }
     }
-    function updateAndDrawParticles() {
+
+    function emitRainbowExplosion(x, y, count = 50) {
+        const rainbowColors = ['#ff2244', '#ff8800', '#ffdd33', '#33ff77', '#00ccff', '#aa44ff'];
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 6;
+            particles.push({
+                x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                size: 3 + Math.random() * 6, color: rainbowColors[Math.floor(Math.random() * rainbowColors.length)],
+                life: 40 + Math.random() * 30, maxLife: 70
+            });
+        }
+    }
+
+    // FIX: now accepts a timeScale so the slow-motion window (set on a
+    // Perfect hit) actually visibly slows the explosion and popup text -
+    // previously "slow motion" only scaled a background-animation clock
+    // that nothing important reads from, so it had no visible effect.
+    function updateAndDrawParticles(timeScale = 1) {
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
-            p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--;
+            p.x += p.vx * timeScale; p.y += p.vy * timeScale; p.vy += 0.05 * timeScale; p.life -= timeScale;
             const alpha = Math.max(0, p.life / p.maxLife);
             ctx.globalAlpha = alpha;
             ctx.fillStyle = p.color;
@@ -592,10 +989,10 @@
     function addPopup(x, y, text, color) {
         popups.push({ x, y, text, color, life: 55, maxLife: 55, vy: -1.6 });
     }
-    function updateAndDrawPopups() {
+    function updateAndDrawPopups(timeScale = 1) {
         for (let i = popups.length - 1; i >= 0; i--) {
             const p = popups[i];
-            p.y += p.vy; p.vy *= 0.97; p.life--;
+            p.y += p.vy * timeScale; p.vy *= 0.97; p.life -= timeScale;
             const alpha = p.life / p.maxLife;
             ctx.globalAlpha = alpha;
             ctx.fillStyle = p.color;
@@ -611,14 +1008,22 @@
         }
     }
 
-    // ============================================================
-    //  Flying coin with perspective scaling
-    // ============================================================
     let flying = null;
 
     function performThrow(power, aimVX) {
         if (isThrowing) return;
         isThrowing = true;
+        totalThrows++;
+        checkGoldenCoin();
+        isCriticalThrow = power > CRITICAL_THRESHOLD;
+        if (isCriticalThrow) {
+            criticalTrail = [];
+            playCritical();
+        }
+        if (isGoldenCoin) {
+            addPopup(coinStartX, coinStartY - 55, '⭐ 金币!', '#ffd700');
+            playGold();
+        }
         updateStatusVisuals();
 
         const deskDistance = coinStartY - target.y;
@@ -627,7 +1032,7 @@
         const p = Math.max(0, Math.min(100, power)) / 100;
         const travelDist = minDist + (maxDist - minDist) * p;
 
-        const friction = 0.965;
+        const friction = frictionOverride || 0.965;
         const speed = travelDist * (1 - friction);
 
         flying = {
@@ -646,39 +1051,71 @@
 
         if (f.frame % 2 === 0) {
             const pScale = getPerspectiveScale(f.y);
-            emitParticles(f.x, f.y, 2, '#ffd700', 1.2 * pScale, 20);
+            const color = isGoldenCoin ? '#ffd700' : (isCriticalThrow ? '#ff00ff' : '#ffd700');
+            emitParticles(f.x, f.y, 2, color, 1.2 * pScale, 20);
+        }
+        if (f.frame % 8 === 0) playCoinSpin();
+
+        if (isCriticalThrow) {
+            criticalTrail.push({ x: f.x, y: f.y, life: 15 });
+            const rainbowColors = ['#ff2244', '#ff8800', '#ffdd33', '#33ff77', '#00ccff', '#aa44ff'];
+            for (let i = criticalTrail.length - 1; i >= 0; i--) {
+                const t = criticalTrail[i];
+                t.life--;
+                const alpha = t.life / 15;
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.fillStyle = rainbowColors[i % rainbowColors.length];
+                const pScale = getPerspectiveScale(t.y);
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, 4 * pScale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                if (t.life <= 0) criticalTrail.splice(i, 1);
+            }
         }
 
         f.x += f.vx;
         f.y += f.vy;
 
-        const friction = 0.965;
+        const friction = frictionOverride || 0.965;
         f.vx *= friction;
         f.vy *= friction;
 
-        // 桌子邊界反彈（梯形邊界）
+        f.vx += windForce;
+
+        if (magneticTarget && !bossMode) {
+            const dx = target.x - f.x;
+            const dy = target.y - f.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0 && dist < 200) {
+                f.vx += (dx / dist) * 0.15;
+                f.vy += (dy / dist) * 0.15;
+            }
+        }
+
         const bounds = getDeskBoundsAtY(f.y);
         const railMargin = 8;
         if (f.x < bounds.left + railMargin) {
             f.x = bounds.left + railMargin;
             f.vx = -f.vx * 0.6;
             emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
+            playSlide();
         }
         if (f.x > bounds.right - railMargin) {
             f.x = bounds.right - railMargin;
             f.vx = -f.vx * 0.6;
             emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
+            playSlide();
         }
 
-        // 遠端邊界
         const farEdge = H * 0.10;
         if (f.y < farEdge) {
             f.y = farEdge;
             f.vy = -f.vy * 0.45;
             emitParticles(f.x, f.y, 8, '#ff6688', 2, 20);
+            playSlide();
         }
 
-        // 近端邊界
         if (f.y > coinStartY + 10) {
             f.y = coinStartY + 10;
             f.vy = -f.vy * 0.3;
@@ -686,7 +1123,6 @@
 
         f.frame++;
 
-        // 繪製帶透視縮放的飛行硬幣
         const flyScale = getPerspectiveScale(f.y);
         ctx.save();
         ctx.translate(f.x, f.y);
@@ -702,30 +1138,29 @@
         }
     }
 
-    // 計算硬幣中心到靶心的桌面坐標系距離
-    // 桌面坐標系中，y 方向被拉伸（逆壓縮）
     function getDistanceToTarget(px, py) {
         const dx = px - target.x;
         const dy = (py - target.y) / PERSPECTIVE_SQUASH;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    // 檢查硬幣是否「完全落在單一顏色的色帶內」，不可跨越任何邊界
-    // 每個環的色帶範圍是 [innerBoundary, outerBoundary)：
-    //   red:    [green半徑, red半徑)
-    //   green:  [yellow半徑, green半徑)
-    //   yellow: [purple半徑, yellow半徑)
-    //   purple: [0, purple半徑)
-    // 硬幣必須整個落在其中一個色帶內（不可觸碰內側或外側邊界），
-    // 否則視為「壓線／跨兩色」，不計分。
     function checkCoinInRing(landX, landY) {
+        if (bossMode) {
+            const dist = getDistanceToTarget(landX, landY);
+            const coinRadius = getCoinCollisionRadius(landY);
+            const bossRadius = getBossHitRadius();
+            if (dist + coinRadius < bossRadius) {
+                return { label: 'boss', pts: 10, color: bossMode.color };
+            }
+            return null;
+        }
+
         const centerDist = getDistanceToTarget(landX, landY);
         const coinRadius = getCoinCollisionRadius(landY);
 
-        // RINGS 順序為外到內：red, green, yellow, purple
         for (let i = 0; i < RINGS.length; i++) {
-            const outerBoundary = RINGS[i].radius;
-            const innerBoundary = (i + 1 < RINGS.length) ? RINGS[i + 1].radius : 0;
+            const outerBoundary = RINGS[i].radius * targetScale;
+            const innerBoundary = (i + 1 < RINGS.length) ? RINGS[i + 1].radius * targetScale : 0;
 
             const clearsOuterEdge = (centerDist + coinRadius) < outerBoundary;
             const clearsInnerEdge = innerBoundary === 0
@@ -736,28 +1171,62 @@
                 return RINGS[i];
             }
         }
-        return null; // touching a border between two colors, or off the target entirely
+        return null;
+    }
+
+    function updateTotalScore() {
+        document.getElementById('totalScore').textContent = totalScore;
     }
 
     function landCoin(x, y) {
-        // 限制在桌子範圍內
         const clamped = clampToDesk(x, y);
         const landX = clamped.x;
         const landY = clamped.y;
 
         coins.push({ x: landX, y: landY, landedAt: Date.now() });
         emitParticles(landX, landY, 16, '#b8942a', 3, 26);
+        playSlide();
 
-        // 必須完全落在單一色帶內，壓線／跨兩色一律不計分
         const ringHit = checkCoinInRing(landX, landY);
 
         if (ringHit) {
-            scores[ringHit.label] += ringHit.pts;
-            document.getElementById(ringHit.label).textContent = scores[ringHit.label];
+            let basePoints = ringHit.pts;
+
+            if (isGoldenCoin) {
+                basePoints = 20;
+                emitRainbowExplosion(landX, landY, 80);
+                addPopup(landX, landY - 50, '⭐ GOLD!', '#ffd700');
+            }
+
+            const distToCenter = getDistanceToTarget(landX, landY);
+            const perfectThreshold = RINGS[RINGS.length - 1].radius * targetScale * 0.3;
+            let isPerfect = false;
+
+            if (!bossMode && distToCenter < perfectThreshold && ringHit.label === 'purple') {
+                isPerfect = true;
+                triggerCameraShake(15);
+                slowMotion = 0.3;
+                setTimeout(() => { slowMotion = 1.0; }, 800);
+                emitRainbowExplosion(landX, landY, 100);
+                addPopup(landX, landY - 70, 'PERFECT!!', '#ff00ff');
+                basePoints *= 3;
+                playPerfect();
+                speak('Perfect!');
+            }
 
             const now = Date.now();
             comboCount = (now - lastHitTime < 1800) ? comboCount + 1 : 1;
             lastHitTime = now;
+
+            const multiplier = getComboMultiplier();
+            const finalPoints = Math.round(basePoints * multiplier * eventMultiplier);
+
+            if (ringHit.label !== 'boss') {
+                scores[ringHit.label] += finalPoints;
+                document.getElementById(ringHit.label).textContent = scores[ringHit.label];
+            }
+            totalScore += finalPoints;
+            updateTotalScore();
 
             if (comboCount >= 2) {
                 const txt = comboCount >= 5 ? `🔥 ${comboCount}x` : comboCount >= 3 ? `✨ ${comboCount}x` : `${comboCount}x`;
@@ -765,17 +1234,40 @@
                 comboEl.className = 'combo show';
                 clearTimeout(comboEl._timer);
                 comboEl._timer = setTimeout(() => comboEl.className = 'combo', 800);
+                if (comboCount === 5 || comboCount === 8) speak(`${comboCount} combo!`);
             }
 
-            emitParticles(landX, landY, 36, ringHit.color, 5, 42);
-            emitParticles(landX, landY, 18, '#fff', 3, 24);
-            addPopup(landX, landY - 30, `+${ringHit.pts}`, ringHit.color);
+            if (isCriticalThrow && !isGoldenCoin) {
+                addPopup(landX, landY - 90, 'CRITICAL!', '#ff00ff');
+            }
+
+            if (!isPerfect) {
+                const particleColor = isGoldenCoin ? '#ffd700' : ringHit.color;
+                emitParticles(landX, landY, isGoldenCoin ? 50 : 36, particleColor, isGoldenCoin ? 7 : 5, isGoldenCoin ? 55 : 42);
+                emitParticles(landX, landY, 18, '#fff', 3, 24);
+                if (ringHit.label !== 'boss') playHit(ringHit.label);
+            }
+
+            const popupText = isGoldenCoin ? `+${finalPoints} ⭐` : (multiplier > 1 ? `+${finalPoints} x${multiplier}` : `+${finalPoints}`);
+            addPopup(landX, landY - 30, popupText, ringHit.color);
+
+            if (bossMode && ringHit.label === 'boss') {
+                bossHealth--;
+                emitParticles(landX, landY, 30, bossMode.color, 6, 35);
+                addPopup(landX, landY - 50, 'HIT!', bossMode.color);
+                playHit('boss');
+            }
         } else {
             addPopup(landX, landY - 30, '✗', '#ff6666');
             comboCount = 0;
             comboEl.className = 'combo';
             emitParticles(landX, landY, 10, '#888', 2, 18);
+            playMiss();
         }
+
+        isGoldenCoin = false;
+        isCriticalThrow = false;
+        criticalTrail = [];
 
         setTimeout(() => {
             isThrowing = false;
@@ -785,9 +1277,6 @@
         }, 250);
     }
 
-    // ============================================================
-    //  Motion-sensor throw detection
-    // ============================================================
     const motion = {
         supported: false,
         active: false,
@@ -912,9 +1401,6 @@
         updateStatusVisuals();
     }
 
-    // ============================================================
-    //  Fallback: touch / mouse swipe
-    // ============================================================
     let touchActive = false;
     let touchStartY = 0;
 
@@ -956,9 +1442,6 @@
         }
     }
 
-    // ============================================================
-    //  Auto clean
-    // ============================================================
     const AUTO_CLEAN_COUNT = 6;
     function checkAutoClean() {
         if (coins.length >= AUTO_CLEAN_COUNT) {
@@ -973,11 +1456,18 @@
         }
     }
 
-    // ============================================================
-    //  Main loop
-    // ============================================================
+    // FIX: shake offset is now applied ONCE around everything (background,
+    // target, coins, particles) instead of only inside drawTable().
     function frame() {
-        bgTime += 16;
+        bgTime += 16 * slowMotion;
+        updateTargetPosition();
+        updateCameraShake();
+        checkEvents();
+        checkBossMode();
+
+        ctx.save();
+        ctx.translate(cameraShake.x, cameraShake.y);
+
         drawTable();
         drawTarget();
 
@@ -1001,16 +1491,15 @@
             document.getElementById('power').textContent = Math.floor(powerValue);
         }
 
-        updateAndDrawParticles();
-        updateAndDrawPopups();
+        updateAndDrawParticles(slowMotion);
+        updateAndDrawPopups(slowMotion);
         checkAutoClean();
+
+        ctx.restore();
 
         requestAnimationFrame(frame);
     }
 
-    // ============================================================
-    //  Init
-    // ============================================================
     function init() {
         layout();
         computeRings();
@@ -1022,6 +1511,7 @@
 
     document.getElementById('startBtn').addEventListener('click', async () => {
         document.getElementById('startOverlay').style.display = 'none';
+        unlockAudioOnce();
         try {
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 const state = await DeviceMotionEvent.requestPermission();
