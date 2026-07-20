@@ -23,33 +23,77 @@
     .hud .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .hud .score { color: #ffd700; }
     .hud .power-wrap { display: flex; justify-content: space-between; margin-top: 2px; }
-    .state-badge {
-        position: absolute; top: 12px; right: 12px; z-index: 20;
-        font-size: 10px; padding: 8px 12px; border-radius: 20px;
-        background: rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.15);
-        transition: all 0.25s;
+
+    /* 狀態線條指示器 */
+    .status-bar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        z-index: 25;
+        height: 6px;
+        transition: all 0.3s ease;
     }
-    .state-badge.ready { color: #66ff99; border-color: rgba(102,255,153,0.5); }
-    .state-badge.wait { color: #ff8866; border-color: rgba(255,136,102,0.5); }
-    .state-badge.flying { color: #ffdd44; border-color: rgba(255,221,68,0.5); }
-    .controls {
-        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-        z-index: 20; display: flex; gap: 12px;
+    .status-bar.ready {
+        background: linear-gradient(90deg, #00ff66, #33ff99, #00ff66);
+        box-shadow: 0 0 20px rgba(0,255,102,0.6), 0 0 40px rgba(0,255,102,0.3);
+        animation: pulse-green 1.2s ease-in-out infinite;
     }
-    .controls button {
-        background: rgba(255,215,0,0.15); border: 2px solid #ffd700;
-        color: #ffd700; padding: 10px 18px;
-        font-family: 'Press Start 2P', cursive; font-size: 10px;
-        border-radius: 30px; cursor: pointer;
-        backdrop-filter: blur(4px);
-        transition: all 0.2s;
-        touch-action: manipulation;
+    .status-bar.wait {
+        background: linear-gradient(90deg, #ff66aa, #ff88cc, #ff66aa);
+        box-shadow: 0 0 20px rgba(255,102,170,0.6), 0 0 40px rgba(255,102,170,0.3);
+        animation: pulse-pink 1.5s ease-in-out infinite;
     }
-    .controls button:active { transform: scale(0.94); background: rgba(255,215,0,0.3); }
-    .controls button.disabled {
-        opacity: 0.35; border-color: rgba(255,215,0,0.35); color: rgba(255,215,0,0.5);
+    .status-bar.flying {
+        background: linear-gradient(90deg, #ffdd44, #ffee66, #ffdd44);
+        box-shadow: 0 0 20px rgba(255,221,68,0.6), 0 0 40px rgba(255,221,68,0.3);
+    }
+
+    @keyframes pulse-green {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+    }
+    @keyframes pulse-pink {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 0.9; }
+    }
+
+    /* 邊框狀態指示 */
+    .status-border {
+        position: absolute;
+        inset: 0;
+        z-index: 18;
+        pointer-events: none;
+        border: 4px solid transparent;
+        transition: all 0.4s ease;
+    }
+    .status-border.ready {
+        border-color: rgba(0,255,102,0.5);
+        box-shadow: inset 0 0 30px rgba(0,255,102,0.15), inset 0 0 60px rgba(0,255,102,0.05);
+    }
+    .status-border.wait {
+        border-color: rgba(255,102,170,0.4);
+        box-shadow: inset 0 0 30px rgba(255,102,170,0.1), inset 0 0 60px rgba(255,102,170,0.03);
+    }
+    .status-border.flying {
+        border-color: rgba(255,221,68,0.5);
+        box-shadow: inset 0 0 30px rgba(255,221,68,0.15), inset 0 0 60px rgba(255,221,68,0.05);
+    }
+
+    /* 角落狀態文字（小型，簡潔） */
+    .corner-status {
+        position: absolute;
+        top: 18px; right: 14px;
+        z-index: 22;
+        font-size: 9px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        background: rgba(0,0,0,0.7);
+        transition: all 0.3s;
         pointer-events: none;
     }
+    .corner-status.ready { color: #00ff66; border: 1px solid rgba(0,255,102,0.4); }
+    .corner-status.wait { color: #ff88aa; border: 1px solid rgba(255,102,170,0.3); }
+    .corner-status.flying { color: #ffdd44; border: 1px solid rgba(255,221,68,0.4); }
+
     .combo {
         position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
         z-index: 15; font-size: 40px; color: #ffdd44;
@@ -64,7 +108,7 @@
         100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
     }
     .hint {
-        position: absolute; bottom: 82px; left: 50%; transform: translateX(-50%);
+        position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
         z-index: 12; font-size: 10px; color: rgba(255,215,0,0.6);
         background: rgba(0,0,0,0.45); padding: 6px 16px;
         border-radius: 20px; backdrop-filter: blur(2px);
@@ -94,10 +138,9 @@
     @media (max-width:500px) {
         .hud { font-size: 9px; padding: 6px 10px; }
         .hud .row { gap: 6px; }
-        .state-badge { font-size: 9px; padding: 6px 10px; }
-        .controls button { font-size: 8px; padding: 8px 14px; }
+        .corner-status { font-size: 8px; padding: 4px 8px; top: 14px; }
         .combo { font-size: 28px; }
-        .hint { font-size: 9px; bottom: 74px; white-space: normal; }
+        .hint { font-size: 9px; bottom: 18px; white-space: normal; }
         .overlay h1 { font-size: 13px; }
     }
 </style>
@@ -111,6 +154,15 @@
     <div class="sub" id="startSub">需要动作感应权限才能甩动投掷</div>
 </div>
 
+<!-- 狀態線條（頂部） -->
+<div class="status-bar wait" id="statusBar"></div>
+
+<!-- 狀態邊框（全螢幕） -->
+<div class="status-border wait" id="statusBorder"></div>
+
+<!-- 角落狀態文字 -->
+<div class="corner-status wait" id="cornerStatus">🤳 穩住</div>
+
 <div class="hud" id="hud">
     <div class="row">
         <span>🔴 <span id="red" class="score">0</span></span>
@@ -123,14 +175,8 @@
     </div>
 </div>
 
-<div class="state-badge wait" id="stateBadge">🤳 稳住手机…</div>
-
 <div class="combo" id="comboDisplay"></div>
 <div class="hint" id="hint">🤳 稳住手机 2 秒 → 快速向前甩动投掷</div>
-
-<div class="controls">
-    <button id="cleanBtn" class="disabled" onclick="cleanDesk()">🧹 清桌</button>
-</div>
 
 <canvas id="canvas"></canvas>
 
@@ -156,19 +202,162 @@
     }
 
     // ============================================================
+    //  8-bit Retro Background System
+    // ============================================================
+    let stars = [];
+    const STAR_COUNT = 120;
+    let decoItems = [];
+    const DECO_COUNT = 10;
+    let scanlineOffset = 0;
+    let bgTime = 0;
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < STAR_COUNT; i++) {
+            stars.push({
+                x: Math.random() * W,
+                y: Math.random() * H * 0.50,
+                size: Math.random() < 0.7 ? 1 : 2,
+                brightness: Math.random(),
+                twinkleSpeed: 0.02 + Math.random() * 0.04,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function initDeco() {
+        decoItems = [];
+        for (let i = 0; i < DECO_COUNT; i++) {
+            decoItems.push({
+                x: Math.random() * W,
+                y: H * 0.08 + Math.random() * H * 0.32,
+                type: Math.random() < 0.5 ? 'star' : 'diamond',
+                color: ['#ff00ff', '#00ffff', '#ffff00', '#ff6600', '#ff3366'][Math.floor(Math.random() * 5)],
+                size: 5 + Math.random() * 7,
+                speed: 0.2 + Math.random() * 0.5,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function drawStars() {
+        for (let s of stars) {
+            const alpha = 0.3 + 0.7 * Math.abs(Math.sin(bgTime * s.twinkleSpeed + s.phase));
+            ctx.fillStyle = `rgba(200, 220, 255, ${alpha})`;
+            ctx.fillRect(Math.floor(s.x), Math.floor(s.y), s.size, s.size);
+        }
+    }
+
+    function drawPixelMountains() {
+        const mountainY = H * 0.42;
+        const mountainColors = ['#0d0520', '#140830', '#1a0d3a', '#0f0825'];
+
+        for (let layer = 0; layer < 4; layer++) {
+            const layerY = mountainY - layer * 18;
+            const baseHeight = 35 + layer * 22;
+            const pixelSize = 4 + layer * 2;
+
+            ctx.fillStyle = mountainColors[layer];
+
+            for (let x = 0; x < W + pixelSize; x += pixelSize) {
+                const noise = Math.sin(x * 0.003 + layer * 2.5) * 0.5 +
+                             Math.sin(x * 0.007 + layer * 1.3) * 0.3 +
+                             Math.sin(x * 0.015) * 0.2;
+                const height = baseHeight + noise * (28 + layer * 12);
+                const h = Math.max(0, height);
+                ctx.fillRect(x, layerY - h, pixelSize, h + 60);
+            }
+        }
+    }
+
+    function drawNeonGrid() {
+        const gridTop = H * 0.45;
+        const gridBottom = H;
+
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.12)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 14; i++) {
+            const t = i / 14;
+            const y = gridTop + (gridBottom - gridTop) * (t * t);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(W, y);
+            ctx.stroke();
+        }
+
+        const centerX = W / 2;
+        const vanishY = H * 0.30;
+
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.10)';
+        for (let i = -10; i <= 10; i++) {
+            const angle = i * 0.065;
+            const x1 = centerX + Math.tan(angle) * (gridTop - vanishY);
+            const x2 = centerX + Math.tan(angle) * (H - vanishY);
+            ctx.beginPath();
+            ctx.moveTo(x1, gridTop);
+            ctx.lineTo(x2, H);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = 'rgba(255, 100, 200, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, H - 2);
+        ctx.lineTo(W, H - 2);
+        ctx.stroke();
+    }
+
+    function drawScanlines() {
+        scanlineOffset = (scanlineOffset + 0.5) % 4;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+        for (let y = scanlineOffset; y < H; y += 4) {
+            ctx.fillRect(0, Math.floor(y), W, 1);
+        }
+    }
+
+    function drawRetroTint() {
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, 'rgba(10, 0, 40, 0.25)');
+        grad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(1, 'rgba(40, 0, 20, 0.15)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawDecoItems() {
+        for (let d of decoItems) {
+            const floatY = d.y + Math.sin(bgTime * 0.001 + d.phase) * 8;
+            const alpha = 0.35 + 0.3 * Math.sin(bgTime * 0.002 + d.phase);
+            ctx.fillStyle = d.color;
+            ctx.globalAlpha = alpha;
+
+            if (d.type === 'star') {
+                const s = d.size;
+                ctx.fillRect(Math.floor(d.x - s/2), Math.floor(floatY - s/6), s, Math.max(1, s/3));
+                ctx.fillRect(Math.floor(d.x - s/6), Math.floor(floatY - s/2), Math.max(1, s/3), s);
+            } else {
+                const s = d.size;
+                ctx.fillRect(Math.floor(d.x - s/2), Math.floor(floatY), s, 2);
+                ctx.fillRect(Math.floor(d.x), Math.floor(floatY - s/2), 2, s);
+            }
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    // ============================================================
     //  Game state
     // ============================================================
-    let coins = [];               // landed coins: {x,y,landedAt}
+    let coins = [];
     let scores = { red: 0, green: 0, yellow: 0, purple: 0 };
     let powerValue = 0;
     let isThrowing = false;
     let comboCount = 0;
     let lastHitTime = 0;
     const comboEl = document.getElementById('comboDisplay');
-    const stateBadge = document.getElementById('stateBadge');
-    const cleanBtn = document.getElementById('cleanBtn');
+    const statusBar = document.getElementById('statusBar');
+    const statusBorder = document.getElementById('statusBorder');
+    const cornerStatus = document.getElementById('cornerStatus');
 
-    // Rings, outer to inner. Radii are relative to the smaller screen dimension.
     const RING_DEFS = [
         { label: 'red',    pts: 1, color: '#ff2244', frac: 0.150 },
         { label: 'green',  pts: 2, color: '#33ff77', frac: 0.112 },
@@ -182,19 +371,44 @@
     }
 
     // ============================================================
+    //  Status visual update (line + border + corner text)
+    // ============================================================
+    function updateStatusVisuals() {
+        let stateClass = 'wait';
+        let cornerText = '🤳 穩住';
+
+        if (isThrowing || flying) {
+            stateClass = 'flying';
+            cornerText = '🪙 飛行中';
+        } else if (motion.state === 'ready') {
+            stateClass = 'ready';
+            cornerText = '✅ 投擲!';
+        }
+
+        statusBar.className = 'status-bar ' + stateClass;
+        statusBorder.className = 'status-border ' + stateClass;
+        cornerStatus.className = 'corner-status ' + stateClass;
+        cornerStatus.textContent = cornerText;
+    }
+
+    // ============================================================
     //  Drawing helpers
     // ============================================================
     function drawTable() {
         ctx.fillStyle = '#0a001f';
         ctx.fillRect(0, 0, W, H);
 
+        drawStars();
+        drawPixelMountains();
+        drawNeonGrid();
+        drawDecoItems();
+
         const deskTop = H * 0.10;
-        // trapezoid desk, narrow at top (far / 3m away) wide at bottom (near player)
         const topHalf = W * 0.28;
         const botHalf = W * 0.62;
         const grad = ctx.createLinearGradient(0, deskTop, 0, H);
-        grad.addColorStop(0, '#241608');
-        grad.addColorStop(1, '#3a281a');
+        grad.addColorStop(0, 'rgba(36, 22, 8, 0.85)');
+        grad.addColorStop(1, 'rgba(58, 40, 26, 0.85)');
         ctx.beginPath();
         ctx.moveTo(W / 2 - topHalf, deskTop);
         ctx.lineTo(W / 2 + topHalf, deskTop);
@@ -204,8 +418,11 @@
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // faint depth lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.15)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
         ctx.lineWidth = 1;
         for (let i = 1; i < 5; i++) {
             const t = i / 5;
@@ -218,14 +435,25 @@
         }
 
         const glow = ctx.createLinearGradient(0, deskTop, 0, H);
-        glow.addColorStop(0, 'rgba(255,100,255,0.10)');
-        glow.addColorStop(0.5, 'rgba(100,200,255,0.06)');
-        glow.addColorStop(1, 'rgba(255,200,100,0.04)');
+        glow.addColorStop(0, 'rgba(255,100,255,0.08)');
+        glow.addColorStop(0.5, 'rgba(100,200,255,0.05)');
+        glow.addColorStop(1, 'rgba(255,200,100,0.03)');
         ctx.fillStyle = glow;
         ctx.fillRect(0, deskTop, W, H - deskTop);
+
+        drawScanlines();
+        drawRetroTint();
     }
 
     function drawTarget() {
+        for (let i = 0; i < RINGS.length; i++) {
+            const r = RINGS[i];
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, r.radius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = r.color + '20';
+            ctx.fill();
+        }
+
         for (let i = 0; i < RINGS.length; i++) {
             ctx.beginPath();
             ctx.arc(target.x, target.y, RINGS[i].radius, 0, Math.PI * 2);
@@ -238,6 +466,15 @@
         ctx.beginPath();
         ctx.arc(target.x, target.y, RINGS[RINGS.length - 1].radius * 0.28, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, RINGS[0].radius + 8, 0, Math.PI * 2);
+        const targetGlow = ctx.createRadialGradient(target.x, target.y, RINGS[RINGS.length-1].radius,
+                                                     target.x, target.y, RINGS[0].radius + 8);
+        targetGlow.addColorStop(0, 'rgba(255,255,255,0.1)');
+        targetGlow.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = targetGlow;
         ctx.fill();
     }
 
@@ -272,7 +509,6 @@
         ctx.restore();
     }
 
-    // transient particles
     let particles = [];
     function emitParticles(x, y, count, color, spread = 3, life = 30) {
         for (let i = 0; i < count; i++) {
@@ -299,7 +535,6 @@
         }
     }
 
-    // popup text
     let popups = [];
     function addPopup(x, y, text, color) {
         popups.push({ x, y, text, color, life: 55, maxLife: 55, vy: -1.6 });
@@ -324,20 +559,15 @@
     }
 
     // ============================================================
-    //  Flying coin (friction slide, not gravity arc)
+    //  Flying coin
     // ============================================================
-    let flying = null; // {x,y,vx,vy,frame}
+    let flying = null;
 
     function performThrow(power, aimVX) {
         if (isThrowing) return;
         isThrowing = true;
-        updateStateBadge();
+        updateStatusVisuals();
 
-        // Scale the throw distance to the ACTUAL on-screen distance between
-        // the coin's start position and the target, so it works regardless
-        // of screen size. power=0 clearly falls short; power=100 slightly
-        // overshoots the target (so max force isn't automatically a bullseye
-        // - that's the risk/reward).
         const deskDistance = coinStartY - target.y;
         const minDist = deskDistance * 0.30;
         const maxDist = deskDistance * 1.18;
@@ -345,7 +575,7 @@
         const travelDist = minDist + (maxDist - minDist) * p;
 
         const friction = 0.965;
-        const speed = travelDist * (1 - friction); // v0 such that sum(v0*friction^n) ~= travelDist
+        const speed = travelDist * (1 - friction);
 
         flying = {
             x: coinStartX,
@@ -361,27 +591,22 @@
         if (!flying) return;
         const f = flying;
 
-        // trail particles
         if (f.frame % 2 === 0) emitParticles(f.x, f.y, 2, '#ffd700', 1.2, 20);
 
         f.x += f.vx;
         f.y += f.vy;
 
-        // friction slide (table drag)
         const friction = 0.965;
         f.vx *= friction;
         f.vy *= friction;
 
-        // side rails bounce
         const railMargin = W * 0.06;
         if (f.x < railMargin) { f.x = railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
         if (f.x > W - railMargin) { f.x = W - railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
 
-        // far rail (back edge of table) - overshoot bounces back
         const farEdge = H * 0.08;
         if (f.y < farEdge) { f.y = farEdge; f.vy = -f.vy * 0.45; emitParticles(f.x, f.y, 8, '#ff6688', 2, 20); }
 
-        // near rail (can't come back past the player)
         if (f.y > coinStartY + 10) { f.y = coinStartY + 10; f.vy = -f.vy * 0.3; }
 
         f.frame++;
@@ -441,7 +666,7 @@
             isThrowing = false;
             powerValue = 0;
             document.getElementById('power').textContent = '0';
-            updateStateBadge();
+            updateStatusVisuals();
         }, 250);
     }
 
@@ -451,10 +676,10 @@
     const motion = {
         supported: false,
         active: false,
-        state: 'wait',      // 'wait' -> holding steady to calibrate, 'ready' -> armed, 'cooldown' -> after a throw
-        locked: false,      // once true, variance/maxSeen freeze - no more recalibration after first success
-        source: null,       // 'rotation' | 'linear' | 'gravity' - locked in once, never switched mid-session
-        variance: 1,        // rolling variance (noise floor) while steady
+        state: 'wait',
+        locked: false,
+        source: null,
+        variance: 1,
         steadyStreak: 0,
         lastAimSign: 1,
         lastEventTime: 0,
@@ -465,27 +690,6 @@
     debugEl.style.cssText = 'position:absolute;top:60px;right:12px;z-index:20;font-size:9px;color:#0f8;background:rgba(0,0,0,0.7);padding:5px 9px;border-radius:8px;font-family:monospace;text-align:right;';
     document.body.appendChild(debugEl);
 
-    function updateStateBadge() {
-        if (isThrowing || flying) {
-            stateBadge.textContent = '🪙 飞行中…';
-            stateBadge.className = 'state-badge flying';
-        } else if (motion.state === 'ready') {
-            stateBadge.textContent = '✅ 可以投掷';
-            stateBadge.className = 'state-badge ready';
-        } else {
-            stateBadge.textContent = '🤳 稳住手机…';
-            stateBadge.className = 'state-badge wait';
-        }
-    }
-
-    // Pulls a magnitude + a lateral-aim value out of whichever sensor signal
-    // we lock onto. rotationRate (gyroscope) is tried first: a throwing
-    // flick is fundamentally a rotation of the wrist, so it reliably
-    // produces a huge spike (tens to hundreds of deg/s) on virtually any
-    // device. accelerationIncludingGravity, by contrast, is often produced
-    // by a heavily low-pass "gravity" virtual sensor that's built to ignore
-    // fast transient motion - which is why it barely moved even at full
-    // force. acceleration (gravity-free) is a middle-ground fallback.
     function readSignal(e) {
         if (motion.source === null) {
             if (e.rotationRate && (e.rotationRate.alpha !== null || e.rotationRate.beta !== null || e.rotationRate.gamma !== null)) {
@@ -497,7 +701,6 @@
             } else {
                 return null;
             }
-            // Real sensor data confirmed - no need to fall back to touch.
             if (motion.autoStartTimeout) { clearTimeout(motion.autoStartTimeout); motion.autoStartTimeout = null; }
         }
         if (motion.source === 'rotation') {
@@ -516,32 +719,7 @@
         };
     }
 
-    // Hard absolute floors, in each sensor's native units, below which a
-    // spike is NEVER treated as a throw - no matter how quiet the resting
-    // noise floor is. This is what actually distinguishes a fast intentional
-    // flick from an accidental slow tilt: a flick blows way past these
-    // numbers; a tilt doesn't get close.
-    //   rotation: deg/s from the gyroscope - a real flick is typically
-    //             200-500+ deg/s; casual tilting is well under 100.
-    //   linear:   m/s^2 gravity-free acceleration - a flick is roughly
-    //             8-15+; hand tremor/tilt is a couple at most.
-    //   gravity:  m/s^2 delta on the gravity-fused channel - this one is
-    //             inherently low-sensitivity, kept as a last-resort fallback.
     const SOURCE_FLOOR = { rotation: 200, linear: 8, gravity: 3.5 };
-
-    // The resting/steady value for each sensor type is a known physical
-    // constant, NOT something that needs to drift over time:
-    //   rotation: gyroscope reads ~0 deg/s at rest, at ANY orientation.
-    //   linear:   gravity-free accelerometer reads ~0 at rest, at any angle.
-    //   gravity:  the gravity vector's magnitude is ~9.8 regardless of angle.
-    // Earlier this baseline was a moving average that got updated whenever
-    // motion "looked steady" - but the follow-through right after a flick
-    // (hand still settling) could get misclassified as steady and blend
-    // into that average, dragging the baseline away from truth. Repeat that
-    // over a few throws and the threshold balloons until nothing clears it,
-    // even though the sensor itself is working fine. Pinning the mean to
-    // the known constant removes the drift entirely; only the noise-floor
-    // (variance) still gets calibrated from real samples.
     const BASE_MEAN = { rotation: 0, linear: 0, gravity: 9.8 };
 
     function handleMotion(e) {
@@ -563,39 +741,33 @@
             debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} base:${baseMean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
         }
 
-        if (isThrowing || flying) return; // ignore motion while a coin is in the air
+        if (isThrowing || flying) return;
 
         if (motion.state === 'wait' || motion.state === 'cooldown') {
-            // Only the noise floor (variance) gets calibrated here - the
-            // mean itself stays pinned to the known constant above, so it
-            // can never drift no matter what the hand does during cooldown.
             const dev = mag - baseMean;
             const looksSteady = Math.abs(dev) < Math.max(stdDev * 6, floor * 0.6);
             if (looksSteady) {
                 if (!motion.locked) {
-                    const cappedVariance = Math.min(motion.variance, (floor * 0.5) ** 2); // don't let noise floor runaway
+                    const cappedVariance = Math.min(motion.variance, (floor * 0.5) ** 2);
                     motion.variance = cappedVariance * 0.92 + (dev * dev) * 0.08;
                 }
                 motion.steadyStreak += dt;
                 if (motion.steadyStreak > 500) {
                     motion.state = 'ready';
-                    updateStateBadge();
+                    updateStatusVisuals();
                 }
             } else {
                 motion.steadyStreak = 0;
             }
         } else if (motion.state === 'ready') {
             if (delta > threshold) {
-                // Require the spike to be confirmed on the very next sample
-                // too (a real flick spans several samples at 60Hz; a single
-                // stray glitch sample won't repeat).
                 if (!motion.pendingSince) {
                     motion.pendingSince = now;
                     motion.pendingPeak = delta;
                     return;
                 }
                 motion.pendingPeak = Math.max(motion.pendingPeak, delta);
-                if (now - motion.pendingSince < 40) return; // wait for confirmation sample
+                if (now - motion.pendingSince < 40) return;
 
                 const confirmedDelta = motion.pendingPeak;
                 motion.pendingSince = null;
@@ -603,7 +775,7 @@
 
                 if (!motion.locked) {
                     if (!motion.maxSeen || confirmedDelta > motion.maxSeen) motion.maxSeen = confirmedDelta;
-                    motion.locked = true; // first successful throw - freeze calibration from here on
+                    motion.locked = true;
                 }
                 const power = Math.max(15, Math.min(100, (confirmedDelta / motion.maxSeen) * 100));
                 const aimVX = Math.max(-6, Math.min(6, sig.aim * (motion.source === 'rotation' ? 0.06 : 0.9)));
@@ -622,11 +794,11 @@
         motion.active = true;
         window.addEventListener('devicemotion', handleMotion, true);
         motion.state = 'wait';
-        updateStateBadge();
+        updateStatusVisuals();
     }
 
     // ============================================================
-    //  Fallback: touch / mouse swipe (desktop or permission denied)
+    //  Fallback: touch / mouse swipe
     // ============================================================
     let touchActive = false;
     let touchStartY = 0;
@@ -635,7 +807,7 @@
         motion.supported = false;
         document.getElementById('hint').textContent = '👆 向上滑动投掷 · 松手即甩出';
         motion.state = 'ready';
-        updateStateBadge();
+        updateStatusVisuals();
         canvas.addEventListener('touchstart', onTouchStart, { passive: false });
         canvas.addEventListener('touchmove', onTouchMove, { passive: false });
         canvas.addEventListener('touchend', onTouchEnd, { passive: false });
@@ -670,31 +842,19 @@
     }
 
     // ============================================================
-    //  Clean desk (only enabled once everything has settled)
+    //  Auto clean (no button)
     // ============================================================
-    function isCleanReady() {
-        if (isThrowing || flying) return false;
-        if (coins.length === 0) return false;
-        return coins.every(c => Date.now() - c.landedAt > 400);
-    }
-    function updateCleanButton() {
-        cleanBtn.classList.toggle('disabled', !isCleanReady());
-    }
-    function cleanDesk() {
-        if (!isCleanReady()) return;
-        coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
-        coins = [];
-        comboCount = 0;
-        comboEl.className = 'combo';
-        updateCleanButton();
-    }
-    window.cleanDesk = cleanDesk;
-
     const AUTO_CLEAN_COUNT = 6;
     function checkAutoClean() {
-        if (coins.length >= AUTO_CLEAN_COUNT && isCleanReady()) {
-            addPopup(W / 2, H * 0.5, '🧹 自动清桌', '#ffd700');
-            cleanDesk();
+        if (coins.length >= AUTO_CLEAN_COUNT) {
+            const allSettled = coins.every(c => Date.now() - c.landedAt > 400);
+            if (allSettled && !isThrowing && !flying) {
+                addPopup(W / 2, H * 0.5, '🧹 自动清桌', '#ffd700');
+                coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
+                coins = [];
+                comboCount = 0;
+                comboEl.className = 'combo';
+            }
         }
     }
 
@@ -702,6 +862,7 @@
     //  Main loop
     // ============================================================
     function frame() {
+        bgTime += 16;
         drawTable();
         drawTarget();
 
@@ -726,7 +887,6 @@
 
         updateAndDrawParticles();
         updateAndDrawPopups();
-        updateCleanButton();
         checkAutoClean();
 
         requestAnimationFrame(frame);
@@ -738,7 +898,9 @@
     function init() {
         layout();
         computeRings();
-        window.addEventListener('resize', () => { layout(); computeRings(); });
+        initStars();
+        initDeco();
+        window.addEventListener('resize', () => { layout(); computeRings(); initStars(); initDeco(); });
         frame();
     }
 
@@ -758,13 +920,6 @@
         }
     });
 
-    // On load: only iOS 13+ Safari genuinely needs a user tap before it will
-    // release sensor data (DeviceMotionEvent.requestPermission existing is
-    // the tell). Everywhere else - Android Firefox/Chrome, desktop browsers
-    // with sensors - just start listening immediately, no overlay needed.
-    // If no real sensor numbers show up within a short window (denied,
-    // unsupported, or a desktop with no sensors at all), fall back to touch
-    // controls automatically instead of leaving the player stuck.
     function autoDetectAndStart() {
         if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
             document.getElementById('startOverlay').style.display = 'flex';
