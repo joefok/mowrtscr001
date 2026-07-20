@@ -24,7 +24,6 @@
     .hud .score { color: #ffd700; }
     .hud .power-wrap { display: flex; justify-content: space-between; margin-top: 2px; }
 
-    /* 狀態線條指示器 */
     .status-bar {
         position: absolute;
         top: 0; left: 0; right: 0;
@@ -56,7 +55,6 @@
         50% { opacity: 0.9; }
     }
 
-    /* 邊框狀態指示 */
     .status-border {
         position: absolute;
         inset: 0;
@@ -78,7 +76,6 @@
         box-shadow: inset 0 0 30px rgba(255,221,68,0.15), inset 0 0 60px rgba(255,221,68,0.05);
     }
 
-    /* 角落狀態文字（小型，簡潔） */
     .corner-status {
         position: absolute;
         top: 18px; right: 14px;
@@ -154,13 +151,8 @@
     <div class="sub" id="startSub">需要动作感应权限才能甩动投掷</div>
 </div>
 
-<!-- 狀態線條（頂部） -->
 <div class="status-bar wait" id="statusBar"></div>
-
-<!-- 狀態邊框（全螢幕） -->
 <div class="status-border wait" id="statusBorder"></div>
-
-<!-- 角落狀態文字 -->
 <div class="corner-status wait" id="cornerStatus">🤳 穩住</div>
 
 <div class="hud" id="hud">
@@ -358,11 +350,12 @@
     const statusBorder = document.getElementById('statusBorder');
     const cornerStatus = document.getElementById('cornerStatus');
 
+    // 彩虹靶定義 - 更大
     const RING_DEFS = [
-        { label: 'red',    pts: 1, color: '#ff2244', frac: 0.150 },
-        { label: 'green',  pts: 2, color: '#33ff77', frac: 0.112 },
-        { label: 'yellow', pts: 3, color: '#ffdd33', frac: 0.076 },
-        { label: 'purple', pts: 5, color: '#aa44ff', frac: 0.040 }
+        { label: 'red',    pts: 1, color: '#ff2244', frac: 0.34 },
+        { label: 'green',  pts: 2, color: '#33ff77', frac: 0.25 },
+        { label: 'yellow', pts: 3, color: '#ffdd33', frac: 0.165 },
+        { label: 'purple', pts: 5, color: '#aa44ff', frac: 0.095 }
     ];
     let RINGS = [];
     function computeRings() {
@@ -370,8 +363,27 @@
         RINGS = RING_DEFS.map(r => ({ ...r, radius: base * r.frac }));
     }
 
+    // 透視壓縮
+    const PERSPECTIVE_SQUASH = 0.55;
+
+    // 硬幣在世界坐標中的半徑（碰撞檢測用）
+    const COIN_WORLD_RADIUS = 16;
+
+    // 硬幣繪製基礎半徑（視覺用，稍大）
+    const COIN_DRAW_RADIUS = 18;
+
+    // 桌子邊界（梯形）
+    function getDeskBoundsAtY(y) {
+        const deskTop = H * 0.10;
+        const topHalf = W * 0.28;
+        const botHalf = W * 0.62;
+        const t = (y - deskTop) / (H - deskTop);
+        const half = topHalf + (botHalf - topHalf) * t;
+        return { left: W/2 - half, right: W/2 + half };
+    }
+
     // ============================================================
-    //  Status visual update (line + border + corner text)
+    //  Status visual update
     // ============================================================
     function updateStatusVisuals() {
         let stateClass = 'wait';
@@ -445,43 +457,79 @@
         drawRetroTint();
     }
 
+    // 繪製平放在桌面上的彩虹靶（透視橢圓）
+    // 中心是整個紫色（最內環延伸到中心，沒有白色圓點）
     function drawTarget() {
+        ctx.save();
+        ctx.translate(target.x, target.y);
+        ctx.scale(1, PERSPECTIVE_SQUASH);
+
+        // 外圈光暈
         for (let i = 0; i < RINGS.length; i++) {
             const r = RINGS[i];
             ctx.beginPath();
-            ctx.arc(target.x, target.y, r.radius + 2, 0, Math.PI * 2);
-            ctx.fillStyle = r.color + '20';
+            ctx.arc(0, 0, r.radius + 6, 0, Math.PI * 2);
+            ctx.fillStyle = r.color + '10';
             ctx.fill();
         }
 
+        // 彩虹環（從外到內）
         for (let i = 0; i < RINGS.length; i++) {
             ctx.beginPath();
-            ctx.arc(target.x, target.y, RINGS[i].radius, 0, Math.PI * 2);
+            ctx.arc(0, 0, RINGS[i].radius, 0, Math.PI * 2);
             ctx.fillStyle = RINGS[i].color;
             ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 2;
             ctx.stroke();
         }
+
+        // 中心：整個紫色（最內環顏色延伸到中心，沒有白色圓點）
+        // 已經由 purple 環覆蓋到中心，不需要額外繪製
+        // 但加一個微妙的中心高光
         ctx.beginPath();
-        ctx.arc(target.x, target.y, RINGS[RINGS.length - 1].radius * 0.28, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
+        ctx.arc(0, 0, RINGS[RINGS.length - 1].radius * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.fill();
 
+        // 整體發光
         ctx.beginPath();
-        ctx.arc(target.x, target.y, RINGS[0].radius + 8, 0, Math.PI * 2);
-        const targetGlow = ctx.createRadialGradient(target.x, target.y, RINGS[RINGS.length-1].radius,
-                                                     target.x, target.y, RINGS[0].radius + 8);
-        targetGlow.addColorStop(0, 'rgba(255,255,255,0.1)');
+        ctx.arc(0, 0, RINGS[0].radius + 18, 0, Math.PI * 2);
+        const targetGlow = ctx.createRadialGradient(0, 0, RINGS[RINGS.length-1].radius,
+                                                     0, 0, RINGS[0].radius + 18);
+        targetGlow.addColorStop(0, 'rgba(170,68,255,0.08)');
+        targetGlow.addColorStop(0.5, 'rgba(255,255,255,0.04)');
         targetGlow.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = targetGlow;
         ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 計算硬幣在當前位置的透視縮放
+    function getPerspectiveScale(y) {
+        const nearY = coinStartY;
+        const farY = target.y;
+        const t = Math.max(0, Math.min(1, (nearY - y) / (nearY - farY)));
+        return 1.0 - t * 0.42;
+    }
+
+    // 將點限制在桌子範圍內
+    function clampToDesk(x, y) {
+        const bounds = getDeskBoundsAtY(y);
+        return {
+            x: Math.max(bounds.left + 8, Math.min(bounds.right - 8, x)),
+            y: Math.max(H * 0.10, Math.min(H - 5, y))
+        };
     }
 
     function drawCoin(x, y, scale = 1, glow = 0) {
+        const perspectiveScale = getPerspectiveScale(y);
+        const finalScale = scale * perspectiveScale;
+
         ctx.save();
         ctx.translate(x, y);
-        ctx.scale(scale, scale);
+        ctx.scale(finalScale, finalScale * PERSPECTIVE_SQUASH);
         if (glow > 0) {
             const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 40 + glow * 15);
             g.addColorStop(0, `rgba(255,215,0,${0.12 * glow})`);
@@ -491,12 +539,12 @@
             ctx.fillStyle = g;
             ctx.fill();
         }
-        const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 22);
+        const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, COIN_DRAW_RADIUS);
         grad.addColorStop(0, '#ffe066');
         grad.addColorStop(0.6, '#ffd700');
         grad.addColorStop(1, '#b8860b');
         ctx.beginPath();
-        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.arc(0, 0, COIN_DRAW_RADIUS, 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
         ctx.strokeStyle = '#a67c00';
@@ -559,7 +607,7 @@
     }
 
     // ============================================================
-    //  Flying coin
+    //  Flying coin with perspective scaling
     // ============================================================
     let flying = null;
 
@@ -591,7 +639,10 @@
         if (!flying) return;
         const f = flying;
 
-        if (f.frame % 2 === 0) emitParticles(f.x, f.y, 2, '#ffd700', 1.2, 20);
+        if (f.frame % 2 === 0) {
+            const pScale = getPerspectiveScale(f.y);
+            emitParticles(f.x, f.y, 2, '#ffd700', 1.2 * pScale, 20);
+        }
 
         f.x += f.vx;
         f.y += f.vy;
@@ -600,21 +651,43 @@
         f.vx *= friction;
         f.vy *= friction;
 
-        const railMargin = W * 0.06;
-        if (f.x < railMargin) { f.x = railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
-        if (f.x > W - railMargin) { f.x = W - railMargin; f.vx = -f.vx * 0.6; emitParticles(f.x, f.y, 6, '#ff9966', 2, 18); }
+        // 桌子邊界反彈（梯形邊界）
+        const bounds = getDeskBoundsAtY(f.y);
+        const railMargin = 8;
+        if (f.x < bounds.left + railMargin) {
+            f.x = bounds.left + railMargin;
+            f.vx = -f.vx * 0.6;
+            emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
+        }
+        if (f.x > bounds.right - railMargin) {
+            f.x = bounds.right - railMargin;
+            f.vx = -f.vx * 0.6;
+            emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
+        }
 
-        const farEdge = H * 0.08;
-        if (f.y < farEdge) { f.y = farEdge; f.vy = -f.vy * 0.45; emitParticles(f.x, f.y, 8, '#ff6688', 2, 20); }
+        // 遠端邊界
+        const farEdge = H * 0.10;
+        if (f.y < farEdge) {
+            f.y = farEdge;
+            f.vy = -f.vy * 0.45;
+            emitParticles(f.x, f.y, 8, '#ff6688', 2, 20);
+        }
 
-        if (f.y > coinStartY + 10) { f.y = coinStartY + 10; f.vy = -f.vy * 0.3; }
+        // 近端邊界
+        if (f.y > coinStartY + 10) {
+            f.y = coinStartY + 10;
+            f.vy = -f.vy * 0.3;
+        }
 
         f.frame++;
 
+        // 繪製帶透視縮放的飛行硬幣
+        const flyScale = getPerspectiveScale(f.y);
         ctx.save();
         ctx.translate(f.x, f.y);
+        ctx.scale(flyScale, flyScale * PERSPECTIVE_SQUASH);
         ctx.rotate(f.frame * 0.22);
-        drawCoin(0, 0, 0.9 + Math.sin(f.frame * 0.15) * 0.03);
+        drawCoin(0, 0, 0.9 + Math.sin(f.frame * 0.15) * 0.03, 0);
         ctx.restore();
 
         const speed = Math.hypot(f.vx, f.vy);
@@ -624,17 +697,39 @@
         }
     }
 
+    // 計算硬幣中心到靶心的桌面坐標系距離
+    function getDistanceToTarget(px, py) {
+        const dx = px - target.x;
+        const dy = (py - target.y) / PERSPECTIVE_SQUASH;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // 檢查硬幣是否完全在某個環內
+    // 條件：硬幣中心到靶心的桌面距離 + 硬幣世界半徑 < 環的半徑
+    function checkCoinInRing(landX, landY) {
+        const centerDist = getDistanceToTarget(landX, landY);
+
+        // 從內到外檢查（紫色最內，紅色最外）
+        for (let i = RINGS.length - 1; i >= 0; i--) {
+            // 硬幣必須完全在環內
+            if (centerDist + COIN_WORLD_RADIUS < RINGS[i].radius) {
+                return RINGS[i];
+            }
+        }
+        return null;
+    }
+
     function landCoin(x, y) {
-        const landX = Math.min(W - 6, Math.max(6, x));
-        const landY = Math.min(H - 6, Math.max(6, y));
+        // 限制在桌子範圍內
+        const clamped = clampToDesk(x, y);
+        const landX = clamped.x;
+        const landY = clamped.y;
+
         coins.push({ x: landX, y: landY, landedAt: Date.now() });
         emitParticles(landX, landY, 16, '#b8942a', 3, 26);
 
-        const d = Math.hypot(target.x - landX, target.y - landY);
-        let ringHit = null;
-        for (let i = RINGS.length - 1; i >= 0; i--) {
-            if (d < RINGS[i].radius) { ringHit = RINGS[i]; break; }
-        }
+        // 使用「完全在環內」的判定
+        const ringHit = checkCoinInRing(landX, landY);
 
         if (ringHit) {
             scores[ringHit.label] += ringHit.pts;
@@ -842,7 +937,7 @@
     }
 
     // ============================================================
-    //  Auto clean (no button)
+    //  Auto clean
     // ============================================================
     const AUTO_CLEAN_COUNT = 6;
     function checkAutoClean() {
@@ -874,8 +969,9 @@
             const glow = Math.min(powerValue / 100, 1.2);
             drawCoin(coinStartX, coinStartY, 1 + powerValue / 500, glow);
             if (powerValue > 10) {
+                const pScale = getPerspectiveScale(coinStartY);
                 ctx.beginPath();
-                ctx.arc(coinStartX, coinStartY, 26 + powerValue / 5, 0, Math.PI * 2);
+                ctx.arc(coinStartX, coinStartY, (26 + powerValue / 5) * pScale, 0, Math.PI * 2);
                 ctx.strokeStyle = `rgba(255,215,0,${0.1 + powerValue / 300})`;
                 ctx.lineWidth = 2 + powerValue / 40;
                 ctx.setLineDash([6, 10]);
