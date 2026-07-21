@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-yue-HK">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>🌈 扔彩虹 · 甩手投掷</title>
+<title>🌈 掟彩虹 · 揈手速擲</title>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     * { margin:0; padding:0; box-sizing:border-box; user-select:none; touch-action:none; -webkit-tap-highlight-color: transparent; }
@@ -25,10 +25,7 @@
     .hud .power-wrap { display: flex; justify-content: space-between; margin-top: 2px; }
 
     .status-bar {
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        z-index: 25;
-        height: 6px;
+        position: absolute; top: 0; left: 0; right: 0; z-index: 25; height: 6px;
         transition: all 0.3s ease;
     }
     .status-bar.ready {
@@ -45,23 +42,12 @@
         background: linear-gradient(90deg, #ffdd44, #ffee66, #ffdd44);
         box-shadow: 0 0 20px rgba(255,221,68,0.6), 0 0 40px rgba(255,221,68,0.3);
     }
-
-    @keyframes pulse-green {
-        0%, 100% { opacity: 0.7; }
-        50% { opacity: 1; }
-    }
-    @keyframes pulse-pink {
-        0%, 100% { opacity: 0.5; }
-        50% { opacity: 0.9; }
-    }
+    @keyframes pulse-green { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+    @keyframes pulse-pink { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
 
     .status-border {
-        position: absolute;
-        inset: 0;
-        z-index: 18;
-        pointer-events: none;
-        border: 4px solid transparent;
-        transition: all 0.4s ease;
+        position: absolute; inset: 0; z-index: 18; pointer-events: none;
+        border: 4px solid transparent; transition: all 0.4s ease;
     }
     .status-border.ready {
         border-color: rgba(0,255,102,0.5);
@@ -77,27 +63,42 @@
     }
 
     .corner-status {
-        position: absolute;
-        top: 18px; right: 14px;
-        z-index: 22;
-        font-size: 9px;
-        padding: 6px 10px;
-        border-radius: 4px;
-        background: rgba(0,0,0,0.7);
-        transition: all 0.3s;
-        pointer-events: none;
+        position: absolute; top: 18px; right: 68px; z-index: 22;
+        font-size: 9px; padding: 6px 10px; border-radius: 4px;
+        background: rgba(0,0,0,0.7); transition: all 0.3s; pointer-events: none;
     }
     .corner-status.ready { color: #00ff66; border: 1px solid rgba(0,255,102,0.4); }
     .corner-status.wait { color: #ff88aa; border: 1px solid rgba(255,102,170,0.3); }
     .corner-status.flying { color: #ffdd44; border: 1px solid rgba(255,221,68,0.4); }
 
-    /* Combo stays center - it's the frequent, quick-flash element */
+    /* Phone-dummy: replaces the old raw sensor-number readout. Tilts live
+       to mirror the phone's real orientation, colored by the same
+       wait/ready/flying states as the rest of the HUD. */
+    .phone-dummy-wrap {
+        position: absolute; top: 14px; right: 14px; z-index: 23;
+        width: 44px; height: 60px; perspective: 240px; pointer-events: none;
+    }
+    .phone-dummy {
+        width: 24px; height: 46px; margin: 7px auto 0;
+        background: #14141c; border: 2px solid rgba(255,102,170,0.55);
+        border-radius: 6px; position: relative;
+        transform-style: preserve-3d;
+        transition: border-color 0.3s, box-shadow 0.3s;
+        box-shadow: 0 0 12px rgba(255,102,170,0.35);
+    }
+    .phone-dummy::before {
+        content: ''; position: absolute; inset: 4px 3px;
+        background: rgba(255,255,255,0.08); border-radius: 3px;
+    }
+    .phone-dummy.ready { border-color: #00ff66; box-shadow: 0 0 14px rgba(0,255,102,0.5); }
+    .phone-dummy.wait { border-color: #ff66aa; box-shadow: 0 0 14px rgba(255,102,170,0.4); }
+    .phone-dummy.flying { border-color: #ffdd44; box-shadow: 0 0 14px rgba(255,221,68,0.5); }
+
     .combo {
         position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
         z-index: 15; font-size: 34px; color: #ffdd44;
         text-shadow: 0 0 40px rgba(255,220,0,0.6);
-        pointer-events: none; opacity: 0;
-        transition: opacity 0.2s;
+        pointer-events: none; opacity: 0; transition: opacity 0.2s;
     }
     .combo.show { opacity: 1; animation: pop 0.5s ease-out; }
     @keyframes pop {
@@ -133,8 +134,6 @@
     .overlay button:active { transform: scale(0.96); }
     .overlay .sub { font-size: 9px; color: rgba(255,255,255,0.4); }
 
-    /* Event banner: moved to a small top pill, NOT centered on screen,
-       so it never collides with the combo text or the boss banner. */
     .event-banner {
         position: absolute; top: 56px; left: 50%;
         transform: translateX(-50%) translateY(-10px);
@@ -148,7 +147,6 @@
     }
     .event-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* Boss banner: upper-middle, clearly above the combo's center position */
     .boss-banner {
         position: absolute; top: 26%; left: 50%; transform: translate(-50%,-50%) scale(0.6);
         z-index: 40; font-size: 15px; color: #ff4444;
@@ -169,7 +167,9 @@
     @media (max-width:500px) {
         .hud { font-size: 9px; padding: 6px 10px; }
         .hud .row { gap: 6px; }
-        .corner-status { font-size: 8px; padding: 4px 8px; top: 14px; }
+        .corner-status { font-size: 8px; padding: 4px 8px; top: 14px; right: 60px; }
+        .phone-dummy-wrap { top: 10px; right: 10px; width: 38px; height: 52px; }
+        .phone-dummy { width: 20px; height: 38px; }
         .combo { font-size: 24px; }
         .hint { font-size: 9px; bottom: 18px; white-space: normal; }
         .overlay h1 { font-size: 13px; }
@@ -181,15 +181,16 @@
 <body>
 
 <div class="overlay" id="startOverlay" style="display:none;">
-    <h1>🌈 扔彩虹<br>甩手投掷</h1>
-    <p>把手机当作真的硬币来甩：<br>手握稳，向前快速一甩，<br>硬币就会滑向桌子远端的彩虹靶。<br>力度太轻滑不到，太重会冲过头弹回来。</p>
-    <button id="startBtn">📳 开始 · 授权动作感应</button>
-    <div class="sub" id="startSub">需要动作感应权限才能甩动投掷</div>
+    <h1>🌈 掟彩虹<br>揈手速擲</h1>
+    <p>將手機當成真硬幣咁揈：<br>揸穩手機，向前快速一揈，<br>硬幣就會喺枱面滑向遠處嘅彩虹靶。<br>力度太細會滑唔到，太大力會衝過龍門彈返嚟。</p>
+    <button id="startBtn">📳 開始 · 授權動作感應</button>
+    <div class="sub" id="startSub">要開咗動作感應先揈得到</div>
 </div>
 
 <div class="status-bar wait" id="statusBar"></div>
 <div class="status-border wait" id="statusBorder"></div>
-<div class="corner-status wait" id="cornerStatus">🤳 穩住</div>
+<div class="corner-status wait" id="cornerStatus">🤳 揸穩</div>
+<div class="phone-dummy-wrap"><div class="phone-dummy wait" id="phoneDummy"></div></div>
 
 <div class="hud" id="hud">
     <div class="row">
@@ -207,7 +208,7 @@
 <div class="combo" id="comboDisplay"></div>
 <div class="event-banner" id="eventBanner"></div>
 <div class="boss-banner" id="bossBanner"></div>
-<div class="hint" id="hint">🤳 稳住手机 2 秒 → 快速向前甩动投掷</div>
+<div class="hint" id="hint">🤳 揸穩手機兩秒 → 快速向前一揈</div>
 
 <canvas id="canvas"></canvas>
 
@@ -230,14 +231,16 @@
     }
 
     // ============================================================
-    //  Procedural audio (missing entirely before - Web Audio + speech synth)
+    //  Procedural audio - fires ONLY from the coin-landed event now.
+    //  The previous version also ran a setInterval-driven background
+    //  loop; that's exactly the kind of thing Firefox's autoplay /
+    //  tab-engagement throttling can silently kill after a while,
+    //  which is very likely why it worked in preview but not in
+    //  Firefox. Removing it and keeping every sound tied to a single,
+    //  direct user-caused event (the coin landing) is both what was
+    //  asked for and the fix for that.
     // ============================================================
     let audioCtx = null;
-    let bgmOn = true;
-    let bgmTimer = null;
-    let bgmIndex = 0;
-    const BGM_NOTES = [262, 330, 392, 330, 294, 370, 440, 370];
-
     function getAudioCtx() {
         if (!audioCtx) {
             try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -277,7 +280,6 @@
         gain.connect(ctxA.destination);
         src.start();
     }
-    function playCoinSpin() { playTone(1100 + Math.random() * 350, 0.05, 'square', 0.025); }
     function playSlide() { playNoiseBurst(0.07, 0.04); }
     function playHit(ringLabel) {
         const freqs = { red: 440, green: 554, yellow: 659, purple: 880, boss: 330 };
@@ -298,9 +300,6 @@
         playTone(880, 0.15, 'square', 0.1, 0.05);
     }
     function playMiss() { playTone(160, 0.18, 'sawtooth', 0.08); }
-    function playSparkle() {
-        [1046, 1318, 1568].forEach((f, i) => playTone(f, 0.2, 'sine', 0.1, i * 0.06));
-    }
     function playBossSpawn() {
         playTone(110, 0.4, 'sawtooth', 0.15);
         playTone(220, 0.3, 'square', 0.1, 0.15);
@@ -308,24 +307,7 @@
     function playBossDefeat() {
         [523, 659, 784, 1046].forEach((f, i) => playTone(f, 0.22, 'square', 0.15, i * 0.08));
     }
-    function speak(text) {
-        try {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(text);
-            u.rate = 1.15; u.pitch = 1.3; u.volume = 0.85;
-            window.speechSynthesis.speak(u);
-        } catch (e) {}
-    }
-    function startBGM() {
-        if (bgmTimer) return;
-        bgmTimer = setInterval(() => {
-            if (!bgmOn || isThrowing || flying) return;
-            playTone(BGM_NOTES[bgmIndex % BGM_NOTES.length], 0.16, 'square', 0.02);
-            bgmIndex++;
-        }, 280);
-    }
-    function unlockAudioOnce() { getAudioCtx(); startBGM(); }
+    function unlockAudioOnce() { getAudioCtx(); }
     window.addEventListener('touchstart', unlockAudioOnce, { once: true });
     window.addEventListener('click', unlockAudioOnce, { once: true });
 
@@ -343,31 +325,23 @@
         stars = [];
         for (let i = 0; i < STAR_COUNT; i++) {
             stars.push({
-                x: Math.random() * W,
-                y: Math.random() * H * 0.50,
-                size: Math.random() < 0.7 ? 1 : 2,
-                brightness: Math.random(),
-                twinkleSpeed: 0.02 + Math.random() * 0.04,
-                phase: Math.random() * Math.PI * 2
+                x: Math.random() * W, y: Math.random() * H * 0.50,
+                size: Math.random() < 0.7 ? 1 : 2, brightness: Math.random(),
+                twinkleSpeed: 0.02 + Math.random() * 0.04, phase: Math.random() * Math.PI * 2
             });
         }
     }
-
     function initDeco() {
         decoItems = [];
         for (let i = 0; i < DECO_COUNT; i++) {
             decoItems.push({
-                x: Math.random() * W,
-                y: H * 0.08 + Math.random() * H * 0.32,
+                x: Math.random() * W, y: H * 0.08 + Math.random() * H * 0.32,
                 type: Math.random() < 0.5 ? 'star' : 'diamond',
                 color: ['#ff00ff', '#00ffff', '#ffff00', '#ff6600', '#ff3366'][Math.floor(Math.random() * 5)],
-                size: 5 + Math.random() * 7,
-                speed: 0.2 + Math.random() * 0.5,
-                phase: Math.random() * Math.PI * 2
+                size: 5 + Math.random() * 7, speed: 0.2 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2
             });
         }
     }
-
     function drawStars() {
         for (let s of stars) {
             const alpha = 0.3 + 0.7 * Math.abs(Math.sin(bgTime * s.twinkleSpeed + s.phase));
@@ -375,7 +349,6 @@
             ctx.fillRect(Math.floor(s.x), Math.floor(s.y), s.size, s.size);
         }
     }
-
     function drawPixelMountains() {
         const mountainY = H * 0.42;
         const mountainColors = ['#0d0520', '#140830', '#1a0d3a', '#0f0825'];
@@ -385,16 +358,13 @@
             const pixelSize = 4 + layer * 2;
             ctx.fillStyle = mountainColors[layer];
             for (let x = 0; x < W + pixelSize; x += pixelSize) {
-                const noise = Math.sin(x * 0.003 + layer * 2.5) * 0.5 +
-                             Math.sin(x * 0.007 + layer * 1.3) * 0.3 +
-                             Math.sin(x * 0.015) * 0.2;
+                const noise = Math.sin(x * 0.003 + layer * 2.5) * 0.5 + Math.sin(x * 0.007 + layer * 1.3) * 0.3 + Math.sin(x * 0.015) * 0.2;
                 const height = baseHeight + noise * (28 + layer * 12);
                 const h = Math.max(0, height);
                 ctx.fillRect(x, layerY - h, pixelSize, h + 60);
             }
         }
     }
-
     function drawNeonGrid() {
         const gridTop = H * 0.45;
         const gridBottom = H;
@@ -403,10 +373,7 @@
         for (let i = 0; i < 14; i++) {
             const t = i / 14;
             const y = gridTop + (gridBottom - gridTop) * (t * t);
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(W, y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
         }
         const centerX = W / 2;
         const vanishY = H * 0.30;
@@ -415,27 +382,17 @@
             const angle = i * 0.065;
             const x1 = centerX + Math.tan(angle) * (gridTop - vanishY);
             const x2 = centerX + Math.tan(angle) * (H - vanishY);
-            ctx.beginPath();
-            ctx.moveTo(x1, gridTop);
-            ctx.lineTo(x2, H);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x1, gridTop); ctx.lineTo(x2, H); ctx.stroke();
         }
         ctx.strokeStyle = 'rgba(255, 100, 200, 0.25)';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, H - 2);
-        ctx.lineTo(W, H - 2);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, H - 2); ctx.lineTo(W, H - 2); ctx.stroke();
     }
-
     function drawScanlines() {
         scanlineOffset = (scanlineOffset + 0.5) % 4;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-        for (let y = scanlineOffset; y < H; y += 4) {
-            ctx.fillRect(0, Math.floor(y), W, 1);
-        }
+        for (let y = scanlineOffset; y < H; y += 4) ctx.fillRect(0, Math.floor(y), W, 1);
     }
-
     function drawRetroTint() {
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, 'rgba(10, 0, 40, 0.25)');
@@ -444,7 +401,6 @@
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, W, H);
     }
-
     function drawDecoItems() {
         for (let d of decoItems) {
             const floatY = d.y + Math.sin(bgTime * 0.001 + d.phase) * 8;
@@ -476,6 +432,7 @@
     const statusBar = document.getElementById('statusBar');
     const statusBorder = document.getElementById('statusBorder');
     const cornerStatus = document.getElementById('cornerStatus');
+    const phoneDummyEl = document.getElementById('phoneDummy');
     const eventBanner = document.getElementById('eventBanner');
     const bossBanner = document.getElementById('bossBanner');
 
@@ -508,10 +465,6 @@
     let targetMoveSpeed = 0.0015;
     let targetMoveRange = 0.15;
 
-    // FIX: target position is now clamped to the desk's trapezoid bounds
-    // (accounting for the target's current radius, which can grow up to
-    // 1.6x during the Giant Target event) - previously it could drift the
-    // target visually off the edge of the desk.
     function updateTargetPosition() {
         targetMovePhase += targetMoveSpeed * 16;
         const offset = Math.sin(targetMovePhase) * W * targetMoveRange;
@@ -538,7 +491,6 @@
     function triggerCameraShake(intensity) {
         cameraShake.intensity = intensity;
     }
-
     function updateCameraShake() {
         if (cameraShake.intensity > 0) {
             cameraShake.x = (Math.random() - 0.5) * cameraShake.intensity;
@@ -551,10 +503,6 @@
         }
     }
 
-    // FIX: the old table [1,1,2,3,5,8,13,21] hit a 21x multiplier at a
-    // combo of just 7-8, which is very achievable and blew every score
-    // number (and the boss thresholds tuned against them) way out of
-    // proportion. Capped at a much saner 3x ceiling.
     const COMBO_MULTIPLIERS = [1, 1, 1.5, 2, 2.5, 3];
     function getComboMultiplier() {
         if (comboCount <= 1) return 1;
@@ -574,7 +522,7 @@
         { name: '🎯 巨大靶心', duration: 12000, apply: () => { targetScale = 1.6; }, remove: () => { targetScale = 1.0; }, color: '#00ff66' },
         { name: '🎯 迷你靶心', duration: 10000, apply: () => { targetScale = 0.6; }, remove: () => { targetScale = 1.0; }, color: '#ff3366' },
         { name: '💨 強風', duration: 8000, apply: () => { windForce = (Math.random() < 0.5 ? -1 : 1) * 0.3; }, remove: () => { windForce = 0; }, color: '#66ccff' },
-        { name: '🧊 冰面', duration: 10000, apply: () => { frictionOverride = 0.985; }, remove: () => { frictionOverride = null; }, color: '#aaddff' },
+        { name: '🧊 溜冰枱面', duration: 10000, apply: () => { frictionOverride = 0.985; }, remove: () => { frictionOverride = null; }, color: '#aaddff' },
         { name: '🧲 磁力靶', duration: 12000, apply: () => { magneticTarget = true; }, remove: () => { magneticTarget = false; }, color: '#ff66ff' }
     ];
 
@@ -597,7 +545,6 @@
             activeEvent.apply();
             eventTimer = now + activeEvent.duration;
             showEventBanner(activeEvent.name, activeEvent.color);
-            playSparkle();
         }
     }
 
@@ -614,22 +561,12 @@
     let bossHealth = 0;
     let bossMaxHealth = 0;
 
-    // FIX: hit-radius is now responsive (scales with screen size like
-    // everything else) instead of a hardcoded 50px that made difficulty
-    // wildly inconsistent across phone sizes.
     function getBossHitRadius() {
         return Math.min(W, H) * 0.135 * targetScale;
     }
 
     const BOSSES = [
-        { 
-            name: '🛸 UFO', 
-            color: '#00ff88', 
-            behavior: 'hover',
-            // FIX: removed the extra "* PERSPECTIVE_SQUASH" here - drawTarget()
-            // already squashes the context once before calling this; squashing
-            // again flattened every boss to ~30% height instead of the
-            // intended 55%.
+        { name: '🛸 UFO', color: '#00ff88', behavior: 'hover',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -651,10 +588,7 @@
                 ctx.restore();
             }
         },
-        { 
-            name: '📦 寶箱', 
-            color: '#ffaa00', 
-            behavior: 'pulse',
+        { name: '📦 寶箱', color: '#ffaa00', behavior: 'pulse',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -672,10 +606,7 @@
                 ctx.restore();
             }
         },
-        { 
-            name: '👁️ 龍眼', 
-            color: '#ff3333', 
-            behavior: 'track',
+        { name: '👁️ 龍眼', color: '#ff3333', behavior: 'track',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -699,10 +630,7 @@
                 ctx.restore();
             }
         },
-        { 
-            name: '🌀 傳送門', 
-            color: '#aa44ff', 
-            behavior: 'spin',
+        { name: '🌀 傳送門', color: '#aa44ff', behavior: 'spin',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -723,6 +651,9 @@
         }
     ];
 
+    // Called once at the end of landCoin() (a landing event) rather than
+    // every animation frame - boss health and totalScore only ever change
+    // there anyway, and this keeps every audio cue tied to that one event.
     function checkBossMode() {
         if (!bossMode && totalScore >= 50 && totalScore % 50 < 10) {
             bossMode = BOSSES[Math.floor(Math.random() * BOSSES.length)];
@@ -730,7 +661,6 @@
             bossMaxHealth = 3;
             showBossBanner(bossMode.name + ' 出現!');
             playBossSpawn();
-            speak(bossMode.name.replace(/[^\u4e00-\u9fa5a-zA-Z]/g, ''));
         } else if (bossMode && bossHealth <= 0) {
             showBossBanner(bossMode.name + ' 擊敗!');
             playBossDefeat();
@@ -749,24 +679,28 @@
 
     function updateStatusVisuals() {
         let stateClass = 'wait';
-        let cornerText = '🤳 穩住';
-        if (isThrowing || flying) {
-            stateClass = 'flying';
-            cornerText = '🪙 飛行中';
-        } else if (motion.state === 'ready') {
-            stateClass = 'ready';
-            cornerText = '✅ 投擲!';
-        }
+        let cornerText = '🤳 揸穩';
+        if (isThrowing || flying) { stateClass = 'flying'; cornerText = '🪙 飛緊'; }
+        else if (motion.state === 'ready') { stateClass = 'ready'; cornerText = '✅ 掟得!'; }
         statusBar.className = 'status-bar ' + stateClass;
         statusBorder.className = 'status-border ' + stateClass;
         cornerStatus.className = 'corner-status ' + stateClass;
         cornerStatus.textContent = cornerText;
+        phoneDummyEl.className = 'phone-dummy ' + stateClass;
     }
 
-    // FIX: no longer shakes its own tiny save/restore block - the shake
-    // offset is now applied ONCE around the entire frame (see frame()),
-    // so the target, coins, and particle explosions all shake together
-    // instead of only the background.
+    // Live phone-orientation dummy: derives tilt from the gravity vector
+    // already present in every devicemotion event (no extra permission
+    // needed beyond the one already granted for throw detection).
+    function updatePhoneDummy(ax, ay, az) {
+        if (ax === undefined || ax === null) return;
+        const beta = Math.atan2(ay, az) * (180 / Math.PI);
+        const gamma = Math.atan2(-ax, az) * (180 / Math.PI);
+        const cb = Math.max(-75, Math.min(75, beta));
+        const cg = Math.max(-75, Math.min(75, gamma));
+        phoneDummyEl.style.transform = `rotateX(${cb}deg) rotateY(${cg}deg)`;
+    }
+
     function drawTable() {
         ctx.fillStyle = '#0a001f';
         ctx.fillRect(0, 0, W, H);
@@ -789,7 +723,6 @@
         ctx.closePath();
         ctx.fillStyle = grad;
         ctx.fill();
-
         ctx.strokeStyle = 'rgba(255, 215, 0, 0.15)';
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -878,11 +811,9 @@
         const t = Math.max(0, Math.min(1, (nearY - y) / (nearY - farY)));
         return 1.0 - t * 0.42;
     }
-
     function getCoinCollisionRadius(y) {
         return COIN_DRAW_RADIUS * COIN_LANDED_SCALE * getPerspectiveScale(y);
     }
-
     function clampToDesk(x, y) {
         const bounds = getDeskBoundsAtY(y);
         return {
@@ -952,7 +883,6 @@
             });
         }
     }
-
     function emitRainbowExplosion(x, y, count = 50) {
         const rainbowColors = ['#ff2244', '#ff8800', '#ffdd33', '#33ff77', '#00ccff', '#aa44ff'];
         for (let i = 0; i < count; i++) {
@@ -965,11 +895,6 @@
             });
         }
     }
-
-    // FIX: now accepts a timeScale so the slow-motion window (set on a
-    // Perfect hit) actually visibly slows the explosion and popup text -
-    // previously "slow motion" only scaled a background-animation clock
-    // that nothing important reads from, so it had no visible effect.
     function updateAndDrawParticles(timeScale = 1) {
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
@@ -1016,14 +941,8 @@
         totalThrows++;
         checkGoldenCoin();
         isCriticalThrow = power > CRITICAL_THRESHOLD;
-        if (isCriticalThrow) {
-            criticalTrail = [];
-            playCritical();
-        }
-        if (isGoldenCoin) {
-            addPopup(coinStartX, coinStartY - 55, '⭐ 金币!', '#ffd700');
-            playGold();
-        }
+        if (isCriticalThrow) criticalTrail = [];
+        if (isGoldenCoin) addPopup(coinStartX, coinStartY - 55, '⭐ 金幣!', '#ffd700');
         updateStatusVisuals();
 
         const deskDistance = coinStartY - target.y;
@@ -1035,13 +954,7 @@
         const friction = frictionOverride || 0.965;
         const speed = travelDist * (1 - friction);
 
-        flying = {
-            x: coinStartX,
-            y: coinStartY,
-            vx: aimVX,
-            vy: -speed,
-            frame: 0
-        };
+        flying = { x: coinStartX, y: coinStartY, vx: aimVX, vy: -speed, frame: 0 };
         document.getElementById('power').textContent = Math.floor(power);
     }
 
@@ -1054,7 +967,6 @@
             const color = isGoldenCoin ? '#ffd700' : (isCriticalThrow ? '#ff00ff' : '#ffd700');
             emitParticles(f.x, f.y, 2, color, 1.2 * pScale, 20);
         }
-        if (f.frame % 8 === 0) playCoinSpin();
 
         if (isCriticalThrow) {
             criticalTrail.push({ x: f.x, y: f.y, life: 15 });
@@ -1080,7 +992,6 @@
         const friction = frictionOverride || 0.965;
         f.vx *= friction;
         f.vy *= friction;
-
         f.vx += windForce;
 
         if (magneticTarget && !bossMode) {
@@ -1099,27 +1010,19 @@
             f.x = bounds.left + railMargin;
             f.vx = -f.vx * 0.6;
             emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
-            playSlide();
         }
         if (f.x > bounds.right - railMargin) {
             f.x = bounds.right - railMargin;
             f.vx = -f.vx * 0.6;
             emitParticles(f.x, f.y, 6, '#ff9966', 2, 18);
-            playSlide();
         }
-
         const farEdge = H * 0.10;
         if (f.y < farEdge) {
             f.y = farEdge;
             f.vy = -f.vy * 0.45;
             emitParticles(f.x, f.y, 8, '#ff6688', 2, 20);
-            playSlide();
         }
-
-        if (f.y > coinStartY + 10) {
-            f.y = coinStartY + 10;
-            f.vy = -f.vy * 0.3;
-        }
+        if (f.y > coinStartY + 10) { f.y = coinStartY + 10; f.vy = -f.vy * 0.3; }
 
         f.frame++;
 
@@ -1132,10 +1035,7 @@
         ctx.restore();
 
         const speed = Math.hypot(f.vx, f.vy);
-        if (speed < 0.35) {
-            landCoin(f.x, f.y);
-            flying = null;
-        }
+        if (speed < 0.35) { landCoin(f.x, f.y); flying = null; }
     }
 
     function getDistanceToTarget(px, py) {
@@ -1149,27 +1049,17 @@
             const dist = getDistanceToTarget(landX, landY);
             const coinRadius = getCoinCollisionRadius(landY);
             const bossRadius = getBossHitRadius();
-            if (dist + coinRadius < bossRadius) {
-                return { label: 'boss', pts: 10, color: bossMode.color };
-            }
+            if (dist + coinRadius < bossRadius) return { label: 'boss', pts: 10, color: bossMode.color };
             return null;
         }
-
         const centerDist = getDistanceToTarget(landX, landY);
         const coinRadius = getCoinCollisionRadius(landY);
-
         for (let i = 0; i < RINGS.length; i++) {
             const outerBoundary = RINGS[i].radius * targetScale;
             const innerBoundary = (i + 1 < RINGS.length) ? RINGS[i + 1].radius * targetScale : 0;
-
             const clearsOuterEdge = (centerDist + coinRadius) < outerBoundary;
-            const clearsInnerEdge = innerBoundary === 0
-                ? true
-                : (centerDist - coinRadius) > innerBoundary;
-
-            if (clearsOuterEdge && clearsInnerEdge) {
-                return RINGS[i];
-            }
+            const clearsInnerEdge = innerBoundary === 0 ? true : (centerDist - coinRadius) > innerBoundary;
+            if (clearsOuterEdge && clearsInnerEdge) return RINGS[i];
         }
         return null;
     }
@@ -1196,6 +1086,7 @@
                 basePoints = 20;
                 emitRainbowExplosion(landX, landY, 80);
                 addPopup(landX, landY - 50, '⭐ GOLD!', '#ffd700');
+                playGold();
             }
 
             const distToCenter = getDistanceToTarget(landX, landY);
@@ -1211,7 +1102,6 @@
                 addPopup(landX, landY - 70, 'PERFECT!!', '#ff00ff');
                 basePoints *= 3;
                 playPerfect();
-                speak('Perfect!');
             }
 
             const now = Date.now();
@@ -1234,11 +1124,11 @@
                 comboEl.className = 'combo show';
                 clearTimeout(comboEl._timer);
                 comboEl._timer = setTimeout(() => comboEl.className = 'combo', 800);
-                if (comboCount === 5 || comboCount === 8) speak(`${comboCount} combo!`);
             }
 
             if (isCriticalThrow && !isGoldenCoin) {
                 addPopup(landX, landY - 90, 'CRITICAL!', '#ff00ff');
+                playCritical();
             }
 
             if (!isPerfect) {
@@ -1269,6 +1159,8 @@
         isCriticalThrow = false;
         criticalTrail = [];
 
+        checkBossMode();
+
         setTimeout(() => {
             isThrowing = false;
             powerValue = 0;
@@ -1278,21 +1170,9 @@
     }
 
     const motion = {
-        supported: false,
-        active: false,
-        state: 'wait',
-        locked: false,
-        source: null,
-        variance: 1,
-        steadyStreak: 0,
-        lastAimSign: 1,
-        lastEventTime: 0,
-        debug: true
+        supported: false, active: false, state: 'wait', locked: false, source: null,
+        variance: 1, steadyStreak: 0, lastAimSign: 1, lastEventTime: 0
     };
-
-    const debugEl = document.createElement('div');
-    debugEl.style.cssText = 'position:absolute;top:60px;right:12px;z-index:20;font-size:9px;color:#0f8;background:rgba(0,0,0,0.7);padding:5px 9px;border-radius:8px;font-family:monospace;text-align:right;';
-    document.body.appendChild(debugEl);
 
     function readSignal(e) {
         if (motion.source === null) {
@@ -1310,23 +1190,23 @@
         if (motion.source === 'rotation') {
             const r = e.rotationRate;
             if (!r || r.alpha === null) return null;
-            return {
-                mag: Math.sqrt((r.alpha || 0) ** 2 + (r.beta || 0) ** 2 + (r.gamma || 0) ** 2),
-                aim: r.gamma || 0
-            };
+            return { mag: Math.sqrt((r.alpha || 0) ** 2 + (r.beta || 0) ** 2 + (r.gamma || 0) ** 2), aim: r.gamma || 0 };
         }
         const a = motion.source === 'linear' ? e.acceleration : e.accelerationIncludingGravity;
         if (!a || a.x === null) return null;
-        return {
-            mag: Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2),
-            aim: a.x || 0
-        };
+        return { mag: Math.sqrt((a.x || 0) ** 2 + (a.y || 0) ** 2 + (a.z || 0) ** 2), aim: a.x || 0 };
     }
 
     const SOURCE_FLOOR = { rotation: 200, linear: 8, gravity: 3.5 };
     const BASE_MEAN = { rotation: 0, linear: 0, gravity: 9.8 };
 
     function handleMotion(e) {
+        // Feed the phone-dummy indicator regardless of which signal we
+        // picked for throw detection - the gravity vector is present in
+        // every devicemotion event and gives a stable absolute tilt.
+        const g = e.accelerationIncludingGravity;
+        if (g && g.x !== null) updatePhoneDummy(g.x, g.y, g.z);
+
         const now = performance.now();
         const dt = now - motion.lastEventTime;
         motion.lastEventTime = now;
@@ -1341,10 +1221,6 @@
         const floor = SOURCE_FLOOR[motion.source] || 6;
         const threshold = Math.max(stdDev * 8, floor);
 
-        if (motion.debug) {
-            debugEl.textContent = `[${motion.source}] mag:${mag.toFixed(1)} base:${baseMean.toFixed(1)} σ:${stdDev.toFixed(2)} Δ:${delta.toFixed(1)} thr:${threshold.toFixed(1)} st:${motion.state}`;
-        }
-
         if (isThrowing || flying) return;
 
         if (motion.state === 'wait' || motion.state === 'cooldown') {
@@ -1356,20 +1232,13 @@
                     motion.variance = cappedVariance * 0.92 + (dev * dev) * 0.08;
                 }
                 motion.steadyStreak += dt;
-                if (motion.steadyStreak > 500) {
-                    motion.state = 'ready';
-                    updateStatusVisuals();
-                }
+                if (motion.steadyStreak > 500) { motion.state = 'ready'; updateStatusVisuals(); }
             } else {
                 motion.steadyStreak = 0;
             }
         } else if (motion.state === 'ready') {
             if (delta > threshold) {
-                if (!motion.pendingSince) {
-                    motion.pendingSince = now;
-                    motion.pendingPeak = delta;
-                    return;
-                }
+                if (!motion.pendingSince) { motion.pendingSince = now; motion.pendingPeak = delta; return; }
                 motion.pendingPeak = Math.max(motion.pendingPeak, delta);
                 if (now - motion.pendingSince < 40) return;
 
@@ -1406,7 +1275,7 @@
 
     function fallbackToTouch() {
         motion.supported = false;
-        document.getElementById('hint').textContent = '👆 向上滑动投掷 · 松手即甩出';
+        document.getElementById('hint').textContent = '👆 向上滑動掟出 · 鬆手即擲';
         motion.state = 'ready';
         updateStatusVisuals();
         canvas.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -1435,11 +1304,8 @@
         if (!touchActive) return;
         touchActive = false;
         if (isThrowing || flying) return;
-        if (powerValue > 8) {
-            performThrow(powerValue, 0);
-        } else {
-            powerValue = 0;
-        }
+        if (powerValue > 8) performThrow(powerValue, 0);
+        else powerValue = 0;
     }
 
     const AUTO_CLEAN_COUNT = 6;
@@ -1447,7 +1313,7 @@
         if (coins.length >= AUTO_CLEAN_COUNT) {
             const allSettled = coins.every(c => Date.now() - c.landedAt > 400);
             if (allSettled && !isThrowing && !flying) {
-                addPopup(W / 2, H * 0.5, '🧹 自动清桌', '#ffd700');
+                addPopup(W / 2, H * 0.5, '🧹 自動清枱', '#ffd700');
                 coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
                 coins = [];
                 comboCount = 0;
@@ -1456,14 +1322,11 @@
         }
     }
 
-    // FIX: shake offset is now applied ONCE around everything (background,
-    // target, coins, particles) instead of only inside drawTable().
     function frame() {
         bgTime += 16 * slowMotion;
         updateTargetPosition();
         updateCameraShake();
         checkEvents();
-        checkBossMode();
 
         ctx.save();
         ctx.translate(cameraShake.x, cameraShake.y);
