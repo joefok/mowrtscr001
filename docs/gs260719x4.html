@@ -176,6 +176,38 @@
         .event-banner { font-size: 9px; padding: 6px 12px; top: 50px; }
         .boss-banner { font-size: 12px; padding: 10px 18px; }
     }
+    /* Classic Windows 3.1 "stop" style dialog - shown when the motion
+       sensor genuinely isn't sending usable data. Positioned near the
+       bottom throw area, not a full-screen blocker. */
+    .win31-dialog {
+        position: absolute; left: 50%; bottom: 15%; transform: translateX(-50%);
+        z-index: 60; width: min(300px, 84vw);
+        background: #c0c0c0; border: 2px solid #fff;
+        box-shadow: 3px 3px 0 rgba(0,0,0,0.5), inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+        font-family: "MS Sans Serif", Tahoma, Geneva, sans-serif;
+        color: #000; display: none;
+    }
+    .win31-dialog.show { display: block; }
+    .win31-titlebar {
+        background: linear-gradient(90deg, #000080, #1084d0);
+        color: #fff; font-size: 12px; font-weight: bold;
+        padding: 3px 6px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .win31-titlebar .closebtn {
+        background: #c0c0c0; border: 1px solid #000; width: 15px; height: 13px;
+        font-size: 9px; line-height: 11px; text-align: center; cursor: pointer;
+        box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
+    }
+    .win31-body { padding: 12px 12px 6px; display: flex; gap: 10px; align-items: flex-start; }
+    .win31-icon { font-size: 26px; flex-shrink: 0; }
+    .win31-msg { font-size: 11px; line-height: 1.6; padding-top: 2px; }
+    .win31-footer { padding: 8px 12px 12px; text-align: center; }
+    .win31-ok {
+        background: #c0c0c0; border: 1px solid #000; padding: 4px 22px; font-size: 11px;
+        box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
+        cursor: pointer; font-family: inherit;
+    }
+    .win31-ok:active { box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff; }
 </style>
 </head>
 <body>
@@ -209,6 +241,15 @@
 <div class="event-banner" id="eventBanner"></div>
 <div class="boss-banner" id="bossBanner"></div>
 <div class="hint" id="hint">🤳 揸穩手機兩秒 → 快速向前一揈</div>
+
+<div class="win31-dialog" id="win31Dialog">
+    <div class="win31-titlebar"><span>⚠ 系統訊息</span><span class="closebtn" id="win31Close">✕</span></div>
+    <div class="win31-body">
+        <div class="win31-icon">🛑</div>
+        <div class="win31-msg" id="win31Msg"></div>
+    </div>
+    <div class="win31-footer"><button class="win31-ok" id="win31Ok">確定</button></div>
+</div>
 
 <canvas id="canvas"></canvas>
 
@@ -281,6 +322,12 @@
         src.start();
     }
     function playSlide() { playNoiseBurst(0.07, 0.04); }
+    function playThrowSound() {
+        [330, 440, 554].forEach((f, i) => playTone(f, 0.09, 'square', 0.09, i * 0.04));
+    }
+    function playCleanSound() {
+        [880, 660, 440, 220].forEach((f, i) => playTone(f, 0.1, 'square', 0.08, i * 0.05));
+    }
     function playHit(ringLabel) {
         const freqs = { red: 440, green: 554, yellow: 659, purple: 880, boss: 330 };
         const f = freqs[ringLabel] || 500;
@@ -939,6 +986,7 @@
         if (isThrowing) return;
         isThrowing = true;
         totalThrows++;
+        playThrowSound();
         checkGoldenCoin();
         isCriticalThrow = power > CRITICAL_THRESHOLD;
         if (isCriticalThrow) criticalTrail = [];
@@ -1273,11 +1321,68 @@
     let touchActive = false;
     let touchStartY = 0;
 
+    // ============================================================
+    //  Win 3.1 "stop" dialog + demo/attract mode
+    //  Shown when the motion sensor never sends usable data. Dismissing
+    //  it kicks off an auto-play demo (random power/angle throws on a
+    //  timer) like a classic arcade attract screen - the moment the
+    //  player actually touches the screen to throw for real, demo mode
+    //  stops and control hands back to them.
+    // ============================================================
+    const win31Dialog = document.getElementById('win31Dialog');
+    const win31Msg = document.getElementById('win31Msg');
+    const WIN31_MESSAGES = [
+        '搵唔到手機郁動感應訊號喎，呢個瀏覽器可能唔識玩，不如換過第個瀏覽器試下（例如 Chrome）？',
+        '錯誤代碼 0x00E7042：感應器傳返嚟嘅嘢係得個吉，建議閣下移玉步去第個瀏覽器度，唔該晒！',
+        '本機動作感應罷咗工，非戰之罪，麻煩換過瀏覽器再嚟過，多謝合作！',
+        '警告：郁動感應訊號等咗好耐都未到，可能今日心情唔好，換個瀏覽器氹下佢啦！'
+    ];
+    function showWin31Dialog() {
+        win31Msg.textContent = WIN31_MESSAGES[Math.floor(Math.random() * WIN31_MESSAGES.length)];
+        win31Dialog.classList.add('show');
+    }
+    function hideWin31Dialog() {
+        win31Dialog.classList.remove('show');
+    }
+    document.getElementById('win31Ok').addEventListener('click', () => {
+        hideWin31Dialog();
+        startDemoMode();
+    });
+    document.getElementById('win31Close').addEventListener('click', () => {
+        hideWin31Dialog();
+        startDemoMode();
+    });
+
+    let demoMode = false;
+    let demoTimer = null;
+    function startDemoMode() {
+        demoMode = true;
+        scheduleDemoThrow();
+    }
+    function stopDemoMode() {
+        if (!demoMode) return;
+        demoMode = false;
+        clearTimeout(demoTimer);
+    }
+    function scheduleDemoThrow() {
+        if (!demoMode) return;
+        demoTimer = setTimeout(() => {
+            if (!demoMode) return;
+            if (!isThrowing && !flying) {
+                const randPower = 25 + Math.random() * 75;
+                const randAim = (Math.random() * 2 - 1) * 5;
+                performThrow(randPower, randAim);
+            }
+            scheduleDemoThrow();
+        }, 1600 + Math.random() * 1400);
+    }
+
     function fallbackToTouch() {
         motion.supported = false;
         document.getElementById('hint').textContent = '👆 向上滑動掟出 · 鬆手即擲';
         motion.state = 'ready';
         updateStatusVisuals();
+        showWin31Dialog();
         canvas.addEventListener('touchstart', onTouchStart, { passive: false });
         canvas.addEventListener('touchmove', onTouchMove, { passive: false });
         canvas.addEventListener('touchend', onTouchEnd, { passive: false });
@@ -1288,6 +1393,7 @@
     }
     function onTouchStart(e) {
         e.preventDefault();
+        stopDemoMode();
         if (isThrowing || flying) return;
         touchActive = true;
         touchStartY = e.touches[0].clientY;
@@ -1314,6 +1420,7 @@
             const allSettled = coins.every(c => Date.now() - c.landedAt > 400);
             if (allSettled && !isThrowing && !flying) {
                 addPopup(W / 2, H * 0.5, '🧹 自動清枱', '#ffd700');
+                playCleanSound();
                 coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
                 coins = [];
                 comboCount = 0;
