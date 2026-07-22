@@ -208,6 +208,29 @@
         cursor: pointer; font-family: inherit;
     }
     .win31-ok:active { box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff; }
+    /* Attract-mode label: semi-transparent 8-bit text shown while the
+       demo loop is auto-throwing. Disappears with a chunky, stepped
+       "glitch" animation (not a smooth fade) the instant a real throw
+       is detected and demo mode ends. */
+    .attract-label {
+        position: absolute; top: 64%; left: 50%; transform: translate(-50%, -50%);
+        z-index: 30; font-size: 15px; color: #ffdd44; letter-spacing: 3px;
+        text-shadow: 2px 2px 0 rgba(0,0,0,0.6), 0 0 12px rgba(255,221,68,0.4);
+        pointer-events: none; display: none; opacity: 0;
+    }
+    .attract-label.show { display: block; opacity: 0.55; animation: attractFlicker 1s steps(2) infinite; }
+    .attract-label.hide { display: block; animation: attractGlitchOut 0.55s steps(7) forwards; }
+    @keyframes attractFlicker { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.38; } }
+    @keyframes attractGlitchOut {
+        0%   { opacity: 1;   transform: translate(-50%, -50%) scale(1);              clip-path: inset(0 0 0 0); }
+        14%  { opacity: 0.85; transform: translate(calc(-50% + 4px), -50%) scale(1);  clip-path: inset(0 0 45% 0); }
+        28%  { opacity: 0.75; transform: translate(calc(-50% - 4px), -50%) scale(1);  clip-path: inset(30% 0 0 0); }
+        42%  { opacity: 0.6;  transform: translate(-50%, -50%) scale(1.06);           clip-path: inset(0 40% 0 0); }
+        57%  { opacity: 0.45; transform: translate(calc(-50% + 3px), -50%) scale(1);  clip-path: inset(0 0 60% 0); }
+        71%  { opacity: 0.3;  transform: translate(-50%, -50%) scale(0.94);           clip-path: inset(50% 0 0 0); }
+        85%  { opacity: 0.15; transform: translate(-50%, -50%) scale(0.9);            clip-path: inset(0 0 85% 0); }
+        100% { opacity: 0;    transform: translate(-50%, -50%) scale(0.85);           clip-path: inset(100% 0 0 0); }
+    }
 </style>
 </head>
 <body>
@@ -250,6 +273,8 @@
     </div>
     <div class="win31-footer"><button class="win31-ok" id="win31Ok">確定</button></div>
 </div>
+
+<div class="attract-label" id="attractLabel">自動掛機中</div>
 
 <canvas id="canvas"></canvas>
 
@@ -1376,15 +1401,25 @@
 
     let demoMode = false;
     let demoTimer = null;
+    const attractLabelEl = document.getElementById('attractLabel');
+    attractLabelEl.addEventListener('animationend', (e) => {
+        if (e.animationName === 'attractGlitchOut') attractLabelEl.classList.remove('hide');
+    });
     function startDemoMode() {
         clearTimeout(idleTimer);
         demoMode = true;
+        attractLabelEl.classList.remove('hide');
+        attractLabelEl.classList.add('show');
         scheduleDemoThrow();
     }
     function stopDemoMode() {
         if (!demoMode) return;
         demoMode = false;
         clearTimeout(demoTimer);
+        if (attractLabelEl.classList.contains('show')) {
+            attractLabelEl.classList.remove('show');
+            attractLabelEl.classList.add('hide');
+        }
     }
     function scheduleDemoThrow() {
         if (!demoMode) return;
