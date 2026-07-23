@@ -297,6 +297,272 @@
     }
 
     // ============================================================
+    //  Locale-adaptive text (i18n) - detects the browser's language
+    //  and serves casual/internet-tone phrasing rather than stiff
+    //  formal translation, in the pixel font, for every visible
+    //  string in the game. Falls back to English for anything not
+    //  covered. Pixel-art styling itself is unaffected - only text
+    //  content changes per locale.
+    // ============================================================
+    const LOCALES = {
+        'zh-HK': {
+            title: '🌈 掟彩虹 · 揈手速擲',
+            overlayTitle: '🌈 掟彩虹<br>揈手速擲',
+            overlayBody: '將手機當成真硬幣咁揈：<br>揸穩手機，向前快速一揈，<br>硬幣就會喺枱面滑向遠處嘅彩虹靶。<br>力度太細會滑唔到，太大力會衝過龍門彈返嚟。',
+            startBtn: '📳 開始 · 授權動作感應',
+            startSub: '要開咗動作感應先揈得到',
+            hint: '🤳 揸穩手機兩秒 → 快速向前一揈',
+            hintFallback: '👆 向上滑動掟出 · 鬆手即擲',
+            statusWait: '🤳 揸穩', statusFlying: '🪙 飛緊', statusReady: '✅ 掟得!',
+            autoClean: '🧹 自動清枱', goldPopup: '⭐ 金幣!', attractLabel: '自動掛機中',
+            win31Title: '⚠ 系統訊息', win31Ok: '確定',
+            win31Messages: [
+                '搵唔到手機郁動感應訊號喎，呢個瀏覽器可能唔識玩，不如換過第個瀏覽器試下（例如 Chrome）？',
+                '錯誤代碼 0x00E7042：感應器傳返嚟嘅嘢係得個吉，建議閣下移玉步去第個瀏覽器度，唔該晒！',
+                '本機動作感應罷咗工，非戰之罪，麻煩換過瀏覽器再嚟過，多謝合作！',
+                '警告：郁動感應訊號等咗好耐都未到，可能今日心情唔好，換個瀏覽器氹下佢啦！'
+            ],
+            events: { double: '🔥 雙倍分數', giant: '🎯 巨大靶心', tiny: '🎯 迷你靶心', wind: '💨 強風', ice: '🧊 溜冰枱面', magnet: '🧲 磁力靶' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 寶箱', eye: '👁️ 龍眼', portal: '🌀 傳送門' },
+            bossAppear: ' 出現!', bossDefeat: ' 擊敗!'
+        },
+        'en': {
+            title: '🌈 Toss the Rainbow · Flick to Fling',
+            overlayTitle: '🌈 Toss the<br>Rainbow',
+            overlayBody: "Treat your phone like a real coin:<br>hold it steady, then flick it forward fast,<br>and it'll slide across the table to the rainbow target.<br>Too weak and it won't reach; too hard and it'll overshoot and bounce back.",
+            startBtn: '📳 Start · Allow Motion Sensor',
+            startSub: "Gotta enable motion sensing to actually flick this thing",
+            hint: '🤳 Hold steady 2s → flick forward fast',
+            hintFallback: '👆 Swipe up to throw · release to fling',
+            statusWait: '🤳 hold steady', statusFlying: '🪙 mid-air', statusReady: '✅ send it!',
+            autoClean: '🧹 auto-clearing the table', goldPopup: '⭐ GOLD COIN!', attractLabel: 'AFK · AUTO MODE',
+            win31Title: '⚠ System Message', win31Ok: 'OK',
+            win31Messages: [
+                "Uh oh, can't find any motion signal - this browser might just not be built different. Try switching browsers?",
+                "Error 0x00E7042: sensor came back empty-handed. Might wanna hop to another browser, thanks for understanding!",
+                "Motion sensor's on strike, not my fault honestly - switch browsers and let's try again!",
+                "Warning: motion signal never showed up. Maybe it's just not feeling it today - try a different browser to cheer it up!"
+            ],
+            events: { double: '🔥 Double Score', giant: '🎯 Giant Target', tiny: '🎯 Tiny Target', wind: '💨 Strong Wind', ice: '🧊 Icy Table', magnet: '🧲 Magnet Target' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 Treasure Chest', eye: '👁️ Dragon Eye', portal: '🌀 Portal' },
+            bossAppear: ' appeared!', bossDefeat: ' defeated!'
+        },
+        'zh-CN': {
+            title: '🌈 扔彩虹 · 甩手速掷',
+            overlayTitle: '🌈 扔彩虹<br>甩手速掷',
+            overlayBody: '把手机当成真硬币来甩：<br>握稳手机，快速向前一甩，<br>硬币就会在桌上滑向远处的彩虹靶。<br>力度太小滑不到，太猛会冲过头弹回来。',
+            startBtn: '📳 开始 · 授权动作感应',
+            startSub: '得先开动作感应才能甩起来',
+            hint: '🤳 握稳手机两秒 → 快速向前一甩',
+            hintFallback: '👆 向上滑动扔出 · 松手即掷',
+            statusWait: '🤳 稳住', statusFlying: '🪙 飞起来了', statusReady: '✅ 可以扔了!',
+            autoClean: '🧹 自动清桌', goldPopup: '⭐ 金币来了!', attractLabel: '自动挂机中',
+            win31Title: '⚠ 系统提示', win31Ok: '确定',
+            win31Messages: [
+                '搜不到手机的动作感应信号，这浏览器可能不太行，要不换个浏览器试试？',
+                '错误代码 0x00E7042：传感器啥也没传回来，建议换个浏览器，谢谢配合！',
+                '动作感应罢工了，不怪我，麻烦换个浏览器重新来过！',
+                '警告：动作信号迟迟不来，可能它今天心情不好，换个浏览器哄哄它吧！'
+            ],
+            events: { double: '🔥 双倍得分', giant: '🎯 超大靶心', tiny: '🎯 迷你靶心', wind: '💨 大风来袭', ice: '🧊 溜冰桌面', magnet: '🧲 磁力靶心' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 宝箱', eye: '👁️ 龙眼', portal: '🌀 传送门' },
+            bossAppear: ' 出现啦!', bossDefeat: ' 被击败了!'
+        },
+        'ja': {
+            title: '🌈 レインボー投げ · フリック一発',
+            overlayTitle: '🌈 レインボー<br>投げちゃおう',
+            overlayBody: 'スマホを本物のコインみたいに扱ってね：<br>しっかり構えて、前にすばやくフリック！<br>コインがテーブルを滑って奥の虹の的まで飛ぶよ。<br>弱いと届かないし、強すぎると飛び越えて跳ね返ってくるよ。',
+            startBtn: '📳 スタート · モーション許可',
+            startSub: 'モーションセンサーをオンにしないと投げられないよ',
+            hint: '🤳 2秒じっとしてから → すばやく前にフリック',
+            hintFallback: '👆 上にスワイプして投げる · 離すと発射',
+            statusWait: '🤳 じっとして', statusFlying: '🪙 飛行中', statusReady: '✅ 投げてOK!',
+            autoClean: '🧹 自動お片付け中', goldPopup: '⭐ ゴールドコイン!', attractLabel: '放置デモ中',
+            win31Title: '⚠ システムメッセージ', win31Ok: 'OK',
+            win31Messages: [
+                'モーション信号が見つからないみたい…このブラウザ、ちょっと相性悪いかも。別のブラウザ試してみる？',
+                'エラーコード 0x00E7042：センサーが空っぽで返ってきたよ。別のブラウザに乗り換えてみてね！',
+                'モーションセンサーがサボり中、こっちのせいじゃないよ〜。ブラウザ変えてもう一回試して！',
+                '警告：モーション信号がずっと来ない…今日は機嫌が悪いのかも。別のブラウザでご機嫌取りしてみて！'
+            ],
+            events: { double: '🔥 スコア2倍', giant: '🎯 でっかい的', tiny: '🎯 ミニ的', wind: '💨 強風注意', ice: '🧊 つるつるテーブル', magnet: '🧲 磁力の的' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 宝箱', eye: '👁️ ドラゴンアイ', portal: '🌀 ポータル' },
+            bossAppear: ' 登場!', bossDefeat: ' 撃破!'
+        },
+        'ko': {
+            title: '🌈 무지개 던지기 · 손목 스냅 한 방',
+            overlayTitle: '🌈 무지개<br>던지기',
+            overlayBody: '폰을 진짜 동전처럼 다뤄봐:<br>꽉 잡고 앞으로 빠르게 휙!<br>동전이 테이블 위를 미끄러져서 저 멀리 무지개 과녁까지 가는 거야.<br>너무 약하면 안 닿고, 너무 세면 튕겨서 돌아온다.',
+            startBtn: '📳 시작 · 동작 감지 허용',
+            startSub: '동작 감지 켜야 던질 수 있음',
+            hint: '🤳 2초간 가만히 → 앞으로 빠르게 휙',
+            hintFallback: '👆 위로 스와이프해서 던지기 · 놓으면 발사',
+            statusWait: '🤳 가만히', statusFlying: '🪙 날아가는 중', statusReady: '✅ 던져!',
+            autoClean: '🧹 자동 정리 중', goldPopup: '⭐ 골드 코인!', attractLabel: '자동 대기 모드',
+            win31Title: '⚠ 시스템 메시지', win31Ok: '확인',
+            win31Messages: [
+                '동작 신호를 못 찾겠어... 이 브라우저랑 궁합이 안 맞나 봐. 다른 브라우저로 한번 해볼래?',
+                '에러 코드 0x00E7042: 센서가 빈손으로 돌아왔어. 다른 브라우저로 갈아타는 거 추천!',
+                '동작 센서가 파업 중, 내 잘못 아님ㅋㅋ 브라우저 바꿔서 다시 해줘!',
+                '경고: 동작 신호가 한참째 안 와... 오늘 기분이 안 좋은가 봐, 다른 브라우저로 달래줘!'
+            ],
+            events: { double: '🔥 점수 2배', giant: '🎯 초대형 과녁', tiny: '🎯 미니 과녁', wind: '💨 강풍 주의', ice: '🧊 미끄러운 테이블', magnet: '🧲 자석 과녁' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 보물상자', eye: '👁️ 드래곤 아이', portal: '🌀 포탈' },
+            bossAppear: ' 등장!', bossDefeat: ' 처치!'
+        },
+        'es': {
+            title: '🌈 Tira el Arcoíris · Flick y ya',
+            overlayTitle: '🌈 Tira el<br>Arcoíris',
+            overlayBody: 'Trata tu celular como si fuera una moneda de verdad:<br>agárralo firme y hazle un flick rápido hacia adelante,<br>y la moneda se deslizará por la mesa hasta el blanco arcoíris.<br>Si le pegas muy suave no llega, y si le pegas muy fuerte se pasa y rebota.',
+            startBtn: '📳 Empezar · Permitir sensor de movimiento',
+            startSub: 'Hay que activar el sensor para poder tirar',
+            hint: '🤳 Quieto 2 segundos → flick rápido hacia adelante',
+            hintFallback: '👆 Desliza hacia arriba para tirar · suelta para lanzar',
+            statusWait: '🤳 quieto ahí', statusFlying: '🪙 volando', statusReady: '✅ ¡dale!',
+            autoClean: '🧹 limpiando la mesa solo', goldPopup: '⭐ ¡MONEDA DORADA!', attractLabel: 'MODO AUTOMÁTICO',
+            win31Title: '⚠ Mensaje del sistema', win31Ok: 'OK',
+            win31Messages: [
+                'No encuentro señal del sensor de movimiento... este navegador igual no da la talla. ¿Probamos con otro?',
+                'Error 0x00E7042: el sensor volvió con las manos vacías. Te recomiendo cambiar de navegador, ¡gracias por entender!',
+                'El sensor de movimiento está en huelga, no es mi culpa. ¡Cambia de navegador y volvemos a intentarlo!',
+                'Aviso: la señal de movimiento no llega ni a la de tres. Capaz no está de humor hoy, ¡prueba otro navegador para animarlo!'
+            ],
+            events: { double: '🔥 Puntos x2', giant: '🎯 Blanco Gigante', tiny: '🎯 Blanco Mini', wind: '💨 Viento Fuerte', ice: '🧊 Mesa de Hielo', magnet: '🧲 Blanco Magnético' },
+            bosses: { ufo: '🛸 OVNI', chest: '📦 Cofre', eye: '👁️ Ojo de Dragón', portal: '🌀 Portal' },
+            bossAppear: ' ¡apareció!', bossDefeat: ' ¡derrotado!'
+        },
+        'pt': {
+            title: '🌈 Joga o Arco-íris · Flick e voa',
+            overlayTitle: '🌈 Joga o<br>Arco-íris',
+            overlayBody: 'Trata o celular como se fosse uma moeda de verdade:<br>segura firme e dá um flick rápido pra frente,<br>e a moeda desliza na mesa até o alvo arco-íris lá longe.<br>Se for fraquinho não chega, se for forte demais passa direto e volta quicando.',
+            startBtn: '📳 Começar · Permitir sensor de movimento',
+            startSub: 'Tem que ligar o sensor de movimento pra poder jogar',
+            hint: '🤳 Fica parado 2s → flick rápido pra frente',
+            hintFallback: '👆 Desliza pra cima pra jogar · solta pra arremessar',
+            statusWait: '🤳 parado aí', statusFlying: '🪙 voando', statusReady: '✅ manda ver!',
+            autoClean: '🧹 limpando a mesa sozinho', goldPopup: '⭐ MOEDA DOURADA!', attractLabel: 'MODO AUTOMÁTICO',
+            win31Title: '⚠ Mensagem do sistema', win31Ok: 'OK',
+            win31Messages: [
+                'Não achei sinal do sensor de movimento... esse navegador deve não ser flor que se cheire. Bora tentar outro?',
+                'Erro 0x00E7042: o sensor voltou de mãos vazias. Bora trocar de navegador, valeu pela paciência!',
+                'O sensor de movimento tá de greve, juro que não fui eu. Troca de navegador e vamo de novo!',
+                'Aviso: o sinal de movimento não chega nunca... deve não tá no clima hoje, tenta outro navegador pra animar ele!'
+            ],
+            events: { double: '🔥 Pontuação Dobrada', giant: '🎯 Alvo Gigante', tiny: '🎯 Alvo Miniatura', wind: '💨 Vento Forte', ice: '🧊 Mesa de Gelo', magnet: '🧲 Alvo Magnético' },
+            bosses: { ufo: '🛸 OVNI', chest: '📦 Baú do Tesouro', eye: '👁️ Olho de Dragão', portal: '🌀 Portal' },
+            bossAppear: ' apareceu!', bossDefeat: ' derrotado!'
+        },
+        'fr': {
+            title: "🌈 Lance l'Arc-en-ciel · Un flick et hop",
+            overlayTitle: "🌈 Lance<br>l'Arc-en-ciel",
+            overlayBody: "Traite ton téléphone comme une vraie pièce :<br>tiens-le bien, puis fais un flick rapide vers l'avant,<br>et la pièce glissera sur la table jusqu'à la cible arc-en-ciel au loin.<br>Trop mou, ça n'arrive pas ; trop fort, ça dépasse et ça rebondit.",
+            startBtn: '📳 Commencer · Autoriser le capteur de mouvement',
+            startSub: 'Faut activer le capteur de mouvement pour pouvoir lancer',
+            hint: "🤳 Reste stable 2s → flick rapide vers l'avant",
+            hintFallback: '👆 Glisse vers le haut pour lancer · relâche pour tirer',
+            statusWait: '🤳 reste stable', statusFlying: '🪙 en plein vol', statusReady: '✅ vas-y, lance!',
+            autoClean: '🧹 nettoyage automatique', goldPopup: '⭐ PIÈCE EN OR!', attractLabel: 'MODE AUTO · AFK',
+            win31Title: '⚠ Message système', win31Ok: 'OK',
+            win31Messages: [
+                "Aucun signal du capteur de mouvement... ce navigateur n'est peut-être pas doué. On essaie un autre ?",
+                "Erreur 0x00E7042 : le capteur est revenu bredouille. Je te conseille de changer de navigateur, merci de ta compréhension !",
+                "Le capteur de mouvement fait grève, c'est pas ma faute promis. Change de navigateur et on repart !",
+                "Attention : le signal de mouvement n'arrive toujours pas... il fait peut-être la tête aujourd'hui, essaie un autre navigateur pour le calmer !"
+            ],
+            events: { double: '🔥 Score x2', giant: '🎯 Cible Géante', tiny: '🎯 Mini Cible', wind: '💨 Vent Fort', ice: '🧊 Table Glacée', magnet: '🧲 Cible Magnétique' },
+            bosses: { ufo: '🛸 OVNI', chest: '📦 Coffre au Trésor', eye: '👁️ Œil de Dragon', portal: '🌀 Portail' },
+            bossAppear: ' est apparu!', bossDefeat: ' vaincu!'
+        },
+        'de': {
+            title: '🌈 Regenbogen werfen · Ein Flick reicht',
+            overlayTitle: '🌈 Regenbogen<br>werfen',
+            overlayBody: 'Behandle dein Handy wie eine echte Münze:<br>halt es ruhig, dann mach einen schnellen Flick nach vorne,<br>und die Münze rutscht über den Tisch zum Regenbogenziel.<br>Zu schwach kommt nicht an, zu stark schießt drüber und prallt zurück.',
+            startBtn: '📳 Start · Bewegungssensor erlauben',
+            startSub: 'Bewegungssensor muss an sein, sonst geht’s nicht',
+            hint: '🤳 2s ruhig halten → schnell nach vorne flicken',
+            hintFallback: '👆 Nach oben wischen zum Werfen · loslassen zum Abschuss',
+            statusWait: '🤳 ruhig halten', statusFlying: '🪙 in der Luft', statusReady: '✅ los geht’s!',
+            autoClean: '🧹 räumt automatisch auf', goldPopup: '⭐ GOLDMÜNZE!', attractLabel: 'AUTO-MODUS · AFK',
+            win31Title: '⚠ Systemmeldung', win31Ok: 'OK',
+            win31Messages: [
+                'Kein Bewegungssignal gefunden... dieser Browser ist vielleicht einfach nicht dafür gemacht. Anderen Browser probieren?',
+                'Fehler 0x00E7042: Sensor kam mit leeren Händen zurück. Empfehle Browserwechsel, danke für dein Verständnis!',
+                'Der Bewegungssensor streikt, ehrlich nicht meine Schuld. Browser wechseln und nochmal versuchen!',
+                'Achtung: Bewegungssignal kommt einfach nicht. Vielleicht hat er heute schlechte Laune, anderer Browser könnte helfen!'
+            ],
+            events: { double: '🔥 Doppelte Punkte', giant: '🎯 Riesenziel', tiny: '🎯 Mini-Ziel', wind: '💨 Starker Wind', ice: '🧊 Eisiger Tisch', magnet: '🧲 Magnetziel' },
+            bosses: { ufo: '🛸 UFO', chest: '📦 Schatztruhe', eye: '👁️ Drachenauge', portal: '🌀 Portal' },
+            bossAppear: ' erscheint!', bossDefeat: ' besiegt!'
+        },
+        'ru': {
+            title: '🌈 Кидай Радугу · Один флик и вперёд',
+            overlayTitle: '🌈 Кидай<br>Радугу',
+            overlayBody: 'Держи телефон как настоящую монетку:<br>крепко зафиксируй, потом резкий флик вперёд,<br>и монетка заскользит по столу к радужной мишени вдали.<br>Слабо кинешь — не долетит, сильно — перелетит и отскочит назад.',
+            startBtn: '📳 Старт · Разрешить датчик движения',
+            startSub: 'Без датчика движения не кинешь, включи его',
+            hint: '🤳 Замри на 2 сек → резкий флик вперёд',
+            hintFallback: '👆 Свайп вверх, чтобы кинуть · отпусти для броска',
+            statusWait: '🤳 замри', statusFlying: '🪙 летит', statusReady: '✅ кидай!',
+            autoClean: '🧹 автоуборка стола', goldPopup: '⭐ ЗОЛОТАЯ МОНЕТА!', attractLabel: 'АВТОРЕЖИМ · АФК',
+            win31Title: '⚠ Системное сообщение', win31Ok: 'ОК',
+            win31Messages: [
+                'Не могу поймать сигнал датчика движения... этот браузер походу не тянет. Попробуй другой?',
+                'Ошибка 0x00E7042: датчик вернулся ни с чем. Советую сменить браузер, спасибо за понимание!',
+                'Датчик движения бастует, я тут ни при чём. Смени браузер и погнали заново!',
+                'Внимание: сигнал движения всё не идёт... может, у него сегодня не то настроение, попробуй другой браузер!'
+            ],
+            events: { double: '🔥 Двойные очки', giant: '🎯 Гигантская мишень', tiny: '🎯 Мини-мишень', wind: '💨 Сильный ветер', ice: '🧊 Ледяной стол', magnet: '🧲 Магнитная мишень' },
+            bosses: { ufo: '🛸 НЛО', chest: '📦 Сундук', eye: '👁️ Глаз дракона', portal: '🌀 Портал' },
+            bossAppear: ' появился!', bossDefeat: ' повержен!'
+        }
+    };
+    function detectLocale() {
+        const langs = navigator.languages || [navigator.language || 'en'];
+        for (const raw of langs) {
+            const lc = (raw || '').toLowerCase();
+            if (!lc) continue;
+            if (lc.startsWith('zh')) {
+                if (lc.includes('hk') || lc.includes('yue') || lc.includes('hant') || lc.includes('tw') || lc.includes('mo')) return 'zh-HK';
+                return 'zh-CN';
+            }
+            if (lc.startsWith('ja')) return 'ja';
+            if (lc.startsWith('ko')) return 'ko';
+            if (lc.startsWith('es')) return 'es';
+            if (lc.startsWith('pt')) return 'pt';
+            if (lc.startsWith('fr')) return 'fr';
+            if (lc.startsWith('de')) return 'de';
+            if (lc.startsWith('ru')) return 'ru';
+            if (lc.startsWith('en')) return 'en';
+        }
+        return 'en';
+    }
+    const LOCALE = detectLocale();
+    const T = LOCALES[LOCALE] || LOCALES['en'];
+
+    function applyLocale() {
+        document.title = T.title;
+        document.documentElement.lang = LOCALE;
+        const ov = document.querySelector('.overlay h1');
+        if (ov) ov.innerHTML = T.overlayTitle;
+        const ovp = document.querySelector('.overlay p');
+        if (ovp) ovp.innerHTML = T.overlayBody;
+        const startBtnEl = document.getElementById('startBtn');
+        if (startBtnEl) startBtnEl.textContent = T.startBtn;
+        const startSubEl = document.getElementById('startSub');
+        if (startSubEl) startSubEl.textContent = T.startSub;
+        const hintEl = document.getElementById('hint');
+        if (hintEl) hintEl.textContent = T.hint;
+        const cornerStatusEl = document.getElementById('cornerStatus');
+        if (cornerStatusEl) cornerStatusEl.textContent = T.statusWait;
+        const attractLabelEl2 = document.getElementById('attractLabel');
+        if (attractLabelEl2) attractLabelEl2.textContent = T.attractLabel;
+        const win31TitleEl = document.querySelector('.win31-titlebar span');
+        if (win31TitleEl) win31TitleEl.textContent = T.win31Title;
+        const win31OkEl = document.getElementById('win31Ok');
+        if (win31OkEl) win31OkEl.textContent = T.win31Ok;
+    }
+
+    // ============================================================
     //  Procedural audio - fires ONLY from the coin-landed event now.
     //  The previous version also ran a setInterval-driven background
     //  loop; that's exactly the kind of thing Firefox's autoplay /
@@ -610,12 +876,12 @@
     let eventTimer = 0;
 
     const EVENTS = [
-        { name: '🔥 雙倍分數', duration: 15000, apply: () => { eventMultiplier = 2; }, remove: () => { eventMultiplier = 1; }, color: '#ff6600' },
-        { name: '🎯 巨大靶心', duration: 12000, apply: () => { targetScale = 1.6; }, remove: () => { targetScale = 1.0; }, color: '#00ff66' },
-        { name: '🎯 迷你靶心', duration: 10000, apply: () => { targetScale = 0.6; }, remove: () => { targetScale = 1.0; }, color: '#ff3366' },
-        { name: '💨 強風', duration: 8000, apply: () => { windForce = (Math.random() < 0.5 ? -1 : 1) * 0.3; }, remove: () => { windForce = 0; }, color: '#66ccff' },
-        { name: '🧊 溜冰枱面', duration: 10000, apply: () => { frictionOverride = 0.985; }, remove: () => { frictionOverride = null; }, color: '#aaddff' },
-        { name: '🧲 磁力靶', duration: 12000, apply: () => { magneticTarget = true; }, remove: () => { magneticTarget = false; }, color: '#ff66ff' }
+        { get name() { return T.events.double; }, duration: 15000, apply: () => { eventMultiplier = 2; }, remove: () => { eventMultiplier = 1; }, color: '#ff6600' },
+        { get name() { return T.events.giant; }, duration: 12000, apply: () => { targetScale = 1.6; }, remove: () => { targetScale = 1.0; }, color: '#00ff66' },
+        { get name() { return T.events.tiny; }, duration: 10000, apply: () => { targetScale = 0.6; }, remove: () => { targetScale = 1.0; }, color: '#ff3366' },
+        { get name() { return T.events.wind; }, duration: 8000, apply: () => { windForce = (Math.random() < 0.5 ? -1 : 1) * 0.3; }, remove: () => { windForce = 0; }, color: '#66ccff' },
+        { get name() { return T.events.ice; }, duration: 10000, apply: () => { frictionOverride = 0.985; }, remove: () => { frictionOverride = null; }, color: '#aaddff' },
+        { get name() { return T.events.magnet; }, duration: 12000, apply: () => { magneticTarget = true; }, remove: () => { magneticTarget = false; }, color: '#ff66ff' }
     ];
 
     let eventMultiplier = 1;
@@ -658,7 +924,7 @@
     }
 
     const BOSSES = [
-        { name: '🛸 UFO', color: '#00ff88', behavior: 'hover',
+        { get name() { return T.bosses.ufo; }, color: '#00ff88', behavior: 'hover',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -680,7 +946,7 @@
                 ctx.restore();
             }
         },
-        { name: '📦 寶箱', color: '#ffaa00', behavior: 'pulse',
+        { get name() { return T.bosses.chest; }, color: '#ffaa00', behavior: 'pulse',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -698,7 +964,7 @@
                 ctx.restore();
             }
         },
-        { name: '👁️ 龍眼', color: '#ff3333', behavior: 'track',
+        { get name() { return T.bosses.eye; }, color: '#ff3333', behavior: 'track',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -722,7 +988,7 @@
                 ctx.restore();
             }
         },
-        { name: '🌀 傳送門', color: '#aa44ff', behavior: 'spin',
+        { get name() { return T.bosses.portal; }, color: '#aa44ff', behavior: 'spin',
             draw: (ctx, x, y, scale, time) => {
                 ctx.save();
                 ctx.translate(x, y);
@@ -751,10 +1017,10 @@
             bossMode = BOSSES[Math.floor(Math.random() * BOSSES.length)];
             bossHealth = 3;
             bossMaxHealth = 3;
-            showBossBanner(bossMode.name + ' 出現!');
+            showBossBanner(bossMode.name + T.bossAppear);
             playBossSpawn();
         } else if (bossMode && bossHealth <= 0) {
-            showBossBanner(bossMode.name + ' 擊敗!');
+            showBossBanner(bossMode.name + T.bossDefeat);
             playBossDefeat();
             bossMode = null;
             totalScore += 20;
@@ -771,9 +1037,9 @@
 
     function updateStatusVisuals() {
         let stateClass = 'wait';
-        let cornerText = '🤳 揸穩';
-        if (isThrowing || flying) { stateClass = 'flying'; cornerText = '🪙 飛緊'; }
-        else if (motion.state === 'ready') { stateClass = 'ready'; cornerText = '✅ 掟得!'; }
+        let cornerText = T.statusWait;
+        if (isThrowing || flying) { stateClass = 'flying'; cornerText = T.statusFlying; }
+        else if (motion.state === 'ready') { stateClass = 'ready'; cornerText = T.statusReady; }
         statusBar.className = 'status-bar ' + stateClass;
         statusBorder.className = 'status-border ' + stateClass;
         cornerStatus.className = 'corner-status ' + stateClass;
@@ -847,6 +1113,33 @@
         drawRetroTint();
     }
 
+    // ============================================================
+    //  HK arcade-style rainbow skin - the flat, thick-outlined
+    //  semicircle "dome" rainbow (red/yellow/green/blue bands) seen
+    //  on classic Hong Kong game-center coin machines. Alternates in
+    //  as one of the two target looks every time the desk auto-clears,
+    //  purely cosmetic - same RINGS radii and scoring underneath, just
+    //  a different paint job and silhouette.
+    // ============================================================
+    let targetTheme = 'classic';
+    const HK_ARCADE_COLORS = ['#e8352f', '#f7ce23', '#3fa63f', '#2b4ea0']; // outer -> inner: red, yellow, green, blue
+
+    function drawHkArcadeBand(outerR, innerR, color) {
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR, Math.PI, Math.PI * 2, false);
+        if (innerR > 0) {
+            ctx.arc(0, 0, innerR, Math.PI * 2, Math.PI, true);
+        } else {
+            ctx.lineTo(0, 0);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
+
     function drawTarget() {
         ctx.save();
         ctx.translate(target.x, target.y);
@@ -863,6 +1156,23 @@
                 ctx.fillStyle = bossMode.color;
                 ctx.fillRect(-barWidth/2, -70, barWidth * (bossHealth / bossMaxHealth), barHeight);
             }
+        } else if (targetTheme === 'hkarcade') {
+            // Same underlying RINGS radii (and therefore identical
+            // scoring/hit-test) as the classic look - only the visual
+            // shape and colors differ.
+            for (let i = 0; i < RINGS.length; i++) {
+                const outerR = RINGS[i].radius * scale;
+                const innerR = (i + 1 < RINGS.length) ? RINGS[i + 1].radius * scale : 0;
+                drawHkArcadeBand(outerR, innerR, HK_ARCADE_COLORS[i]);
+            }
+            // outer black rim for the classic arcade-plaque look
+            ctx.beginPath();
+            ctx.arc(0, 0, RINGS[0].radius * scale, Math.PI, Math.PI * 2, false);
+            ctx.lineTo(-RINGS[0].radius * scale, 0);
+            ctx.closePath();
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
         } else {
             for (let i = 0; i < RINGS.length; i++) {
                 const r = RINGS[i];
@@ -1036,7 +1346,7 @@
         checkGoldenCoin();
         isCriticalThrow = power > CRITICAL_THRESHOLD;
         if (isCriticalThrow) criticalTrail = [];
-        if (isGoldenCoin) addPopup(coinStartX, coinStartY - 55, '⭐ 金幣!', '#ffd700');
+        if (isGoldenCoin) addPopup(coinStartX, coinStartY - 55, T.goldPopup, '#ffd700');
         updateStatusVisuals();
 
         const deskDistance = coinStartY - target.y;
@@ -1377,14 +1687,8 @@
     // ============================================================
     const win31Dialog = document.getElementById('win31Dialog');
     const win31Msg = document.getElementById('win31Msg');
-    const WIN31_MESSAGES = [
-        '搵唔到手機郁動感應訊號喎，呢個瀏覽器可能唔識玩，不如換過第個瀏覽器試下（例如 Chrome）？',
-        '錯誤代碼 0x00E7042：感應器傳返嚟嘅嘢係得個吉，建議閣下移玉步去第個瀏覽器度，唔該晒！',
-        '本機動作感應罷咗工，非戰之罪，麻煩換過瀏覽器再嚟過，多謝合作！',
-        '警告：郁動感應訊號等咗好耐都未到，可能今日心情唔好，換個瀏覽器氹下佢啦！'
-    ];
     function showWin31Dialog() {
-        win31Msg.textContent = WIN31_MESSAGES[Math.floor(Math.random() * WIN31_MESSAGES.length)];
+        win31Msg.textContent = T.win31Messages[Math.floor(Math.random() * T.win31Messages.length)];
         win31Dialog.classList.add('show');
     }
     function hideWin31Dialog() {
@@ -1450,7 +1754,7 @@
 
     function fallbackToTouch() {
         motion.supported = false;
-        document.getElementById('hint').textContent = '👆 向上滑動掟出 · 鬆手即擲';
+        document.getElementById('hint').textContent = T.hintFallback;
         motion.state = 'ready';
         updateStatusVisuals();
         showWin31Dialog();
@@ -1491,12 +1795,13 @@
         if (coins.length >= AUTO_CLEAN_COUNT) {
             const allSettled = coins.every(c => Date.now() - c.landedAt > 400);
             if (allSettled && !isThrowing && !flying) {
-                addPopup(W / 2, H * 0.5, '🧹 自動清枱', '#ffd700');
+                addPopup(W / 2, H * 0.5, T.autoClean, '#ffd700');
                 playCleanSound();
                 coins.forEach(c => emitParticles(c.x, c.y, 18, '#888', 4, 28));
                 coins = [];
                 comboCount = 0;
                 comboEl.className = 'combo';
+                targetTheme = (targetTheme === 'classic') ? 'hkarcade' : 'classic';
             }
         }
     }
@@ -1543,6 +1848,7 @@
     }
 
     function init() {
+        applyLocale();
         layout();
         computeRings();
         initStars();
