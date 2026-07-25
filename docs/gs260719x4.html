@@ -1448,6 +1448,17 @@
         return Math.sqrt(dx * dx + dy * dy);
     }
 
+    // The HK arcade skin's dome is only the UPPER half of the circle -
+    // its flat base sits at target.y. A coin resting below that line is
+    // outside the drawn silhouette entirely, even if it's radially close
+    // to the center, so it must not score. This mirrors the same "must
+    // be fully within, not touching any border" rule already used for
+    // the ring bands themselves - the baseline counts as a border too.
+    function isWithinHkArcadeDome(landX, landY) {
+        const coinRadius = getCoinCollisionRadius(landY);
+        return (landY + coinRadius * PERSPECTIVE_SQUASH) <= target.y;
+    }
+
     function checkCoinInRing(landX, landY) {
         if (bossMode) {
             const dist = getDistanceToTarget(landX, landY);
@@ -1456,6 +1467,7 @@
             if (dist + coinRadius < bossRadius) return { label: 'boss', pts: 10, color: bossMode.color };
             return null;
         }
+        if (targetTheme === 'hkarcade' && !isWithinHkArcadeDome(landX, landY)) return null;
         const centerDist = getDistanceToTarget(landX, landY);
         const coinRadius = getCoinCollisionRadius(landY);
         for (let i = 0; i < RINGS.length; i++) {
@@ -1709,9 +1721,18 @@
     attractLabelEl.addEventListener('animationend', (e) => {
         if (e.animationName === 'attractGlitchOut') attractLabelEl.classList.remove('hide');
     });
+    // 3x weighted toward the HK arcade skin while attract mode is
+    // running (75% vs 25%, a 3:1 ratio) so it shows up far more often
+    // during the demo loop; real play keeps the plain alternating toggle.
+    function pickTargetTheme(biasHk) {
+        if (biasHk) return Math.random() < 0.75 ? 'hkarcade' : 'classic';
+        return (targetTheme === 'classic') ? 'hkarcade' : 'classic';
+    }
+
     function startDemoMode() {
         clearTimeout(idleTimer);
         demoMode = true;
+        targetTheme = pickTargetTheme(true);
         attractLabelEl.classList.remove('hide');
         attractLabelEl.classList.add('show');
         scheduleDemoThrow();
@@ -1801,7 +1822,7 @@
                 coins = [];
                 comboCount = 0;
                 comboEl.className = 'combo';
-                targetTheme = (targetTheme === 'classic') ? 'hkarcade' : 'classic';
+                targetTheme = pickTargetTheme(demoMode);
             }
         }
     }
