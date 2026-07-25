@@ -337,7 +337,9 @@ const CONFIG = {
     BOMB: {color:'#333333',glow:'rgba(255,0,0,0.6)',speed:0.9,score:-200,probability:0.04},
     CURVE: {color:'#9b59b6',glow:'rgba(155,89,182,0.5)',speed:1.15,score:250,probability:0.08},
     FAST: {color:'#ff1744',glow:'rgba(255,23,68,0.5)',speed:1.8,score:350,probability:0.07},
-    SLOW: {color:'#00e676',glow:'rgba(0,230,118,0.4)',speed:0.5,score:150,probability:0.05}
+    SLOW: {color:'#00e676',glow:'rgba(0,230,118,0.4)',speed:0.5,score:150,probability:0.05},
+    INVISIBLE: {color:'#888888',glow:'rgba(136,136,136,0.4)',speed:1.0,score:150,probability:0.03},
+    MEGA: {color:'#00ff00',glow:'rgba(0,255,0,0.6)',speed:0.6,score:1000,probability:0.02}
   },
   POWERUPS: {
     DOUBLE: {name:'Double Score',color:'#ffd700',duration:10000,icon:'2x'},
@@ -345,7 +347,8 @@ const CONFIG = {
     FREEZE: {name:'Freeze Time',color:'#00bcd4',duration:5000,icon:'F'},
     SLOWMO: {name:'Slow Motion',color:'#ff9800',duration:6000,icon:'M'},
     MAGNET: {name:'Magnet',color:'#9b59b6',duration:8000,icon:'G'},
-    AUTO: {name:'Auto Save',color:'#e74c3c',duration:5000,icon:'A'}
+    AUTO: {name:'Auto Save',color:'#e74c3c',duration:5000,icon:'A'},
+    COMBOBOOST: {name:'Combo Boost',color:'#ff66cc',duration:8000,icon:'C'}
   },
   GAME_MODES: {
     kids: {name:'Kids',desc:'Slow balls, extra lives',lives:5,spawnInterval:2200,speedMult:0.35,time:90,difficulty:1},
@@ -386,8 +389,14 @@ const MATH = {
   capsuleCollision(c1x,c1y,c2x,c2y,r1,cx,cy,r2){return this.pointOnLine(cx,cy,c1x,c1y,c2x,c2y)<=r1+r2},
   easeOutElastic(t){const c4=(2*Math.PI)/3;if(t===0)return 0;if(t===1)return 1;return Math.pow(2,-10*t)*Math.sin((t*10-0.75)*c4)+1},
   easeOutBack(t){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)},
-  easeInOutCubic(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},
-  noise(x){return Math.sin(x*12.9898)*43758.5453-Math.floor(Math.sin(x*12.9898)*43758.5453)}
+  easeInOutCubic(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;},
+  circleLineCollision(cx,cy,r,x1,y1,x2,y2){
+    const dx=x2-x1,dy=y2-y1;const len2=dx*dx+dy*dy;
+    if(len2===0)return this.dist(cx,cy,x1,y1)<=r;
+    let t=((cx-x1)*dx+(cy-y1)*dy)/len2;t=Math.max(0,Math.min(1,t));
+    const px=x1+t*dx,py=y1+t*dy;
+    return this.dist(cx,cy,px,py)<=r+5;
+  }
 };
 
 // ============================================================
@@ -509,7 +518,7 @@ const PARTICLES = {
   },
   spawnConfetti(x,y,z,count){
     count=count||50;const colors=['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff','#ffd700','#ff6600'];
-    for(let i=0;i<count;i++){const angle=Math.random()*Math.PI*2,speed=MATH.rand(3,10);this.spawn(x,y,z,Math.cos(angle)*speed,Math.sin(angle)*speed-4,MATH.rand(-2,2),MATH.rand(1,3),MATH.rand(3,6),MATH.randChoice(colors),'confetti',0.2,0.97);}
+    for(let i=0;i<count;i++){const angle=Math.random()*Math.PI*2,speed=MATH.rand(3,10);this.spawn(x,y,z,Math.cos(angle)*speed,Math.sin(angle)*speed-4,MATH.rand(-2,2),MATH.rand(1,3),MATH.randChoice(colors),'confetti',0.2,0.97);}
   },
   spawnSmoke(x,y,z,count){
     count=count||15;
@@ -586,7 +595,7 @@ const BALLS = {
     const startZ=800+MATH.rand(0,200);
     const targetX=goalX+MATH.rand(0,goalW);
     const targetY=MATH.rand(goalTop,h*0.75);
-    const targetZ=goalZ=100;
+    const targetZ=100;
     const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
@@ -633,6 +642,7 @@ const POSE = {
   lostFrames: 0,
   maxLostFrames: 15,
   cameraFacing: 'user',
+  detecting: false,
 
   async init(){
     this.video=document.getElementById('videoElement');
@@ -659,6 +669,8 @@ const POSE = {
 
   async detect(){
     if(!this.detector||!this.video||this.video.readyState<2)return null;
+    if(this.detecting)return this.lastPose;
+    this.detecting=true;
     try{
       const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:this.mirror});
       this.frameCount++;
@@ -668,13 +680,15 @@ const POSE = {
         this.lostFrames=0;
         this.smoothPose(pose);
         this.lastPose=pose;
+        this.detecting=false;
         return pose;
       }else{
         this.lostFrames++;
         if(this.lostFrames>this.maxLostFrames){this.lastPose=null;this.smoothedKeypoints=[];}
+        this.detecting=false;
         return this.lastPose;
       }
-    }catch(e){console.warn('Detection error:',e);return this.lastPose;}
+    }catch(e){console.warn('Detection error:',e);this.detecting=false;return this.lastPose;}
   },
 
   computeConfidence(pose){
@@ -827,22 +841,25 @@ const COLLISION = {
   checkBallPlayer(ball){
     if(!POSE.smoothedKeypoints.length||ball.collisionCooldown>0)return null;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=RENDERER.width/640;const scaleY=RENDERER.height/480;
+    const scaleX=RENDERER.width / POSE.video.videoWidth;
+    const scaleY=RENDERER.height / POSE.video.videoHeight;
+
+    const kpsScaled = kps.map(kp => kp ? { ...kp, x: kp.x * scaleX, y: kp.y * scaleY } : kp);
 
     // Head collision (circle)
-    const nose=kps[0];const leftEye=kps[1];const rightEye=kps[2];
+    const nose=kpsScaled[0];const leftEye=kpsScaled[1];const rightEye=kpsScaled[2];
     if(nose&&nose.score>0.2){
       const headRadius=Math.max(20,(leftEye&&rightEye&&leftEye.score>0.2&&rightEye.score>0.2)?MATH.dist(leftEye.x,leftEye.y,rightEye.x,rightEye.y)*1.5:30);
-      const hx=nose.x*scaleX,hy=nose.y*scaleY;
+      const hx=nose.x,hy=nose.y;
       const d=MATH.dist(ball.x,ball.y,hx,hy);
       if(d<ball.radius+headRadius)return{part:'HEAD',x:hx,y:hy};
     }
 
     // Torso collision (capsule/rectangle)
-    const ls=kps[5],rs=kps[6],lh=kps[11],rh=kps[12];
+    const ls=kpsScaled[5],rs=kpsScaled[6],lh=kpsScaled[11],rh=kpsScaled[12];
     if(ls&&rs&&lh&&rh&&ls.score>0.2&&rs.score>0.2&&lh.score>0.2&&rh.score>0.2){
-      const tcx=(ls.x+rs.x+lh.x+rh.x)/4*scaleX;const tcy=(ls.y+rs.y+lh.y+rh.y)/4*scaleY;
-      const tw=MATH.dist(ls.x,ls.y,rs.x,rs.y)*scaleX*0.8;const th=MATH.dist((ls.x+rs.x)/2,(ls.y+rs.y)/2,(lh.x+rh.x)/2,(lh.y+rh.y)/2)*scaleY;
+      const tcx=(ls.x+rs.x+lh.x+rh.x)/4;const tcy=(ls.y+rs.y+lh.y+rh.y)/4;
+      const tw=MATH.dist(ls.x,ls.y,rs.x,rs.y)*0.8;const th=MATH.dist((ls.x+rs.x)/2,(ls.y+rs.y)/2,(lh.x+rh.x)/2,(lh.y+rh.y)/2);
       const dx=Math.abs(ball.x-tcx)-tw/2;const dy=Math.abs(ball.y-tcy)-th/2;
       if(dx<ball.radius&&dy<ball.radius)return{part:'TORSO',x:tcx,y:tcy};
     }
@@ -851,12 +868,12 @@ const COLLISION = {
     const armPairs=[[5,7,9],[6,8,10]];
     for(let i=0;i<armPairs.length;i++){
       const[s,e,w]=armPairs[i];
-      const sk=kps[s],ek=kps[e],wk=kps[w];
+      const sk=kpsScaled[s],ek=kpsScaled[e],wk=kpsScaled[w];
       if(sk&&ek&&sk.score>0.2&&ek.score>0.2){
-        const sx=sk.x*scaleX,sy=sk.y*scaleY,ex=ek.x*scaleX,ey=ek.y*scaleY;
+        const sx=sk.x,sy=sk.y,ex=ek.x,ey=ek.y;
         if(MATH.circleLineCollision(ball.x,ball.y,ball.radius,sx,sy,ex,ey))return{part:i===0?'LEFT_ARM':'RIGHT_ARM',x:(sx+ex)/2,y:(sy+ey)/2};
         if(wk&&wk.score>0.2){
-          const wx=wk.x*scaleX,wy=wk.y*scaleY;
+          const wx=wk.x,wy=wk.y;
           if(MATH.circleLineCollision(ball.x,ball.y,ball.radius,ex,ey,wx,wy))return{part:i===0?'LEFT_HAND':'RIGHT_HAND',x:wx,y:wy};
         }
       }
@@ -866,12 +883,12 @@ const COLLISION = {
     const legPairs=[[11,13,15],[12,14,16]];
     for(let i=0;i<legPairs.length;i++){
       const[h,k,a]=legPairs[i];
-      const hk=kps[h],kk=kps[k],ak=kps[a];
+      const hk=kpsScaled[h],kk=kpsScaled[k],ak=kpsScaled[a];
       if(hk&&kk&&hk.score>0.2&&kk.score>0.2){
-        const hx=hk.x*scaleX,hy=hk.y*scaleY,kx=kk.x*scaleX,ky=kk.y*scaleY;
+        const hx=hk.x,hy=hk.y,kx=kk.x,ky=kk.y;
         if(MATH.circleLineCollision(ball.x,ball.y,ball.radius,hx,hy,kx,ky))return{part:i===0?'LEFT_LEG':'RIGHT_LEG',x:(hx+kx)/2,y:(hy+ky)/2};
         if(ak&&ak.score>0.2){
-          const ax=ak.x*scaleX,ay=ak.y*scaleY;
+          const ax=ak.x,ay=ak.y;
           if(MATH.circleLineCollision(ball.x,ball.y,ball.radius,kx,ky,ax,ay))return{part:i===0?'LEFT_FOOT':'RIGHT_FOOT',x:ax,y:ay};
         }
       }
@@ -1155,6 +1172,12 @@ const RENDERER = {
       }else if(ball.type==='ICE'){
         ctx.strokeStyle='rgba(0,191,255,0.6)';ctx.lineWidth=1;
         for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;ctx.beginPath();ctx.moveTo(screenX,screenY);ctx.lineTo(screenX+Math.cos(a)*radius,screenY+Math.sin(a)*radius);ctx.stroke();}
+      }else if(ball.type==='INVISIBLE'){
+        ctx.strokeStyle='rgba(200,200,200,0.3)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(screenX,screenY,radius*0.9,0,Math.PI*2);ctx.stroke();
+      }else if(ball.type==='MEGA'){
+        ctx.strokeStyle='rgba(0,255,0,0.8)';ctx.lineWidth=3;
+        ctx.beginPath();ctx.arc(screenX,screenY,radius*1.3,0,Math.PI*2);ctx.stroke();
       }
 
       // Spin lines
@@ -1202,7 +1225,8 @@ const RENDERER = {
   drawPlayerOverlay(ctx){
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=this.width/640;const scaleY=this.height/480;
+    const scaleX=this.width / POSE.video.videoWidth;
+    const scaleY=this.height / POSE.video.videoHeight;
     const alpha=POSE.confidence*0.6;
 
     // Draw skeleton
@@ -1318,7 +1342,13 @@ const GAME = {
 
   startCalibration(){
     this.state='calibrating';AUDIO.init();AUDIO.resume();
-    POSE.init().then(()=>{CALIBRATION.start();});
+    POSE.init().then(()=>{
+      CALIBRATION.start();
+    }).catch(e=>{
+      console.error(e);
+      alert('Camera access is required for this kiosk. Please allow camera permission.');
+      GAME.backToMenu();
+    });
   },
 
   startCountdown(){
@@ -1438,6 +1468,7 @@ const GAME = {
     let points=info.score;
     if(this.powerups.DOUBLE)points*=2;
     if(this.powerups.AUTO)points=Math.floor(points*1.5);
+    if(this.powerups.COMBOBOOST)points=Math.floor(points*1.3);
 
     this.combo++;if(this.combo>this.maxCombo)this.maxCombo=this.combo;
     const comboMult=Math.min(1+this.combo*0.1,3);
@@ -1456,6 +1487,8 @@ const GAME = {
     if(ball.type==='FIRE')PARTICLES.spawnFire(ball.x,ball.y,0,15);
     if(ball.type==='ICE')PARTICLES.spawnSmoke(ball.x,ball.y,0,8);
     if(ball.type==='RAINBOW')PARTICLES.spawnConfetti(ball.x,ball.y,0,20);
+    if(ball.type==='INVISIBLE'){PARTICLES.spawnSmoke(ball.x,ball.y,0,12);PARTICLES.spawnStars(ball.x,ball.y,8);}
+    if(ball.type==='MEGA'){PARTICLES.spawnStars(ball.x,ball.y,25);AUDIO.playPerfect();}
 
     RENDERER.triggerShake(4,200);
 
@@ -1808,7 +1841,10 @@ const LOOP = {
 
     // Pose detection
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
-      POSE.detect();
+      if (!POSE.detecting) {
+        POSE.detecting = true;
+        POSE.detect().finally(() => { POSE.detecting = false; });
+      }
     }
 
     // Calibration preview drawing
