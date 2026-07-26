@@ -197,6 +197,10 @@ canvas{display:block}
     <div class="cal-title" id="calTitle">Get Ready</div>
     <div class="cal-desc" id="calDesc">We need to calibrate your position for the best experience.</div>
     <div class="cal-progress"><div class="cal-progress-bar" id="calProgressBar" style="width:0%"></div></div>
+    <div class="cal-desc-alt" id="calDescAlt" style="font-size:14px;color:#ffd700;margin-top:-14px;margin-bottom:14px;min-height:18px"></div>
+    <div class="cal-detect-wrap" id="calDetectWrap" style="display:none;width:100%;height:10px;background:rgba(255,255,255,0.1);border-radius:5px;overflow:hidden;margin-bottom:20px">
+      <div id="calDetectBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ffb200,#ff7a00);border-radius:5px;transition:width 0.1s linear"></div>
+    </div>
     <div class="cal-camera-preview" id="calPreview">
       <video id="calVideo" autoplay playsinline muted></video>
       <canvas id="calCanvas"></canvas>
@@ -212,7 +216,7 @@ canvas{display:block}
       </svg>
     </div>
     <div class="cal-countdown hidden" id="calCountdown">3</div>
-    <button class="cal-btn" id="calBtn" onclick="CALIBRATION.start()">START CALIBRATION</button>
+    <button class="cal-btn" id="calBtn" style="display:none" onclick="CALIBRATION.start()">START CALIBRATION</button>
   </div>
 </div>
 <div class="game-over hidden" id="gameOver">
@@ -359,7 +363,7 @@ const CONFIG = {
     AUTO: {name:'Auto Save',color:'#e74c3c',duration:5000,icon:'A'}
   },
   GAME_MODES: {
-    catch: {name:'Catch!',desc:'Raise your hand and catch the ball',lives:8,spawnInterval:1800,speedMult:0.55,time:0,difficulty:1,singleBall:true,handOnly:true,handRadius:90},
+    catch: {name:'Catch!',desc:'Raise your hand and catch the ball',lives:15,spawnInterval:1800,speedMult:0.55,time:60,difficulty:1,singleBall:true,handOnly:true,handRadius:90},
     kids: {name:'Kids',desc:'Slow balls, extra lives',lives:5,spawnInterval:2200,speedMult:0.35,time:90,difficulty:1},
     easy: {name:'Easy',desc:'Relaxed pace',lives:4,spawnInterval:1800,speedMult:0.55,time:75,difficulty:2},
     normal: {name:'Normal',desc:'Standard challenge',lives:3,spawnInterval:1400,speedMult:1.0,time:60,difficulty:3},
@@ -661,6 +665,12 @@ const POSE = {
   maxLostFrames: 15,
   cameraFacing: 'user',
   initializing: false,
+  baselineHandY: null,
+  RAISE_THRESHOLD: 55, // px in 640x480 pose space a wrist must rise above the calibrated resting height
+  // MoveNet's left_wrist/right_wrist labels came out swapped versus what players
+  // actually saw on screen with the mirrored front camera, so we remap here in
+  // one place rather than chasing index 9/10 through every function.
+  WRIST: {left:10, right:9},
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -773,6 +783,16 @@ const POSE = {
     this.cameraFacing=facing;this.mirror=(facing==='user');
     if(this.video&&this.video.srcObject){this.video.srcObject.getTracks().forEach(t=>t.stop());}
     this.setupCamera().catch(e=>console.warn('Camera switch failed:',e));
+  },
+
+  // True once a wrist has risen a meaningful amount above the calibrated resting
+  // height (falls back to "always true" if no baseline was captured, so the
+  // game still works if calibration was skipped).
+  isHandRaised(wristIdx){
+    if(this.baselineHandY==null)return true;
+    const kp=this.smoothedKeypoints[wristIdx];
+    if(!kp||kp.score<0.25)return false;
+    return kp.y<this.baselineHandY-this.RAISE_THRESHOLD;
   }
 };
 
@@ -781,7 +801,13 @@ const POSE = {
 // ============================================================
 const CALIBRATION = {
   step: 0,
-  steps: [
+  steps: [],
+  CATCH_STEPS: [
+    {title:'Step 1 / 2',sub:'準備雙手撲球！',desc:'Stand back so your whole body is visible.',descAlt:'Get ready to catch with both hands!',action:'detect'},
+    {title:'Step 2 / 2',sub:'請放鬆，雙手自然垂下',desc:'RELAX — drop both hands down.',descAlt:'保持唔好郁，偵測緊你最低位置...',action:'baseline'},
+    {title:'校準完成',sub:'READY! READY!',desc:'Calibration complete! Get ready to catch.',descAlt:'',action:'done'}
+  ],
+  FULL_STEPS: [
     {title:'Get Ready',desc:'Stand back so your full body is visible in the camera.',action:'start'},
     {title:'Position Check',desc:'Center yourself in the outline. Make sure lighting is good.',action:'detect'},
     {title:'Raise Hands',desc:'Raise both hands above your head and hold for 2 seconds.',action:'hands'},
@@ -794,8 +820,12 @@ const CALIBRATION = {
   poseCheckTimer: null,
   handsUpTime: 0,
   autoTimer: null,
+  baselineSamples: [],
+  baselineStart: 0,
 
   start(){
+    const mode=GAME.currentMode;
+    this.steps=(mode&&mode.handOnly)?this.CATCH_STEPS:this.FULL_STEPS;
     this.active=true;this.step=0;this.updateUI();document.getElementById('calibrationOverlay').classList.remove('hidden');
     const calVideo=document.getElementById('calVideo');
     if(POSE.video&&POSE.video.srcObject){calVideo.srcObject=POSE.video.srcObject;calVideo.play();}
@@ -807,24 +837,34 @@ const CALIBRATION = {
   startStep(){
     this.clearAutoTimer();
     const s=this.steps[this.step];this.updateUI();
+    const detectWrap=document.getElementById('calDetectWrap');
     if(s.action==='start'){
-      document.getElementById('calBtn').style.display='inline-block';document.getElementById('calBtn').textContent='CONTINUE';document.getElementById('calBtn').onclick=()=>this.next();
-      // Auto-advance for kiosk / hands-free operation
+      detectWrap.style.display='none';
+      document.getElementById('calBtn').style.display='none';
+      // Fully automatic — no tap required anywhere in the flow
       this.autoTimer=setTimeout(()=>{if(this.active&&this.step===0)this.next();},3000);
     }
-    else if(s.action==='detect'){document.getElementById('calBtn').style.display='none';this.startPoseCheck();
+    else if(s.action==='detect'){
+      document.getElementById('calBtn').style.display='none';detectWrap.style.display='block';
+      this.startPoseCheck();
       // Fallback: don't get stuck forever waiting for a clean pose read
-      this.autoTimer=setTimeout(()=>{if(this.active&&this.step===1)this.next();},8000);
+      this.autoTimer=setTimeout(()=>{if(this.active&&this.steps[this.step]===s)this.next();},8000);
     }
-    else if(s.action==='hands'){document.getElementById('calBtn').style.display='none';this.handsUpTime=0;this.startHandsCheck();
+    else if(s.action==='baseline'){
+      document.getElementById('calBtn').style.display='none';detectWrap.style.display='block';
+      this.startBaselineCheck();
+      this.autoTimer=setTimeout(()=>{if(this.active&&this.steps[this.step]===s)this.finishBaseline();},6000);
+    }
+    else if(s.action==='hands'){document.getElementById('calBtn').style.display='none';detectWrap.style.display='none';this.handsUpTime=0;this.startHandsCheck();
       // Fallback: don't get stuck forever waiting for hands-up
-      this.autoTimer=setTimeout(()=>{if(this.active&&this.step===2)this.next();},7000);
+      this.autoTimer=setTimeout(()=>{if(this.active&&this.steps[this.step]===s)this.next();},7000);
     }
-    else if(s.action==='relax'){document.getElementById('calBtn').style.display='none';this.autoTimer=setTimeout(()=>this.next(),2000);}
+    else if(s.action==='relax'){document.getElementById('calBtn').style.display='none';detectWrap.style.display='none';this.autoTimer=setTimeout(()=>this.next(),2000);}
     else if(s.action==='done'){
-      document.getElementById('calBtn').style.display='inline-block';document.getElementById('calBtn').textContent='START GAME';document.getElementById('calBtn').onclick=()=>this.finish();
-      // Auto-start so the kiosk keeps flowing without a tap
-      this.autoTimer=setTimeout(()=>{if(this.active&&this.step===this.steps.length-1)this.finish();},2500);
+      detectWrap.style.display='none';
+      document.getElementById('calBtn').style.display='none';
+      // Fully automatic — no tap required anywhere in the flow
+      this.autoTimer=setTimeout(()=>{if(this.active&&this.step===this.steps.length-1)this.finish();},1500);
     }
   },
 
@@ -832,24 +872,56 @@ const CALIBRATION = {
 
   updateUI(){
     const s=this.steps[this.step];
-    document.getElementById('calStep').textContent='Step '+(this.step+1)+' of '+this.steps.length;
+    document.getElementById('calStep').textContent=s.sub?s.sub:'Step '+(this.step+1)+' of '+this.steps.length;
     document.getElementById('calTitle').textContent=s.title;
     document.getElementById('calDesc').textContent=s.desc;
+    document.getElementById('calDescAlt').textContent=s.descAlt||'';
     document.getElementById('calProgressBar').style.width=((this.step+1)/this.steps.length*100)+'%';
+    document.getElementById('calDetectBar').style.width='0%';
   },
 
   startPoseCheck(){
-    let checks=0;const interval=setInterval(()=>{
-      if(!this.active||this.step!==1){clearInterval(interval);return;}
+    let checks=0;const myStep=this.step;const interval=setInterval(()=>{
+      if(!this.active||this.step!==myStep){clearInterval(interval);return;}
       const bounds=POSE.getPlayerBounds();
-      if(bounds&&bounds.w>80&&bounds.h>150&&POSE.confidence>0.4){checks++;if(checks>10){clearInterval(interval);this.next();}}
-      else{checks=0;}
+      const pct=Math.min(100,(checks/10)*100);
+      const bar=document.getElementById('calDetectBar');if(bar)bar.style.width=pct+'%';
+      if(bounds&&bounds.w>60&&POSE.confidence>0.3){checks++;if(checks>10){clearInterval(interval);this.next();}}
+      else{checks=Math.max(0,checks-1);}
     },100);
   },
 
+  // Step 2: player relaxes and drops both hands — we sample their resting wrist
+  // height so "raise your hand" can be detected relative to a real baseline,
+  // just like the mall kiosk's own calibration.
+  startBaselineCheck(){
+    this.baselineSamples=[];this.baselineStart=performance.now();
+    const myStep=this.step;const interval=setInterval(()=>{
+      if(!this.active||this.step!==myStep){clearInterval(interval);return;}
+      const lw=POSE.smoothedKeypoints[9],rw=POSE.smoothedKeypoints[10];
+      const ys=[];
+      if(lw&&lw.score>0.25)ys.push(lw.y);
+      if(rw&&rw.score>0.25)ys.push(rw.y);
+      if(ys.length)this.baselineSamples.push(ys.reduce((a,b)=>a+b,0)/ys.length);
+      const elapsed=performance.now()-this.baselineStart;
+      const pct=Math.min(100,(elapsed/1500)*100);
+      const bar=document.getElementById('calDetectBar');if(bar)bar.style.width=pct+'%';
+      if(elapsed>=1500&&this.baselineSamples.length>=3){clearInterval(interval);this.finishBaseline();}
+    },100);
+  },
+
+  finishBaseline(){
+    if(this.baselineSamples.length){
+      POSE.baselineHandY=this.baselineSamples.reduce((a,b)=>a+b,0)/this.baselineSamples.length;
+    }else{
+      POSE.baselineHandY=null; // fall back to proximity-only catching
+    }
+    this.next();
+  },
+
   startHandsCheck(){
-    const interval=setInterval(()=>{
-      if(!this.active||this.step!==2){clearInterval(interval);return;}
+    const myStep=this.step;const interval=setInterval(()=>{
+      if(!this.active||this.step!==myStep){clearInterval(interval);return;}
       const leftWrist=POSE.smoothedKeypoints[9];const rightWrist=POSE.smoothedKeypoints[10];
       const leftShoulder=POSE.smoothedKeypoints[5];const rightShoulder=POSE.smoothedKeypoints[6];
       if(leftWrist&&rightWrist&&leftShoulder&&rightShoulder&&leftWrist.score>0.3&&rightWrist.score>0.3){
@@ -894,12 +966,12 @@ const COLLISION = {
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
       const radius=mode.handRadius||90;
-      const leftWrist=kps[9],rightWrist=kps[10];
-      if(leftWrist&&leftWrist.score>0.25){
+      const leftWrist=kps[POSE.WRIST.left],rightWrist=kps[POSE.WRIST.right];
+      if(leftWrist&&leftWrist.score>0.25&&POSE.isHandRaised(POSE.WRIST.left)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
       }
-      if(rightWrist&&rightWrist.score>0.25){
+      if(rightWrist&&rightWrist.score>0.25&&POSE.isHandRaised(POSE.WRIST.right)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
@@ -1097,6 +1169,9 @@ const RENDERER = {
     // Particles (in front)
     this.drawParticles(ctx,'front');
 
+    // Floating +score popups
+    this.drawScorePopups(ctx);
+
     // Player overlay
     if(GAME.state==='playing'||GAME.state==='calibrating'){
       this.drawPlayerOverlay(ctx);
@@ -1276,6 +1351,21 @@ const RENDERER = {
     ctx.lineTo(cx,cy-outerR);ctx.closePath();ctx.fill();
   },
 
+  drawScorePopups(ctx){
+    for(const p of GAME.scorePopups){
+      const alpha=Math.min(1,p.life/1.1);
+      ctx.save();
+      ctx.globalAlpha=alpha;
+      ctx.font='bold 30px Segoe UI, sans-serif';
+      ctx.textAlign='center';
+      ctx.fillStyle='#ffd700';
+      ctx.strokeStyle='rgba(0,0,0,0.6)';ctx.lineWidth=4;
+      ctx.strokeText(p.text,p.x,p.y);
+      ctx.fillText(p.text,p.x,p.y);
+      ctx.restore();
+    }
+  },
+
   drawPlayerOverlay(ctx){
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
@@ -1309,15 +1399,18 @@ const RENDERER = {
 
     // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      const leftWrist=kps[9],rightWrist=kps[10];
-      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff');
-      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a');
+      const leftWrist=kps[POSE.WRIST.left],rightWrist=kps[POSE.WRIST.right];
+      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(POSE.WRIST.left));
+      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(POSE.WRIST.right));
     }
   },
 
-  drawGlove(ctx,x,y,color){
+  drawGlove(ctx,x,y,color,raised){
     ctx.save();ctx.translate(x,y);
-    ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=10;
+    const scale=raised?1.25:0.85;
+    ctx.scale(scale,scale);
+    ctx.shadowColor=raised?'rgba(255,255,255,0.7)':'rgba(0,0,0,0.4)';ctx.shadowBlur=raised?18:8;
+    ctx.globalAlpha=raised?1:0.6;
     // Palm
     ctx.fillStyle=color;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.fill();
@@ -1328,6 +1421,7 @@ const RENDERER = {
     ctx.shadowBlur=0;
     ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.stroke();
+    ctx.globalAlpha=1;
     ctx.restore();
   },
 
@@ -1368,6 +1462,9 @@ const GAME = {
   frameCount: 0,
   lastFpsTime: 0,
   kioskEnabled: false,
+  kioskRestartTimer: null,
+  scorePopups: [],
+  finalCountdownShown: false,
 
   init(){
     this.lastActivity=performance.now();
@@ -1403,6 +1500,7 @@ const GAME = {
 
   selectMode(modeKey){
     this.currentMode={...CONFIG.GAME_MODES[modeKey],key:modeKey};
+    document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('modeSelect').classList.add('hidden');
     this.startCalibration();
   },
@@ -1444,7 +1542,7 @@ const GAME = {
     this.score=0;this.lives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
     this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
     this.accuracy=100;this.powerups={};this.activePowerups=[];
-    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();
+    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;
     document.getElementById('gameOver').classList.add('hidden');
     document.getElementById('pauseMenu').classList.add('hidden');
     document.getElementById('attractOverlay').style.display='none';
@@ -1456,6 +1554,7 @@ const GAME = {
         if(this.state!=='playing')return;
         this.timeLeft--;
         if(this.timeLeft<=10&&this.timeLeft>0)AUDIO.playCountdown();
+        if(this.timeLeft===10&&!this.finalCountdownShown){this.finalCountdownShown=true;this.showCenterMessage('FINAL 10 SECONDS!','Go go go!');}
         if(this.timeLeft<=0){this.timeLeft=0;this.endGame();}
         this.updateHUD();
       },1000);
@@ -1511,6 +1610,11 @@ const GAME = {
     document.getElementById('centerMessage').style.display='none';
     BALLS.clear();PARTICLES.clear();AUDIO.stopMusic();AUDIO.startMusic();
     this.startAttractMode();
+    // Kiosk keeps cycling on its own — don't wait on the 30s idle timer between rounds
+    if(SETTINGS.values.kioskMode){
+      if(this.kioskRestartTimer)clearTimeout(this.kioskRestartTimer);
+      this.kioskRestartTimer=setTimeout(()=>{if(this.state==='menu')this.selectMode('catch');},4000);
+    }
   },
 
   endGame(){
@@ -1554,6 +1658,7 @@ const GAME = {
     else if(this.combo>=5){AUDIO.playPerfect();this.showCenterMessage('AMAZING!','Combo x'+this.combo);}
 
     PARTICLES.spawnExplosion(ball.x,ball.y,0,20,info.color);
+    this.scorePopups.push({x:ball.x,y:ball.y,text:'+'+points,life:1.1,vy:-55});
     if(ball.type==='GOLDEN'){PARTICLES.spawnConfetti(ball.x,ball.y,0,30);AUDIO.playPerfect();}
     if(ball.type==='FIRE')PARTICLES.spawnFire(ball.x,ball.y,0,15);
     if(ball.type==='ICE')PARTICLES.spawnSmoke(ball.x,ball.y,0,8);
@@ -1640,6 +1745,14 @@ const GAME = {
     this.updatePowerupDisplay();
   },
 
+  updateScorePopups(dt){
+    for(let i=this.scorePopups.length-1;i>=0;i--){
+      const p=this.scorePopups[i];
+      p.y+=p.vy*dt;p.life-=dt;
+      if(p.life<=0)this.scorePopups.splice(i,1);
+    }
+  },
+
   showCenterMessage(title,sub){
     const el=document.getElementById('centerMessage');
     document.getElementById('msgTitle').textContent=title;
@@ -1702,7 +1815,7 @@ const GAME = {
         const idle=(performance.now()-this.lastActivity)/1000;
         if(idle>15)document.getElementById('attractOverlay').style.display='flex';
         else document.getElementById('attractOverlay').style.display='none';
-        if(idle>30&&SETTINGS.values.kioskMode){this.startModeSelect();this.selectMode('catch');}
+        if(idle>30&&SETTINGS.values.kioskMode){this.selectMode('catch');}
       }
     },1000);
   },
@@ -1714,7 +1827,7 @@ const GAME = {
     document.body.style.cursor='none';
     const kioskToggle=document.getElementById('toggleKiosk');
     if(kioskToggle)kioskToggle.classList.add('on');
-    setTimeout(()=>{if(this.state==='menu'){this.startModeSelect();this.selectMode('catch');}},5000);
+    setTimeout(()=>{if(this.state==='menu')this.selectMode('catch');},1500);
   },
 
   showBootError(message){
@@ -1968,6 +2081,7 @@ const LOOP = {
 
     // Update powerups
     GAME.updatePowerups(dt);
+    GAME.updateScorePopups(dt);
 
     // Kiosk idle check
     if(SETTINGS.values.kioskMode&&GAME.state==='gameover'){
