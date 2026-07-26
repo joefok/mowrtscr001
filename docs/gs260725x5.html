@@ -265,6 +265,7 @@ canvas{display:block}
     <div class="setting-row"><label>Difficulty</label><select class="setting-select" id="difficultySelect" onchange="SETTINGS.changeDifficulty(this.value)"><option value="kids">Kids</option><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option><option value="expert">Expert</option></select></div>
     <div class="setting-row"><label>Reduced Motion</label><div class="setting-toggle" id="toggleReducedMotion" onclick="SETTINGS.toggle('reducedMotion')"></div></div>
     <div class="setting-row"><label>Color Blind Mode</label><div class="setting-toggle" id="toggleColorBlind" onclick="SETTINGS.toggle('colorBlind')"></div></div>
+    <div class="setting-row"><label>Swap Hands</label><div class="setting-toggle" id="toggleSwapHands" onclick="SETTINGS.toggle('swapHands')"></div></div>
     <div class="setting-row"><label>Show FPS</label><div class="setting-toggle on" id="toggleFps" onclick="SETTINGS.toggle('showFps')"></div></div>
     <div class="setting-row"><label>Kiosk Mode</label><div class="setting-toggle" id="toggleKiosk" onclick="SETTINGS.toggle('kioskMode')"></div></div>
     <div class="setting-row"><label>Debug Overlay</label><div class="setting-toggle" id="toggleDebug" onclick="SETTINGS.toggle('debug')"></div></div>
@@ -667,10 +668,9 @@ const POSE = {
   initializing: false,
   baselineHandY: null,
   RAISE_THRESHOLD: 55, // px in 640x480 pose space a wrist must rise above the calibrated resting height
-  // MoveNet's left_wrist/right_wrist labels came out swapped versus what players
-  // actually saw on screen with the mirrored front camera, so we remap here in
-  // one place rather than chasing index 9/10 through every function.
-  WRIST: {left:10, right:9},
+  // MoveNet + flipHorizontal already returns left_wrist/right_wrist correctly
+  // matched to the mirrored front-camera view — no remap needed here.
+  WRIST: {left:9, right:10},
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -793,6 +793,15 @@ const POSE = {
     const kp=this.smoothedKeypoints[wristIdx];
     if(!kp||kp.score<0.25)return false;
     return kp.y<this.baselineHandY-this.RAISE_THRESHOLD;
+  },
+
+  // Reads the current wrist index for a screen side, honoring the on-device
+  // "Swap Hands" setting in case the camera/mirroring behaves differently
+  // than expected on a given device.
+  getWrist(side){
+    const swap=(typeof SETTINGS!=='undefined')&&SETTINGS.values.swapHands;
+    if(side==='left')return swap?this.WRIST.right:this.WRIST.left;
+    return swap?this.WRIST.left:this.WRIST.right;
   }
 };
 
@@ -966,12 +975,13 @@ const COLLISION = {
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
       const radius=mode.handRadius||90;
-      const leftWrist=kps[POSE.WRIST.left],rightWrist=kps[POSE.WRIST.right];
-      if(leftWrist&&leftWrist.score>0.25&&POSE.isHandRaised(POSE.WRIST.left)){
+      const leftIdx=POSE.getWrist('left'),rightIdx=POSE.getWrist('right');
+      const leftWrist=kps[leftIdx],rightWrist=kps[rightIdx];
+      if(leftWrist&&leftWrist.score>0.25&&POSE.isHandRaised(leftIdx)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
       }
-      if(rightWrist&&rightWrist.score>0.25&&POSE.isHandRaised(POSE.WRIST.right)){
+      if(rightWrist&&rightWrist.score>0.25&&POSE.isHandRaised(rightIdx)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
@@ -1290,10 +1300,7 @@ const RENDERER = {
 
       // Ball pattern
       if(ball.type==='NORMAL'){
-        ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1.5;
-        ctx.beginPath();ctx.arc(screenX,screenY,radius*0.7,0.2,1.2);ctx.stroke();
-        ctx.beginPath();ctx.arc(screenX,screenY,radius*0.7,2.2,3.2);ctx.stroke();
-        ctx.beginPath();ctx.arc(screenX,screenY,radius*0.4,4.2,5.2);ctx.stroke();
+        this.drawSoccerPattern(ctx,screenX,screenY,radius,ball.spin);
       }else if(ball.type==='GOLDEN'){
         ctx.strokeStyle='rgba(255,215,0,0.8)';ctx.lineWidth=2;
         ctx.beginPath();ctx.arc(screenX,screenY,radius*0.6,0,Math.PI*2);ctx.stroke();
@@ -1351,6 +1358,36 @@ const RENDERER = {
     ctx.lineTo(cx,cy-outerR);ctx.closePath();ctx.fill();
   },
 
+  // Classic black-and-white football pattern: a central pentagon with five
+  // seams radiating out to small hexagon caps at the edge, rotating with the
+  // ball's spin so it visibly "rolls" through the air like a real football.
+  drawSoccerPattern(ctx,cx,cy,radius,spin){
+    ctx.save();
+    ctx.translate(cx,cy);ctx.rotate(spin);
+    const pentR=radius*0.4;
+    const verts=[];
+    for(let i=0;i<5;i++){
+      const a=-Math.PI/2+i*(Math.PI*2/5);
+      verts.push([Math.cos(a)*pentR,Math.sin(a)*pentR]);
+    }
+    // Center pentagon
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();ctx.moveTo(verts[0][0],verts[0][1]);
+    for(let i=1;i<5;i++)ctx.lineTo(verts[i][0],verts[i][1]);
+    ctx.closePath();ctx.fill();
+    // Seams radiating to the edge, each capped with a small hexagon patch
+    for(let i=0;i<5;i++){
+      const a=-Math.PI/2+i*(Math.PI*2/5);
+      const vx=verts[i][0],vy=verts[i][1];
+      const ex=Math.cos(a)*radius*0.92,ey=Math.sin(a)*radius*0.92;
+      ctx.strokeStyle='#1a1a1a';ctx.lineWidth=Math.max(1.5,radius*0.06);
+      ctx.beginPath();ctx.moveTo(vx,vy);ctx.lineTo(ex,ey);ctx.stroke();
+      // small dark patch near the edge like a partial hexagon panel
+      ctx.beginPath();ctx.arc(ex,ey,radius*0.16,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  },
+
   drawScorePopups(ctx){
     for(const p of GAME.scorePopups){
       const alpha=Math.min(1,p.life/1.1);
@@ -1399,9 +1436,10 @@ const RENDERER = {
 
     // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      const leftWrist=kps[POSE.WRIST.left],rightWrist=kps[POSE.WRIST.right];
-      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(POSE.WRIST.left));
-      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(POSE.WRIST.right));
+      const leftIdx=POSE.getWrist('left'),rightIdx=POSE.getWrist('right');
+      const leftWrist=kps[leftIdx],rightWrist=kps[rightIdx];
+      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(leftIdx));
+      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(rightIdx));
     }
   },
 
@@ -1873,6 +1911,7 @@ const SETTINGS = {
     difficulty: 'normal',
     reducedMotion: false,
     colorBlind: false,
+    swapHands: false,
     showFps: true,
     kioskMode: true,
     debug: false,
@@ -1911,7 +1950,7 @@ const SETTINGS = {
   changeDifficulty(val){this.values.difficulty=val;this.save();},
 
   updateUI(){
-    const toggles={music:'toggleMusic',sfx:'toggleSfx',reducedMotion:'toggleReducedMotion',colorBlind:'toggleColorBlind',showFps:'toggleFps',kioskMode:'toggleKiosk',debug:'toggleDebug'};
+    const toggles={music:'toggleMusic',sfx:'toggleSfx',reducedMotion:'toggleReducedMotion',colorBlind:'toggleColorBlind',showFps:'toggleFps',kioskMode:'toggleKiosk',debug:'toggleDebug',swapHands:'toggleSwapHands'};
     for(const[key,id]of Object.entries(toggles)){
       const el=document.getElementById(id);if(el)el.classList.toggle('on',this.values[key]);
     }
