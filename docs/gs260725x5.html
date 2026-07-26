@@ -359,6 +359,7 @@ const CONFIG = {
     AUTO: {name:'Auto Save',color:'#e74c3c',duration:5000,icon:'A'}
   },
   GAME_MODES: {
+    catch: {name:'Catch!',desc:'Raise your hand and catch the ball',lives:8,spawnInterval:1800,speedMult:0.55,time:0,difficulty:1,singleBall:true,handOnly:true,handRadius:90},
     kids: {name:'Kids',desc:'Slow balls, extra lives',lives:5,spawnInterval:2200,speedMult:0.35,time:90,difficulty:1},
     easy: {name:'Easy',desc:'Relaxed pace',lives:4,spawnInterval:1800,speedMult:0.55,time:75,difficulty:2},
     normal: {name:'Normal',desc:'Standard challenge',lives:3,spawnInterval:1400,speedMult:1.0,time:60,difficulty:3},
@@ -595,8 +596,22 @@ const BALLS = {
     const startX=MATH.rand(w*0.1,w*0.9);
     const startY=MATH.rand(goalTop*0.3,goalTop*0.8);
     const startZ=800+MATH.rand(0,200);
-    const targetX=goalX+MATH.rand(0,goalW);
-    const targetY=MATH.rand(goalTop,h*0.75);
+    let targetX=goalX+MATH.rand(0,goalW);
+    let targetY=MATH.rand(goalTop,h*0.75);
+    if(mode.handOnly){
+      // Aim roughly toward wherever the player's tracked hands currently are,
+      // so a raised hand has a real chance to catch it (like the reference kiosk)
+      const lw=POSE.smoothedKeypoints[9],rw=POSE.smoothedKeypoints[10];
+      const scaleX=w/640,scaleY=h/480;
+      const handXs=[];
+      if(lw&&lw.score>0.3)handXs.push(lw.x*scaleX);
+      if(rw&&rw.score>0.3)handXs.push(rw.x*scaleX);
+      if(handXs.length){
+        const avgHandX=handXs.reduce((a,b)=>a+b,0)/handXs.length;
+        targetX=MATH.clamp(MATH.lerp(targetX,avgHandX,0.6),goalX+20,goalX+goalW-20);
+      }
+      targetY=MATH.rand(h*0.32,h*0.55);
+    }
     const targetZ=100;
     const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
@@ -617,7 +632,8 @@ const BALLS = {
     const goalY=RENDERER.height*0.25;
     const goalRect={x:goalX,y:goalY,w:goalW,h:goalH};
     this.spawnTimer-=dt*1000;
-    if(this.spawnTimer<=0&&GAME.state==='playing'){
+    const canSpawn=!mode.singleBall||this.active.filter(b=>b.active).length===0;
+    if(this.spawnTimer<=0&&GAME.state==='playing'&&canSpawn){
       this.spawn();
       const baseInterval=mode.spawnInterval/this.difficultyMult;
       this.spawnTimer=MATH.rand(baseInterval*0.7,baseInterval*1.3);
@@ -873,6 +889,22 @@ const COLLISION = {
     if(!POSE.smoothedKeypoints.length||ball.collisionCooldown>0)return null;
     const kps=POSE.smoothedKeypoints;
     const scaleX=RENDERER.width/640;const scaleY=RENDERER.height/480;
+
+    // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
+    const mode=GAME.currentMode;
+    if(mode&&mode.handOnly){
+      const radius=mode.handRadius||90;
+      const leftWrist=kps[9],rightWrist=kps[10];
+      if(leftWrist&&leftWrist.score>0.25){
+        const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
+        if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
+      }
+      if(rightWrist&&rightWrist.score>0.25){
+        const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
+        if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
+      }
+      return null;
+    }
 
     // Head collision (circle)
     const nose=kps[0];const leftEye=kps[1];const rightEye=kps[2];
@@ -1274,6 +1306,29 @@ const RENDERER = {
       ctx.fillStyle='rgba(0,0,0,0.15)';
       ctx.beginPath();ctx.ellipse(bounds.cx*scaleX,this.groundY,bounds.w*scaleX*0.5,10,0,0,Math.PI*2);ctx.fill();
     }
+
+    // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
+    if(GAME.currentMode&&GAME.currentMode.handOnly){
+      const leftWrist=kps[9],rightWrist=kps[10];
+      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff');
+      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a');
+    }
+  },
+
+  drawGlove(ctx,x,y,color){
+    ctx.save();ctx.translate(x,y);
+    ctx.shadowColor='rgba(0,0,0,0.4)';ctx.shadowBlur=10;
+    // Palm
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.fill();
+    // Fingers
+    for(let i=-2;i<=2;i++){
+      ctx.beginPath();ctx.ellipse(i*9,-16,6,14,0,0,Math.PI*2);ctx.fill();
+    }
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
   },
 
   darkenColor(color,factor){
@@ -1647,7 +1702,7 @@ const GAME = {
         const idle=(performance.now()-this.lastActivity)/1000;
         if(idle>15)document.getElementById('attractOverlay').style.display='flex';
         else document.getElementById('attractOverlay').style.display='none';
-        if(idle>30&&SETTINGS.values.kioskMode){this.startModeSelect();this.selectMode('normal');}
+        if(idle>30&&SETTINGS.values.kioskMode){this.startModeSelect();this.selectMode('catch');}
       }
     },1000);
   },
@@ -1659,7 +1714,7 @@ const GAME = {
     document.body.style.cursor='none';
     const kioskToggle=document.getElementById('toggleKiosk');
     if(kioskToggle)kioskToggle.classList.add('on');
-    setTimeout(()=>{if(this.state==='menu'){this.startModeSelect();this.selectMode('normal');}},5000);
+    setTimeout(()=>{if(this.state==='menu'){this.startModeSelect();this.selectMode('catch');}},5000);
   },
 
   showBootError(message){
