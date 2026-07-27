@@ -595,8 +595,11 @@ const BALLS = {
     const mode=GAME.currentMode||CONFIG.GAME_MODES.normal;
     const w=RENDERER.width,h=RENDERER.height;
     const goalW=w*CONFIG.GOAL_WIDTH_RATIO,goalX=(w-goalW)/2,goalTop=h*0.25;
-    let type='NORMAL';const r=Math.random();let cum=0;
-    for(const[t,info]of Object.entries(CONFIG.BALL_TYPES)){cum+=info.probability;if(r<cum){type=t;break}}
+    let type='NORMAL';
+    if(!mode.handOnly){
+      const r=Math.random();let cum=0;
+      for(const[t,info]of Object.entries(CONFIG.BALL_TYPES)){cum+=info.probability;if(r<cum){type=t;break}}
+    }
     const info=CONFIG.BALL_TYPES[type];
     const startX=MATH.rand(w*0.1,w*0.9);
     const startY=MATH.rand(goalTop*0.3,goalTop*0.8);
@@ -627,6 +630,7 @@ const BALLS = {
     if(!b){b=new Ball();this.pool.push(b);}
     b.spawn(type,startX,startY,startZ,vx,vy,vz,radius);
     this.active.push(b);
+    KICKER.trigger();
   },
   update(dt){
     const mode=GAME.currentMode||CONFIG.GAME_MODES.normal;
@@ -668,9 +672,6 @@ const POSE = {
   initializing: false,
   baselineHandY: null,
   RAISE_THRESHOLD: 55, // px in 640x480 pose space a wrist must rise above the calibrated resting height
-  // MoveNet + flipHorizontal already returns left_wrist/right_wrist correctly
-  // matched to the mirrored front-camera view — no remap needed here.
-  WRIST: {left:9, right:10},
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -788,9 +789,8 @@ const POSE = {
   // True once a wrist has risen a meaningful amount above the calibrated resting
   // height (falls back to "always true" if no baseline was captured, so the
   // game still works if calibration was skipped).
-  isHandRaised(wristIdx){
+  isHandRaised(kp){
     if(this.baselineHandY==null)return true;
-    const kp=this.smoothedKeypoints[wristIdx];
     if(!kp||kp.score<0.25)return false;
     return kp.y<this.baselineHandY-this.RAISE_THRESHOLD;
   },
@@ -798,10 +798,21 @@ const POSE = {
   // Reads the current wrist index for a screen side, honoring the on-device
   // "Swap Hands" setting in case the camera/mirroring behaves differently
   // than expected on a given device.
-  getWrist(side){
-    const swap=(typeof SETTINGS!=='undefined')&&SETTINGS.values.swapHands;
-    if(side==='left')return swap?this.WRIST.right:this.WRIST.left;
-    return swap?this.WRIST.left:this.WRIST.right;
+  // We no longer trust MoveNet's own left_wrist/right_wrist labels for this —
+  // camera mirroring made that unreliable. Instead we look at where each wrist
+  // ACTUALLY is on screen right now and call whichever one has the smaller x
+  // "left": that guarantees "move your left hand" always moves the glove on
+  // the left side of the screen, regardless of any label or mirror confusion.
+  getWristsBySide(){
+    const a=this.smoothedKeypoints[9],b=this.smoothedKeypoints[10];
+    const aOk=a&&a.score>0.25,bOk=b&&b.score>0.25;
+    let result;
+    if(aOk&&bOk)result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
+    else if(aOk)result={left:a,right:null};
+    else if(bOk)result={left:null,right:b};
+    else result={left:null,right:null};
+    if(SETTINGS&&SETTINGS.values.swapHands){const t=result.left;result.left=result.right;result.right=t;}
+    return result;
   }
 };
 
@@ -975,13 +986,12 @@ const COLLISION = {
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
       const radius=mode.handRadius||90;
-      const leftIdx=POSE.getWrist('left'),rightIdx=POSE.getWrist('right');
-      const leftWrist=kps[leftIdx],rightWrist=kps[rightIdx];
-      if(leftWrist&&leftWrist.score>0.25&&POSE.isHandRaised(leftIdx)){
+      const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
+      if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
       }
-      if(rightWrist&&rightWrist.score>0.25&&POSE.isHandRaised(rightIdx)){
+      if(rightWrist&&POSE.isHandRaised(rightWrist)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
         if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
@@ -1043,6 +1053,78 @@ const COLLISION = {
 // ============================================================
 // RENDERER (Procedural Graphics Engine)
 // ============================================================
+// ============================================================
+// KICKER CHARACTER (cartoon mascot that kicks the ball out to the player)
+// ============================================================
+const KICKER = {
+  kickTimer: 0,
+  kickDuration: 0.45,
+  bobPhase: 0,
+
+  trigger(){this.kickTimer=this.kickDuration;},
+
+  update(dt){
+    if(this.kickTimer>0)this.kickTimer=Math.max(0,this.kickTimer-dt);
+    this.bobPhase+=dt;
+  },
+
+  draw(ctx){
+    const w=RENDERER.width,h=RENDERER.height;
+    const x=w*0.5,y=h*0.36;
+    const scale=Math.min(w,h)*0.12;
+    // 0 at the start of the kick, 1 once it's finished; the leg swing peaks mid-motion
+    const progress=1-(this.kickTimer/this.kickDuration);
+    const kickPhase=this.kickTimer>0?Math.sin(progress*Math.PI):0;
+    const idleBob=Math.sin(this.bobPhase*2)*scale*0.03;
+
+    ctx.save();
+    ctx.translate(x,y+idleBob);
+
+    // Ground shadow
+    ctx.fillStyle='rgba(0,0,0,0.25)';
+    ctx.beginPath();ctx.ellipse(0,scale*0.95,scale*0.55,scale*0.14,0,0,Math.PI*2);ctx.fill();
+
+    // Back (planted) leg
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(-scale*0.32,scale*0.5,scale*0.18,scale*0.42);
+    ctx.fillStyle='#2a2a2a';ctx.fillRect(-scale*0.36,scale*0.88,scale*0.26,scale*0.12);
+
+    // Kicking leg — swings forward from the hip on every throw
+    ctx.save();
+    ctx.translate(scale*0.14,scale*0.5);
+    ctx.rotate(-kickPhase*1.0);
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(-scale*0.09,0,scale*0.18,scale*0.42);
+    ctx.fillStyle='#2a2a2a';ctx.fillRect(-scale*0.13,scale*0.38,scale*0.26,scale*0.12);
+    ctx.restore();
+
+    // Body
+    const bodyGrad=ctx.createRadialGradient(-scale*0.15,-scale*0.2,scale*0.1,0,0,scale*0.62);
+    bodyGrad.addColorStop(0,'#8477e0');bodyGrad.addColorStop(1,'#4c3fa8');
+    ctx.fillStyle=bodyGrad;
+    ctx.beginPath();ctx.ellipse(0,0,scale*0.5,scale*0.62,0,0,Math.PI*2);ctx.fill();
+
+    // Horns
+    ctx.fillStyle='#f5f5f5';
+    ctx.beginPath();ctx.moveTo(-scale*0.32,-scale*0.55);ctx.quadraticCurveTo(-scale*0.52,-scale*0.98,-scale*0.2,-scale*0.7);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(scale*0.32,-scale*0.55);ctx.quadraticCurveTo(scale*0.52,-scale*0.98,scale*0.2,-scale*0.7);ctx.closePath();ctx.fill();
+
+    // Eyes
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();ctx.arc(-scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);ctx.fill();
+
+    // Grinning mouth with little teeth
+    ctx.fillStyle='#1a1a1a';
+    ctx.beginPath();ctx.ellipse(0,scale*0.2,scale*0.28,scale*0.15,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ffffff';
+    for(let i=-2;i<=2;i++){
+      ctx.beginPath();ctx.moveTo(i*scale*0.09-scale*0.03,scale*0.08);ctx.lineTo(i*scale*0.09+scale*0.03,scale*0.08);ctx.lineTo(i*scale*0.09,scale*0.2);ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+};
+
 const RENDERER = {
   canvas: null, ctx: null, width: 0, height: 0, groundY: 0,
   shakeIntensity: 0, shakeTimer: 0, flashIntensity: 0,
@@ -1169,6 +1251,9 @@ const RENDERER = {
 
     // Goal net
     this.drawGoalNet(ctx,w,h);
+
+    // Kicker mascot — the "far center" character the player watches kick the ball out
+    if(GAME.state==='playing'||GAME.state==='countdown')KICKER.draw(ctx);
 
     // Particles (behind balls)
     this.drawParticles(ctx,'behind');
@@ -1436,10 +1521,9 @@ const RENDERER = {
 
     // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      const leftIdx=POSE.getWrist('left'),rightIdx=POSE.getWrist('right');
-      const leftWrist=kps[leftIdx],rightWrist=kps[rightIdx];
-      if(leftWrist&&leftWrist.score>0.25)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(leftIdx));
-      if(rightWrist&&rightWrist.score>0.25)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(rightIdx));
+      const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
+      if(leftWrist)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(leftWrist));
+      if(rightWrist)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(rightWrist));
     }
   },
 
@@ -1580,7 +1664,7 @@ const GAME = {
     this.score=0;this.lives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
     this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
     this.accuracy=100;this.powerups={};this.activePowerups=[];
-    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;
+    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;
     document.getElementById('gameOver').classList.add('hidden');
     document.getElementById('pauseMenu').classList.add('hidden');
     document.getElementById('attractOverlay').style.display='none';
@@ -2114,6 +2198,7 @@ const LOOP = {
 
     // Update balls
     BALLS.update(dt);
+    KICKER.update(dt);
 
     // Update particles
     PARTICLES.update(dt);
