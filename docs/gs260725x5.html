@@ -614,12 +614,18 @@ const BALLS = {
     let targetX=goalX+MATH.rand(0,goalW);
     let targetY=MATH.rand(goalTop,h*0.75);
     if(mode.handOnly){
-      // Random target within a realistic catch band — NOT aimed at wherever the
-      // player's hand currently is. Auto-aiming there made the game trivial
-      // (stand still, always catch); real physics doesn't know where your
-      // hand is, so the player has to actually react and move to it.
-      targetX=MATH.rand(goalX+goalW*0.15,goalX+goalW*0.85);
-      targetY=MATH.rand(h*0.30,h*0.58);
+      // Aim like a real shooter — mostly for the corners (harder for a keeper
+      // to reach), only occasionally down the middle. Never based on where
+      // the player's hand currently is; they have to react and move to it.
+      const corner=Math.random();
+      if(corner<0.42){
+        targetX=MATH.rand(goalX+goalW*0.06,goalX+goalW*0.30); // left corner
+      }else if(corner<0.84){
+        targetX=MATH.rand(goalX+goalW*0.70,goalX+goalW*0.94); // right corner
+      }else{
+        targetX=MATH.rand(goalX+goalW*0.38,goalX+goalW*0.62); // occasional center
+      }
+      targetY=MATH.rand(h*0.28,h*0.60);
     }
     const targetZ=100;
     const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
@@ -996,15 +1002,22 @@ const COLLISION = {
     // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
+      // The ball only becomes catchable once it's genuinely close to the
+      // player (not the instant it's kicked from far away) — this also means
+      // its true on-screen size (not the static spawn radius) is what counts.
+      const CLOSE_Z=380;
+      if(ball.z>CLOSE_Z)return null;
+      const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
+      const visualRadius=ball.radius*zScale;
       const radius=mode.handRadius||90;
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
       if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
-        if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
+        if(MATH.dist(ball.x,ball.y,hx,hy)<visualRadius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
       }
       if(rightWrist&&POSE.isHandRaised(rightWrist)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
-        if(MATH.dist(ball.x,ball.y,hx,hy)<ball.radius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
+        if(MATH.dist(ball.x,ball.y,hx,hy)<visualRadius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
       return null;
     }
