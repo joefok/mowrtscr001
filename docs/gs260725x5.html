@@ -601,8 +601,15 @@ const BALLS = {
       for(const[t,info]of Object.entries(CONFIG.BALL_TYPES)){cum+=info.probability;if(r<cum){type=t;break}}
     }
     const info=CONFIG.BALL_TYPES[type];
-    const startX=MATH.rand(w*0.1,w*0.9);
-    const startY=MATH.rand(goalTop*0.3,goalTop*0.8);
+    let startX,startY;
+    if(mode.handOnly){
+      const foot=KICKER.getFootPosition();
+      startX=foot.x+MATH.rand(-10,10);
+      startY=foot.y+MATH.rand(-6,6);
+    }else{
+      startX=MATH.rand(w*0.1,w*0.9);
+      startY=MATH.rand(goalTop*0.3,goalTop*0.8);
+    }
     const startZ=800+MATH.rand(0,200);
     let targetX=goalX+MATH.rand(0,goalW);
     let targetY=MATH.rand(goalTop,h*0.75);
@@ -713,10 +720,20 @@ const POSE = {
   async detect(){
     if(!this.detector||!this.video||this.video.readyState<2)return null;
     try{
-      const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:this.mirror});
+      // We always request RAW (unflipped) poses and mirror the coordinates
+      // ourselves below — the library's own flipHorizontal behaved
+      // inconsistently, which is what caused the left/right confusion.
+      const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false});
       this.frameCount++;
       if(poses&&poses.length>0){
         const pose=poses[0];
+        if(this.mirror){
+          // Front camera only: flip every keypoint horizontally so the player
+          // sees a true mirror image — raise your real right hand and it
+          // moves things on the right side of the screen, like a bathroom mirror.
+          const vw=this.video.videoWidth||640;
+          for(const kp of pose.keypoints)kp.x=vw-kp.x;
+        }
         this.confidence=this.computeConfidence(pose);
         this.lostFrames=0;
         this.smoothPose(pose);
@@ -1062,6 +1079,14 @@ const KICKER = {
   bobPhase: 0,
 
   trigger(){this.kickTimer=this.kickDuration;},
+
+  // Screen position of the kicking foot, using the exact same geometry as
+  // draw() below, so the ball can spawn from this precise point.
+  getFootPosition(){
+    const w=RENDERER.width,h=RENDERER.height;
+    const scale=Math.min(w,h)*0.12;
+    return {x:w*0.5+scale*0.14,y:h*0.36+scale*0.85,scale};
+  },
 
   update(dt){
     if(this.kickTimer>0)this.kickTimer=Math.max(0,this.kickTimer-dt);
@@ -1995,7 +2020,7 @@ const SETTINGS = {
     difficulty: 'normal',
     reducedMotion: false,
     colorBlind: false,
-    swapHands: true,
+    swapHands: false,
     showFps: true,
     kioskMode: true,
     debug: false,
