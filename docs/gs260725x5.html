@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a1a0a">
 <title>GoalKeeper Pro - Interactive Soccer Kiosk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.10.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.10.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.10.0"></script>
@@ -43,17 +45,23 @@ canvas{display:block}
 .cal-progress{width:100%;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:20px}
 .cal-progress-bar{height:100%;background:linear-gradient(90deg,#ffd700,#ff8c00);border-radius:4px;transition:width 0.3s ease}
 .cal-camera-preview{width:100%;max-width:320px;height:240px;background:#000;border-radius:12px;margin:0 auto 20px;position:relative;overflow:hidden;border:2px solid rgba(255,215,0,0.3)}
-.cal-camera-preview video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-.cal-camera-preview canvas{position:absolute;top:0;left:0;width:100%;height:100%;transform:scaleX(-1)}
-.cal-body-outline{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.cal-camera-preview video{display:none}
+.cal-camera-preview canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+.cal-body-outline{display:none}
 .cal-countdown{font-size:72px;font-weight:900;color:#ffd700;text-shadow:0 0 40px rgba(255,215,0,0.5);margin:10px 0}
 .cal-btn{background:linear-gradient(135deg,#ffd700,#ff8c00);border:none;border-radius:12px;padding:14px 40px;font-size:18px;font-weight:800;color:#1a1a1a;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px;pointer-events:auto}
 .cal-btn:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(255,215,0,0.4)}
 .cal-btn:active{transform:scale(0.98)}
 .main-menu{position:fixed;top:0;left:0;width:100%;height:100%;z-index:40;background:rgba(0,15,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto}
 .main-menu.hidden{display:none}
-.menu-logo{font-size:72px;font-weight:900;color:#ffd700;text-shadow:0 4px 30px rgba(0,0,0,0.8),0 0 80px rgba(255,215,0,0.2);margin-bottom:8px;letter-spacing:6px;text-align:center}
-.menu-subtitle{font-size:18px;color:#aaa;margin-bottom:40px;letter-spacing:8px;text-transform:uppercase}
+.menu-logo{font-family:'Press Start 2P',monospace;font-size:34px;font-weight:400;color:#ffd700;text-shadow:4px 4px 0 #b45f00,8px 8px 0 rgba(0,0,0,0.5);margin-bottom:18px;letter-spacing:2px;text-align:center;line-height:1.6;image-rendering:pixelated}
+.menu-subtitle{font-family:'Press Start 2P',monospace;font-size:11px;color:#7bed9f;margin-bottom:34px;letter-spacing:3px;text-transform:uppercase;text-shadow:2px 2px 0 rgba(0,0,0,0.6)}
+.pixel-loading-wrap{width:280px;max-width:80vw}
+.pixel-loading-label{font-family:'Press Start 2P',monospace;font-size:11px;color:#fff;text-align:center;margin-bottom:10px;letter-spacing:2px;animation:pixelBlink 0.9s steps(1) infinite}
+@keyframes pixelBlink{0%,49%{opacity:1}50%,100%{opacity:0.35}}
+.pixel-loading-bar{width:100%;height:22px;background:#1a1a1a;border:3px solid #ffd700;box-shadow:0 0 0 3px #000;position:relative;overflow:hidden;image-rendering:pixelated}
+.pixel-loading-fill{height:100%;width:0%;background:repeating-linear-gradient(90deg,#ffd700 0 10px,#ff8c00 10px 20px);animation:pixelFill 1.4s steps(20) forwards}
+@keyframes pixelFill{from{width:0%}to{width:100%}}
 .menu-btn{width:280px;padding:16px 24px;margin:8px 0;background:rgba(255,255,255,0.08);border:2px solid rgba(255,215,0,0.3);border-radius:16px;color:#fff;font-size:18px;font-weight:700;cursor:pointer;transition:all 0.2s;text-align:center;backdrop-filter:blur(4px)}
 .menu-btn:hover{background:rgba(255,215,0,0.15);border-color:#ffd700;transform:translateX(8px)}
 .menu-btn.primary{background:linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,140,0,0.2));border-color:#ffd700}
@@ -162,15 +170,19 @@ canvas{display:block}
 <div class="instruction-bar" id="instructionBar" style="display:none">Stand in front of camera and use your body to block the ball!</div>
 <div class="powerup-indicator" id="powerupIndicator"></div>
 <div class="main-menu" id="mainMenu">
-  <div class="menu-logo">&#9917; GOALKEEPER</div>
+  <div class="menu-logo">&#9917; GOAL<br>KEEPER</div>
   <div class="menu-subtitle">Interactive Soccer Kiosk</div>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:10px">
+  <div class="pixel-loading-wrap">
+    <div class="pixel-loading-label">GET READY!</div>
+    <div class="pixel-loading-bar"><div class="pixel-loading-fill"></div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:26px;opacity:0.55">
     <button class="menu-btn primary" id="btnPlay" onclick="GAME.startModeSelect()">&#9654; PLAY GAME</button>
     <button class="menu-btn" onclick="GAME.showLeaderboard()">&#127942; LEADERBOARD</button>
     <button class="menu-btn" onclick="GAME.showSettings()">&#9881; SETTINGS</button>
     <button class="menu-btn" onclick="GAME.showTutorial()">&#10067; HOW TO PLAY</button>
   </div>
-  <div style="margin-top:30px;color:#666;font-size:12px;text-align:center">Powered by TensorFlow.js MoveNet</div>
+  <div style="margin-top:20px;color:#666;font-size:11px;text-align:center">Powered by TensorFlow.js MoveNet</div>
 </div>
 <div class="main-menu hidden" id="modeSelect">
   <div class="menu-logo" style="font-size:48px">SELECT MODE</div>
@@ -864,8 +876,8 @@ const CALIBRATION = {
     const mode=GAME.currentMode;
     this.steps=(mode&&mode.handOnly)?this.CATCH_STEPS:this.FULL_STEPS;
     this.active=true;this.step=0;this.updateUI();document.getElementById('calibrationOverlay').classList.remove('hidden');
-    const calVideo=document.getElementById('calVideo');
-    if(POSE.video&&POSE.video.srcObject){calVideo.srcObject=POSE.video.srcObject;calVideo.play();}
+    // The camera feed itself is never shown — drawPreview() renders a live
+    // cartoon avatar driven by the tracked pose instead.
     this.startStep();
   },
 
@@ -975,18 +987,67 @@ const CALIBRATION = {
   },
 
   drawPreview(ctx){
+    // Mini pitch backdrop (no camera image is ever shown here)
+    ctx.clearRect(0,0,320,240);
+    const sky=ctx.createLinearGradient(0,0,0,240);
+    sky.addColorStop(0,'#1b3a63');sky.addColorStop(0.55,'#265c8f');sky.addColorStop(0.55,'#2f8a3d');sky.addColorStop(1,'#1f5c2a');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,320,240);
+    ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.ellipse(160,190,55,18,0,0,Math.PI*2);ctx.stroke();
+
     if(!POSE.smoothedKeypoints.length)return;
-    ctx.clearRect(0,0,320,240);ctx.save();ctx.scale(-1,1);ctx.translate(-320,0);
-    for(const kp of POSE.smoothedKeypoints){
-      if(kp.score>CONFIG.POSE_CONFIDENCE_THRESHOLD){
-        ctx.beginPath();ctx.arc(kp.x*0.5,kp.y*0.5,4,0,Math.PI*2);ctx.fillStyle='rgba(0,255,100,0.8)';ctx.fill();
-      }
+    const kps=POSE.smoothedKeypoints;
+    const s=0.5; // pose space (640x480) -> preview canvas (320x240)
+    const pt=(i)=>{const kp=kps[i];if(!kp||kp.score<0.2)return null;return{x:kp.x*s,y:kp.y*s};};
+
+    const nose=pt(0),ls=pt(5),rs=pt(6),le=pt(7),re=pt(8),lw=pt(9),rw=pt(10),
+          lh=pt(11),rh=pt(12),lk=pt(13),rk=pt(14),la=pt(15),ra=pt(16);
+
+    ctx.lineCap='round';ctx.lineJoin='round';
+
+    // Legs — blue shorts fading to white socks
+    this.drawAvatarLimb(ctx,lh,lk,la,'#2b5fd9',10);
+    this.drawAvatarLimb(ctx,rh,rk,ra,'#2b5fd9',10);
+    // Arms — red jersey sleeves
+    this.drawAvatarLimb(ctx,ls,le,lw,'#e8433a',9);
+    this.drawAvatarLimb(ctx,rs,re,rw,'#e8433a',9);
+
+    // Torso (jersey)
+    if(ls&&rs&&lh&&rh){
+      ctx.fillStyle='#e8433a';
+      ctx.beginPath();
+      ctx.moveTo(ls.x,ls.y);ctx.lineTo(rs.x,rs.y);ctx.lineTo(rh.x,rh.y);ctx.lineTo(lh.x,lh.y);
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.stroke();
+      // simple number on the jersey
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.font='bold 12px Segoe UI, sans-serif';ctx.textAlign='center';
+      ctx.fillText('1',(ls.x+rs.x+lh.x+rh.x)/4,(ls.y+rs.y)/2+14);
     }
-    for(const[a,b]of CONFIG.SKELETON_CONNECTIONS){
-      const k1=POSE.smoothedKeypoints[a],k2=POSE.smoothedKeypoints[b];
-      if(k1&&k2&&k1.score>0.2&&k2.score>0.2){ctx.beginPath();ctx.moveTo(k1.x*0.5,k1.y*0.5);ctx.lineTo(k2.x*0.5,k2.y*0.5);ctx.strokeStyle='rgba(0,255,100,0.5)';ctx.lineWidth=2;ctx.stroke();}
+
+    // Head
+    if(nose){
+      ctx.fillStyle='#ffd8a8';
+      ctx.beginPath();ctx.arc(nose.x,nose.y-8,14,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#3a2417';
+      ctx.beginPath();ctx.arc(nose.x,nose.y-16,13,Math.PI,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#1a1a1a';
+      ctx.beginPath();ctx.arc(nose.x-5,nose.y-9,2,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(nose.x+5,nose.y-9,2,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#1a1a1a';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(nose.x,nose.y-4,4,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
     }
-    ctx.restore();
+  },
+
+  // Draws a two-segment limb (e.g. shoulder->elbow->wrist) as a thick rounded
+  // line with joint circles, used to build the live avatar above.
+  drawAvatarLimb(ctx,a,b,c,color,width){
+    ctx.strokeStyle=color;ctx.lineWidth=width;
+    if(a&&b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    if(b&&c){ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.stroke();}
+    ctx.fillStyle=color;
+    for(const p of[a,b,c]){if(p){ctx.beginPath();ctx.arc(p.x,p.y,width*0.5,0,Math.PI*2);ctx.fill();}}
+    if(c){ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(c.x,c.y,width*0.42,0,Math.PI*2);ctx.fill();}
   }
 };
 
@@ -1767,7 +1828,7 @@ const GAME = {
     // Kiosk keeps cycling on its own — don't wait on the 30s idle timer between rounds
     if(SETTINGS.values.kioskMode){
       if(this.kioskRestartTimer)clearTimeout(this.kioskRestartTimer);
-      this.kioskRestartTimer=setTimeout(()=>{if(this.state==='menu')this.selectMode('catch');},4000);
+      this.kioskRestartTimer=setTimeout(()=>{if(this.state==='menu')this.selectMode('catch');},900);
     }
   },
 
@@ -1775,18 +1836,15 @@ const GAME = {
     this.state='gameover';
     if(this.timerInterval){clearInterval(this.timerInterval);this.timerInterval=null;}
     AUDIO.stopMusic();AUDIO.playCrowdCheer();
-    document.getElementById('hudTop').style.display='none';
+    // No full-screen modal — keep the stadium and HUD visible behind the
+    // result so the scene never feels like it "stops"; just flash the score.
     document.getElementById('instructionBar').style.display='none';
-    document.getElementById('gameOver').classList.remove('hidden');
-    document.getElementById('goScore').textContent=this.score;
-    document.getElementById('goAccuracy').textContent=this.accuracy+'%';
-    document.getElementById('goMaxCombo').textContent='x'+this.maxCombo;
-    document.getElementById('goSaves').textContent=this.savedBalls;
+    this.showCenterMessage('ROUND OVER!','Score '+this.score+'  \u2022  Best Combo x'+this.maxCombo,2400);
     PARTICLES.spawnConfetti(RENDERER.width/2,RENDERER.height/2,0,CONFIG.CONFETTI_COUNT);
     RENDERER.triggerShake(15,600);
 
     if(SETTINGS.values.kioskMode){
-      setTimeout(()=>{this.saveScoreAuto();this.backToMenu();},8000);
+      setTimeout(()=>{this.saveScoreAuto();this.backToMenu();},3000);
     }
   },
 
@@ -1907,7 +1965,7 @@ const GAME = {
     }
   },
 
-  showCenterMessage(title,sub){
+  showCenterMessage(title,sub,duration){
     const el=document.getElementById('centerMessage');
     document.getElementById('msgTitle').textContent=title;
     document.getElementById('msgSub').textContent=sub;
@@ -1915,7 +1973,7 @@ const GAME = {
     el.querySelector('.msg-title').style.animation='none';
     el.querySelector('.msg-title').offsetHeight;
     el.querySelector('.msg-title').style.animation='messagePop 0.6s cubic-bezier(0.175,0.885,0.32,1.275)';
-    if(sub)setTimeout(()=>el.style.display='none',900);
+    if(sub)setTimeout(()=>el.style.display='none',duration||900);
   },
 
   showCombo(n){
@@ -2263,10 +2321,8 @@ const MOBILE = {
         if(document.visibilityState==='visible')navigator.wakeLock.request('screen').catch(()=>{});
       });
     }
-    // Touch controls visibility
-    if('ontouchstart'in window||navigator.maxTouchPoints>0){
-      document.getElementById('touchControls').style.display='flex';
-    }
+    // Touch controls intentionally not shown — this is a fully automatic
+    // kiosk experience, on-screen pause/screenshot buttons aren't needed.
     // Fullscreen on tap
     document.addEventListener('click',()=>{
       const el=document.documentElement;
