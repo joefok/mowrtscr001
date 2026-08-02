@@ -16,7 +16,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
-canvas{display:block}
+canvas{display:block;touch-action:none}
+.hud-top,.combo-display,.powerup-indicator{will-change:transform,opacity;transform:translateZ(0)}
 #gameCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
 #videoElement{position:fixed;top:-9999px;left:-9999px;width:640px;height:480px;opacity:0;pointer-events:none;z-index:0}
 .ui-layer{position:fixed;z-index:10;pointer-events:none;width:100%;height:100%;top:0;left:0}
@@ -27,7 +28,7 @@ canvas{display:block}
 .hud-panel .value{font-size:28px;font-weight:900;color:#fff;line-height:1}
 .hud-panel .sub{font-size:11px;color:#aaa;margin-top:2px}
 .hud-left,.hud-right{display:flex;gap:10px;align-items:flex-start}
-.center-message{position:fixed;top:50%;left:0;right:0;transform:translateY(-50%);z-index:30;display:flex;justify-content:space-between;padding:0 3vw;pointer-events:none;opacity:0.68;transition:opacity 0.2s ease}
+.center-message{position:fixed;top:50%;left:0;right:0;transform:translateY(-50%) translateZ(0);will-change:transform,opacity;z-index:30;display:flex;justify-content:space-between;padding:0 3vw;pointer-events:none;opacity:0.68;transition:opacity 0.2s ease}
 .center-message .msg-side{max-width:36vw}
 .center-message .msg-side.msg-right{text-align:right}
 .center-message .msg-title{font-size:34px;font-weight:900;color:#ffd700;text-shadow:0 3px 14px rgba(0,0,0,0.9),0 0 40px rgba(255,215,0,0.3);letter-spacing:2px;animation:messagePop 0.6s cubic-bezier(0.175,0.885,0.32,1.275)}
@@ -1232,6 +1233,48 @@ const KICKER = {
     this.bobPhase+=dt;
   },
 
+  // Pre-renders everything that never changes shape (only the kicking leg
+  // actually animates) into two cached layers, split at the exact point the
+  // kicking leg is drawn in the original z-order (behind the shadow/back-leg,
+  // in front once the body/head are drawn) so the final image is identical.
+  buildStaticSprite(scale){
+    const pad=scale*1.35;
+    const size=Math.ceil(pad*2);
+    if(!this._spriteBack)this._spriteBack=document.createElement('canvas');
+    if(!this._spriteFront)this._spriteFront=document.createElement('canvas');
+    this._spriteBack.width=this._spriteBack.height=size;
+    this._spriteFront.width=this._spriteFront.height=size;
+
+    const bctx=this._spriteBack.getContext('2d');
+    bctx.translate(pad,pad);
+    bctx.fillStyle='rgba(0,0,0,0.25)';
+    bctx.beginPath();bctx.ellipse(0,scale*0.95,scale*0.55,scale*0.14,0,0,Math.PI*2);bctx.fill();
+    bctx.fillStyle='#ffffff';
+    bctx.fillRect(-scale*0.32,scale*0.5,scale*0.18,scale*0.42);
+    bctx.fillStyle='#2a2a2a';bctx.fillRect(-scale*0.36,scale*0.88,scale*0.26,scale*0.12);
+
+    const fctx=this._spriteFront.getContext('2d');
+    fctx.translate(pad,pad);
+    const bodyGrad=fctx.createRadialGradient(-scale*0.15,-scale*0.2,scale*0.1,0,0,scale*0.62);
+    bodyGrad.addColorStop(0,'#8477e0');bodyGrad.addColorStop(1,'#4c3fa8');
+    fctx.fillStyle=bodyGrad;
+    fctx.beginPath();fctx.ellipse(0,0,scale*0.5,scale*0.62,0,0,Math.PI*2);fctx.fill();
+    fctx.fillStyle='#f5f5f5';
+    fctx.beginPath();fctx.moveTo(-scale*0.32,-scale*0.55);fctx.quadraticCurveTo(-scale*0.52,-scale*0.98,-scale*0.2,-scale*0.7);fctx.closePath();fctx.fill();
+    fctx.beginPath();fctx.moveTo(scale*0.32,-scale*0.55);fctx.quadraticCurveTo(scale*0.52,-scale*0.98,scale*0.2,-scale*0.7);fctx.closePath();fctx.fill();
+    fctx.fillStyle='#1a1a1a';
+    fctx.beginPath();fctx.arc(-scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);fctx.fill();
+    fctx.beginPath();fctx.arc(scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);fctx.fill();
+    fctx.fillStyle='#1a1a1a';
+    fctx.beginPath();fctx.ellipse(0,scale*0.2,scale*0.28,scale*0.15,0,0,Math.PI*2);fctx.fill();
+    fctx.fillStyle='#ffffff';
+    for(let i=-2;i<=2;i++){
+      fctx.beginPath();fctx.moveTo(i*scale*0.09-scale*0.03,scale*0.08);fctx.lineTo(i*scale*0.09+scale*0.03,scale*0.08);fctx.lineTo(i*scale*0.09,scale*0.2);fctx.closePath();fctx.fill();
+    }
+
+    this._spritePad=pad;this._spriteScale=scale;
+  },
+
   draw(ctx){
     const w=RENDERER.width,h=RENDERER.height;
     const x=w*0.5,y=h*0.36;
@@ -1241,19 +1284,16 @@ const KICKER = {
     const kickPhase=this.kickTimer>0?Math.sin(progress*Math.PI):0;
     const idleBob=Math.sin(this.bobPhase*2)*scale*0.03;
 
+    if(this._spriteScale!==scale)this.buildStaticSprite(scale);
+
     ctx.save();
     ctx.translate(x,y+idleBob);
 
-    // Ground shadow
-    ctx.fillStyle='rgba(0,0,0,0.25)';
-    ctx.beginPath();ctx.ellipse(0,scale*0.95,scale*0.55,scale*0.14,0,0,Math.PI*2);ctx.fill();
+    // Shadow + planted back leg (cached — identical every frame until resize)
+    ctx.drawImage(this._spriteBack,-this._spritePad,-this._spritePad);
 
-    // Back (planted) leg
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(-scale*0.32,scale*0.5,scale*0.18,scale*0.42);
-    ctx.fillStyle='#2a2a2a';ctx.fillRect(-scale*0.36,scale*0.88,scale*0.26,scale*0.12);
-
-    // Kicking leg — swings forward from the hip on every throw
+    // Kicking leg — swings forward from the hip on every throw (the only
+    // part that actually animates, so it's the only part still drawn live)
     ctx.save();
     ctx.translate(scale*0.14,scale*0.5);
     ctx.rotate(-kickPhase*1.0);
@@ -1262,32 +1302,10 @@ const KICKER = {
     ctx.fillStyle='#2a2a2a';ctx.fillRect(-scale*0.13,scale*0.38,scale*0.26,scale*0.12);
     ctx.restore();
 
-    // Body (gradient cached per scale — identical every frame until resize)
-    if(this._bodyGradScale!==scale){
-      this._bodyGradScale=scale;
-      this._bodyGrad=ctx.createRadialGradient(-scale*0.15,-scale*0.2,scale*0.1,0,0,scale*0.62);
-      this._bodyGrad.addColorStop(0,'#8477e0');this._bodyGrad.addColorStop(1,'#4c3fa8');
-    }
-    ctx.fillStyle=this._bodyGrad;
-    ctx.beginPath();ctx.ellipse(0,0,scale*0.5,scale*0.62,0,0,Math.PI*2);ctx.fill();
+    // Body, horns, eyes, mouth (cached — drawn after the leg, matching the
+    // original z-order where the body overlaps the top of the kicking leg)
+    ctx.drawImage(this._spriteFront,-this._spritePad,-this._spritePad);
 
-    // Horns
-    ctx.fillStyle='#f5f5f5';
-    ctx.beginPath();ctx.moveTo(-scale*0.32,-scale*0.55);ctx.quadraticCurveTo(-scale*0.52,-scale*0.98,-scale*0.2,-scale*0.7);ctx.closePath();ctx.fill();
-    ctx.beginPath();ctx.moveTo(scale*0.32,-scale*0.55);ctx.quadraticCurveTo(scale*0.52,-scale*0.98,scale*0.2,-scale*0.7);ctx.closePath();ctx.fill();
-
-    // Eyes
-    ctx.fillStyle='#1a1a1a';
-    ctx.beginPath();ctx.arc(-scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(scale*0.18,-scale*0.08,scale*0.07,0,Math.PI*2);ctx.fill();
-
-    // Grinning mouth with little teeth
-    ctx.fillStyle='#1a1a1a';
-    ctx.beginPath();ctx.ellipse(0,scale*0.2,scale*0.28,scale*0.15,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ffffff';
-    for(let i=-2;i<=2;i++){
-      ctx.beginPath();ctx.moveTo(i*scale*0.09-scale*0.03,scale*0.08);ctx.lineTo(i*scale*0.09+scale*0.03,scale*0.08);ctx.lineTo(i*scale*0.09,scale*0.2);ctx.closePath();ctx.fill();
-    }
     ctx.restore();
   }
 };
