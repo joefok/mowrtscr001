@@ -1127,11 +1127,13 @@ const COLLISION = {
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
       if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
-        if(MATH.dist(ball.x,ball.y,hx,hy)<visualRadius+radius)return{part:'LEFT_HAND',x:hx,y:hy};
+        const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
+        if(dx*dx+dy*dy<thr*thr)return{part:'LEFT_HAND',x:hx,y:hy};
       }
       if(rightWrist&&POSE.isHandRaised(rightWrist)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
-        if(MATH.dist(ball.x,ball.y,hx,hy)<visualRadius+radius)return{part:'RIGHT_HAND',x:hx,y:hy};
+        const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
+        if(dx*dx+dy*dy<thr*thr)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
       return null;
     }
@@ -1550,7 +1552,7 @@ const RENDERER = {
       ctx.beginPath();ctx.ellipse(screenX,shadowY,radius*shadowScale*0.8,radius*shadowScale*0.3,0,0,Math.PI*2);ctx.fill();
 
       // Trail
-      if(ball.trail.length>1&&this.quality==='high'){
+      if(ball.trail.length>1&&this.quality!=='low'){
         for(let i=1;i<ball.trail.length;i++){
           const t1=ball.trail[i-1],t2=ball.trail[i];
           const alpha=(i/ball.trail.length)*0.3;
@@ -1564,22 +1566,19 @@ const RENDERER = {
       let color=info.color;
       if(color==='rainbow'){color='hsl('+ball.rainbowHue+',100%,60%)';}
 
-      // Soft glow without full shadowBlur (very expensive). High quality gets a
-      // cheap outer halo; body uses a simple 2-stop radial that looks identical.
-      if(this.quality==='high'){
-        ctx.fillStyle=info.glow;ctx.beginPath();ctx.arc(screenX,screenY,radius*1.35,0,Math.PI*2);ctx.fill();
-      }
+      // Ball glow — restored to true shadowBlur. This game only ever has ONE
+      // ball active at a time (Catch mode), so the "expensive" glow costs
+      // nothing in practice; approximating it with a flat halo circle changed
+      // the actual pixels, which we don't want.
+      ctx.shadowColor=info.glow;ctx.shadowBlur=20;
       const ballGrad=ctx.createRadialGradient(screenX-radius*0.3,screenY-radius*0.3,radius*0.1,screenX,screenY,radius);
-      ballGrad.addColorStop(0,'rgba(255,255,255,0.9)');ballGrad.addColorStop(0.35,color);ballGrad.addColorStop(1,this.darkenColor(color,0.5));
+      ballGrad.addColorStop(0,'rgba(255,255,255,0.9)');ballGrad.addColorStop(0.3,color);ballGrad.addColorStop(1,this.darkenColor(color,0.5));
       ctx.fillStyle=ballGrad;ctx.beginPath();ctx.arc(screenX,screenY,radius,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
 
-      // Ball pattern
+      // Ball pattern — the real seam pattern at every quality tier (same reasoning: one ball, negligible cost)
       if(ball.type==='NORMAL'){
-        if(this.quality==='high')this.drawSoccerPattern(ctx,screenX,screenY,radius,ball.spin);
-        else if(this.quality==='medium'){
-          ctx.strokeStyle='rgba(20,20,20,0.55)';ctx.lineWidth=Math.max(1,radius*0.08);
-          ctx.beginPath();ctx.arc(screenX,screenY,radius*0.45,ball.spin,ball.spin+Math.PI*1.2);ctx.stroke();
-        }
+        this.drawSoccerPattern(ctx,screenX,screenY,radius,ball.spin);
       }else if(ball.type==='GOLDEN'){
         ctx.strokeStyle='rgba(255,215,0,0.8)';ctx.lineWidth=2;
         ctx.beginPath();ctx.arc(screenX,screenY,radius*0.6,0,Math.PI*2);ctx.stroke();
@@ -1622,6 +1621,8 @@ const RENDERER = {
         ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(0,0,size,0,Math.PI*2);ctx.fill();
       }else{
         ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(0,0,size,0,Math.PI*2);ctx.fill();
+        ctx.shadowColor=p.color;ctx.shadowBlur=size*2;
+        ctx.fill();ctx.shadowBlur=0;
       }
       ctx.restore();
     }
@@ -1717,7 +1718,7 @@ const RENDERER = {
     ctx.save();ctx.translate(x,y);
     const scale=raised?1.25:0.85;
     ctx.scale(scale,scale);
-    ctx.shadowColor=raised?'rgba(255,255,255,0.55)':'rgba(0,0,0,0.35)';ctx.shadowBlur=raised?8:0;
+    ctx.shadowColor=raised?'rgba(255,255,255,0.7)':'rgba(0,0,0,0.4)';ctx.shadowBlur=raised?18:8;
     ctx.globalAlpha=raised?1:0.6;
     // Palm
     ctx.fillStyle=color;
