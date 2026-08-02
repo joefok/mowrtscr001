@@ -329,14 +329,14 @@ canvas{display:block}
 // CONFIGURATION
 // ============================================================
 const CONFIG = {
-  VERSION: '2.0.0',
+  VERSION: '2.0.1',
   TARGET_FPS_DESKTOP: 60,
   TARGET_FPS_MOBILE: 30,
   GAME_DURATION: 60,
   INITIAL_LIVES: 3,
-  BALL_POOL_SIZE: 50,
-  PARTICLE_POOL_SIZE: 400,
-  MAX_PARTICLES: 600,
+  BALL_POOL_SIZE: 24,
+  PARTICLE_POOL_SIZE: 180,
+  MAX_PARTICLES: 220,
   GOAL_WIDTH_RATIO: 0.7,
   GOAL_HEIGHT_RATIO: 0.35,
   BALL_RADIUS_MIN: 10,
@@ -353,7 +353,8 @@ const CONFIG = {
   POWERUP_DURATION: 8000,
   SCREEN_SHAKE_DURATION: 350,
   SCREEN_SHAKE_INTENSITY: 10,
-  CONFETTI_COUNT: 80,
+  CONFETTI_COUNT: 48,
+  POSE_DETECT_EVERY_N: 2,
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
   SKELETON_CONNECTIONS: [[5,6],[5,7],[6,8],[7,9],[8,10],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]],
   BODY_PARTS: {
@@ -528,44 +529,68 @@ class Particle {
 }
 
 const PARTICLES = {
-  pool: [], active: [],
-  init(){for(let i=0;i<CONFIG.PARTICLE_POOL_SIZE;i++)this.pool.push(new Particle());},
+  pool: [], active: [], free: [],
+  init(){
+    this.pool=[];this.active=[];this.free=[];
+    for(let i=0;i<CONFIG.PARTICLE_POOL_SIZE;i++){const p=new Particle();this.pool.push(p);this.free.push(p);}
+  },
+  acquire(){
+    if(this.free.length)return this.free.pop();
+    if(this.pool.length>=CONFIG.MAX_PARTICLES)return null;
+    const p=new Particle();this.pool.push(p);return p;
+  },
   spawn(x,y,z,vx,vy,vz,life,size,color,type,gravity,drag,count){
     count=count||1;
+    const q=RENDERER.quality;
+    if(q==='low')count=Math.max(1,count>>1);
+    else if(q==='medium')count=Math.max(1,Math.floor(count*0.7));
+    const spread=0.3;
     for(let i=0;i<count;i++){
-      let p=this.pool.find(p=>!p.active);
-      if(!p){p=new Particle();this.pool.push(p);}
-      const spread=0.3;
+      const p=this.acquire();
+      if(!p)break;
       p.init(x,y,z,vx+Math.random()*spread-spread/2,vy+Math.random()*spread-spread/2,vz+Math.random()*spread-spread/2,life*(0.8+Math.random()*0.4),size,color,type,gravity,drag);
       this.active.push(p);
     }
   },
   spawnExplosion(x,y,z,count,color,size){
-    count=count||30;color=color||'#ffd700';size=size||4;
+    count=count||20;color=color||'#ffd700';size=size||4;
     for(let i=0;i<count;i++){const angle=Math.random()*Math.PI*2,speed=MATH.rand(2,8);this.spawn(x,y,z,Math.cos(angle)*speed,Math.sin(angle)*speed-2,MATH.rand(-1,1),MATH.rand(0.5,1.5),size,color,'sparkle',0.15,0.96);}
   },
   spawnConfetti(x,y,z,count){
-    count=count||50;const colors=['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff','#ffd700','#ff6600'];
+    count=count||32;const colors=['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff','#ffd700','#ff6600'];
     for(let i=0;i<count;i++){const angle=Math.random()*Math.PI*2,speed=MATH.rand(3,10);this.spawn(x,y,z,Math.cos(angle)*speed,Math.sin(angle)*speed-4,MATH.rand(-2,2),MATH.rand(1,3),MATH.rand(3,6),MATH.randChoice(colors),'confetti',0.2,0.97);}
   },
   spawnSmoke(x,y,z,count){
-    count=count||15;
+    count=count||8;
     for(let i=0;i<count;i++){this.spawn(x,y,z,MATH.rand(-1,1),MATH.rand(-2,-0.5),MATH.rand(-0.5,0.5),MATH.rand(1,2.5),MATH.rand(8,20),'rgba(100,100,100,0.3)','smoke',-0.05,0.99);}
   },
   spawnFire(x,y,z,count){
-    count=count||20;const colors=['#ff4500','#ff6600','#ff8800','#ffaa00','#ffcc00'];
+    count=count||10;const colors=['#ff4500','#ff6600','#ff8800','#ffaa00','#ffcc00'];
     for(let i=0;i<count;i++){this.spawn(x,y,z,MATH.rand(-1.5,1.5),MATH.rand(-4,-1),MATH.rand(-0.5,0.5),MATH.rand(0.3,0.8),MATH.rand(3,8),MATH.randChoice(colors),'fire',0.1,0.95);}
   },
   spawnStars(x,y,count){
-    count=count||12;
+    count=count||8;
     for(let i=0;i<count;i++){const angle=(i/count)*Math.PI*2,speed=MATH.rand(2,6);this.spawn(x,y,0,Math.cos(angle)*speed,Math.sin(angle)*speed,0,MATH.rand(0.5,1.2),MATH.rand(4,8),'#ffd700','star',0,0.95);}
   },
   update(dt){
-    this.active=this.active.filter(p=>p.active);
-    this.active.forEach(p=>p.update(dt));
-    if(this.active.length>CONFIG.MAX_PARTICLES){this.active.sort((a,b)=>a.life-b.life);for(let i=CONFIG.MAX_PARTICLES;i<this.active.length;i++)this.active[i].active=false;this.active.length=CONFIG.MAX_PARTICLES;}
+    const act=this.active;
+    let write=0;
+    for(let i=0;i<act.length;i++){
+      const p=act[i];
+      p.update(dt);
+      if(p.active)act[write++]=p;
+      else this.free.push(p);
+    }
+    act.length=write;
+    if(act.length>CONFIG.MAX_PARTICLES){
+      for(let i=CONFIG.MAX_PARTICLES;i<act.length;i++){act[i].active=false;this.free.push(act[i]);}
+      act.length=CONFIG.MAX_PARTICLES;
+    }
   },
-  clear(){this.active.forEach(p=>p.active=false);this.active=[];}
+  clear(){
+    for(let i=0;i<this.active.length;i++){this.active[i].active=false;this.free.push(this.active[i]);}
+    this.active.length=0;
+  }
 };
 
 // ============================================================
@@ -591,8 +616,7 @@ class Ball {
     if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*20;}
     this.x+=this.vx*dt;this.y+=this.vy*dt;this.z+=this.vz*dt;
     this.vy+=0.15*dt*60;this.spin+=dt*5;
-    this.trail.push({x:this.x,y:this.y,z:this.z,time:performance.now()});
-    if(this.trail.length>12)this.trail.shift();
+    if(RENDERER.quality!=='low'){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>8)this.trail.shift();}
     if(this.y>RENDERER.groundY-this.radius&&this.bounces<this.maxBounces){
       this.y=RENDERER.groundY-this.radius;this.vy*=-0.6;this.vx*=0.8;this.vz*=0.8;this.bounces++;
       AUDIO.playBounce();PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
@@ -609,8 +633,11 @@ class Ball {
 }
 
 const BALLS = {
-  pool: [], active: [], spawnTimer: 0, spawnInterval: 1500, difficultyMult: 1,
-  init(){for(let i=0;i<CONFIG.BALL_POOL_SIZE;i++)this.pool.push(new Ball());},
+  pool: [], active: [], free: [], spawnTimer: 0, spawnInterval: 1500, difficultyMult: 1,
+  init(){
+    this.pool=[];this.active=[];this.free=[];
+    for(let i=0;i<CONFIG.BALL_POOL_SIZE;i++){const b=new Ball();this.pool.push(b);this.free.push(b);}
+  },
   spawn(){
     const mode=GAME.currentMode||CONFIG.GAME_MODES.normal;
     const w=RENDERER.width,h=RENDERER.height;
@@ -653,7 +680,7 @@ const BALLS = {
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
     const vx=(dx/dist)*speed*60,vy=(dy/dist)*speed*60,vz=(dz/dist)*speed*60;
     const radius=MATH.rand(CONFIG.BALL_RADIUS_MIN,CONFIG.BALL_RADIUS_MAX)*MATH.lerp(1,1.5,1-startZ/1000);
-    let b=this.pool.find(ball=>!ball.active);
+    let b=this.free.length?this.free.pop():null;
     if(!b){b=new Ball();this.pool.push(b);}
     b.spawn(type,startX,startY,startZ,vx,vy,vz,radius);
     this.active.push(b);
@@ -674,10 +701,15 @@ const BALLS = {
       const baseInterval=mode.spawnInterval/this.difficultyMult;
       this.spawnTimer=MATH.rand(baseInterval*0.7,baseInterval*1.3);
     }
-    this.active=this.active.filter(b=>b.active);
-    this.active.forEach(b=>b.update(dt,goalZ,goalRect));
+    const act=this.active;let w=0;
+    for(let i=0;i<act.length;i++){
+      const b=act[i];
+      b.update(dt,goalZ,goalRect);
+      if(b.active)act[w++]=b; else this.free.push(b);
+    }
+    act.length=w;
   },
-  clear(){this.active.forEach(b=>b.reset());this.active=[];this.spawnTimer=0;}
+  clear(){for(const b of this.active){b.reset();this.free.push(b);}this.active.length=0;this.spawnTimer=0;}
 };
 
 // ============================================================
@@ -698,7 +730,9 @@ const POSE = {
   cameraFacing: 'user',
   initializing: false,
   baselineHandY: null,
-  RAISE_THRESHOLD: 55, // px in 640x480 pose space a wrist must rise above the calibrated resting height
+  RAISE_THRESHOLD: 40, // relative to actual video height (~360)
+  videoW: 480,
+  videoH: 360,
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -711,9 +745,11 @@ const POSE = {
       }
       await tf.setBackend('webgl');
       await tf.ready();
-      const modelType=tf.getBackend()==='webgl'&&navigator.hardwareConcurrency>4?'SINGLEPOSE_THUNDER':'SINGLEPOSE_LIGHTNING';
+      // Always use Lightning — ~3x faster, same tracking quality for this game
+      const modelType='SINGLEPOSE_LIGHTNING';
       this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
-        modelType: poseDetection.movenet.modelType[modelType]
+        modelType: poseDetection.movenet.modelType[modelType],
+        enableSmoothing: false
       });
       this.isReady=true;
       console.log('MoveNet loaded:',modelType);
@@ -731,10 +767,16 @@ const POSE = {
       throw new Error('Camera API not available. Make sure the page is served over HTTPS or localhost.');
     }
     const stream=await navigator.mediaDevices.getUserMedia({
-      video: {width:640,height:480,facingMode:this.cameraFacing},audio:false
+      video: {width:{ideal:480},height:{ideal:360},facingMode:this.cameraFacing,frameRate:{ideal:24,max:30}},audio:false
     });
     this.video.srcObject=stream;
-    return new Promise(resolve=>{this.video.onloadedmetadata=()=>{this.video.play();resolve();};});
+    return new Promise(resolve=>{this.video.onloadedmetadata=()=>{
+      this.videoW=this.video.videoWidth||480;
+      this.videoH=this.video.videoHeight||360;
+      // Scale raise threshold with actual resolution
+      this.RAISE_THRESHOLD=Math.round(this.videoH*0.11);
+      this.video.play();resolve();
+    };});
   },
 
   async detect(){
@@ -744,14 +786,13 @@ const POSE = {
       // ourselves below — the library's own flipHorizontal behaved
       // inconsistently, which is what caused the left/right confusion.
       const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false});
-      this.frameCount++;
       if(poses&&poses.length>0){
         const pose=poses[0];
         if(this.mirror){
           // Front camera only: flip every keypoint horizontally so the player
           // sees a true mirror image — raise your real right hand and it
           // moves things on the right side of the screen, like a bathroom mirror.
-          const vw=this.video.videoWidth||640;
+          const vw=this.videoW||this.video.videoWidth||480;
           for(const kp of pose.keypoints)kp.x=vw-kp.x;
         }
         this.confidence=this.computeConfidence(pose);
@@ -1005,8 +1046,8 @@ const CALIBRATION = {
 
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
-    const s=0.5; // pose space (640x480) -> preview canvas (320x240)
-    const pt=(i)=>{const kp=kps[i];if(!kp||kp.score<0.2)return null;return{x:kp.x*s,y:kp.y*s};};
+    const sX=320/(POSE.videoW||480), sY=240/(POSE.videoH||360);
+    const pt=(i)=>{const kp=kps[i];if(!kp||kp.score<0.2)return null;return{x:kp.x*sX,y:kp.y*sY};};
 
     const nose=pt(0),ls=pt(5),rs=pt(6),le=pt(7),re=pt(8),lw=pt(9),rw=pt(10),
           lh=pt(11),rh=pt(12),lk=pt(13),rk=pt(14),la=pt(15),ra=pt(16);
@@ -1066,7 +1107,7 @@ const COLLISION = {
   checkBallPlayer(ball){
     if(!POSE.smoothedKeypoints.length||ball.collisionCooldown>0)return null;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=RENDERER.width/640;const scaleY=RENDERER.height/480;
+    const scaleX=RENDERER.width/(POSE.videoW||480);const scaleY=RENDERER.height/(POSE.videoH||360);
 
     // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
     const mode=GAME.currentMode;
@@ -1234,7 +1275,7 @@ const RENDERER = {
 
   init(){
     this.canvas=document.getElementById('gameCanvas');
-    this.ctx=this.canvas.getContext('2d');
+    this.ctx=this.canvas.getContext('2d',{alpha:false,desynchronized:true});
     this.resize();
     window.addEventListener('resize',()=>this.resize());
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
@@ -1248,9 +1289,9 @@ const RENDERER = {
   },
 
   initClouds(){
-    this.clouds=[];const count=this.quality==='low'?3:this.quality==='medium'?5:8;
+    this.clouds=[];const count=this.quality==='low'?2:this.quality==='medium'?3:5;
     for(let i=0;i<count;i++){
-      this.clouds.push({x:Math.random()*this.width,y:Math.random()*this.height*0.25,speed:0.2+Math.random()*0.4,size:40+Math.random()*80,opacity:0.3+Math.random()*0.3});
+      this.clouds.push({x:Math.random()*this.width,y:Math.random()*this.height*0.25,speed:0.2+Math.random()*0.4,size:50+Math.random()*90,opacity:0.3+Math.random()*0.3});
     }
   },
 
@@ -1262,20 +1303,21 @@ const RENDERER = {
   },
 
   initCrowd(){
-    this.crowdDots=[];const rows=this.quality==='low'?8:this.quality==='medium'?12:18;
-    const cols=this.quality==='low'?30:this.quality==='medium'?50:80;
+    this.crowdDots=[];const rows=this.quality==='low'?5:this.quality==='medium'?8:12;
+    const cols=this.quality==='low'?20:this.quality==='medium'?32:48;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
         this.crowdDots.push({
           x:(c/cols)*this.width+Math.random()*4,y:this.height*0.05+(r/rows)*this.height*0.18+Math.random()*3,
-          color:Math.random()>0.5?'#1a3a1a':'#0d2b0d',size:2+Math.random()*3,phase:Math.random()*Math.PI*2
+          color:Math.random()>0.5?'#1a3a1a':'#0d2b0d',size:2.5+Math.random()*3,phase:Math.random()*Math.PI*2
         });
       }
     }
   },
 
   initStars(){
-    this.stars=[];for(let i=0;i<50;i++){this.stars.push({x:Math.random()*this.width,y:Math.random()*this.height*0.35,size:Math.random()*2,opacity:Math.random(),phase:Math.random()*Math.PI*2});}
+    this.stars=[];const n=this.quality==='low'?12:this.quality==='medium'?22:30;
+    for(let i=0;i<n;i++){this.stars.push({x:Math.random()*this.width,y:Math.random()*this.height*0.35,size:Math.random()*2,opacity:Math.random(),phase:Math.random()*Math.PI*2});}
   },
 
   triggerShake(intensity,duration){
@@ -1291,6 +1333,7 @@ const RENDERER = {
 
   render(dt){
     this.time+=dt;
+    this._frame=(this._frame|0)+1;
     const ctx=this.ctx;const w=this.width;const h=this.height;
     ctx.save();
 
@@ -1373,10 +1416,12 @@ const RENDERER = {
       this.drawPlayerOverlay(ctx);
     }
 
-    // Vignette
-    const vig=ctx.createRadialGradient(w/2,h/2,w*0.3,w/2,h/2,w*0.8);
-    vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.4)');
-    ctx.fillStyle=vig;ctx.fillRect(0,0,w,h);
+    // Vignette (skip on low quality)
+    if(this.quality!=='low'){
+      const vig=ctx.createRadialGradient(w/2,h/2,w*0.3,w/2,h/2,w*0.8);
+      vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.4)');
+      ctx.fillStyle=vig;ctx.fillRect(0,0,w,h);
+    }
 
     ctx.restore();
   },
@@ -1393,8 +1438,11 @@ const RENDERER = {
   },
 
   drawCrowd(ctx,w,h){
-    for(const d of this.crowdDots){
-      const bounce=Math.sin(this.time*4+d.phase)*1.5;
+    const t=this.time*4;
+    const motion=!SETTINGS.values.reducedMotion;
+    for(let i=0,n=this.crowdDots.length;i<n;i++){
+      const d=this.crowdDots[i];
+      const bounce=motion?Math.sin(t+d.phase)*1.5:0;
       ctx.fillStyle=d.color;ctx.beginPath();ctx.arc(d.x,d.y+bounce,d.size,0,Math.PI*2);ctx.fill();
     }
     // Stadium structure
@@ -1492,7 +1540,7 @@ const RENDERER = {
         ctx.beginPath();ctx.arc(screenX,screenY,radius*0.6,0,Math.PI*2);ctx.stroke();
         ctx.fillStyle='rgba(255,215,0,0.3)';ctx.beginPath();ctx.arc(screenX,screenY,radius*0.3,0,Math.PI*2);ctx.fill();
       }else if(ball.type==='FIRE'){
-        PARTICLES.spawnFire(screenX,screenY,0,2);
+        if((RENDERER._frame|0)%3===0) PARTICLES.spawnFire(screenX,screenY,0,1);
       }else if(ball.type==='BOMB'){
         const pulse=0.8+Math.sin(ball.pulsePhase)*0.2;
         ctx.strokeStyle='rgba(255,0,0,'+pulse+')';ctx.lineWidth=2;
@@ -1592,7 +1640,7 @@ const RENDERER = {
   drawPlayerOverlay(ctx){
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=this.width/640;const scaleY=this.height/480;
+    const scaleX=this.width/(POSE.videoW||480);const scaleY=this.height/(POSE.videoH||360);
     const isCatchMode=GAME.currentMode&&GAME.currentMode.handOnly;
 
     if(!isCatchMode){
@@ -1868,15 +1916,15 @@ const GAME = {
 
     AUDIO.playSave();
     if(this.combo>=3){AUDIO.playCombo(this.combo);this.showCombo(this.combo);}
-    if(this.combo>=10){AUDIO.playPerfect();this.showCenterMessage('LEGENDARY!','Combo x'+this.combo);PARTICLES.spawnStars(ball.x,ball.y,15);}
+    if(this.combo>=10){AUDIO.playPerfect();this.showCenterMessage('LEGENDARY!','Combo x'+this.combo);PARTICLES.spawnStars(ball.x,ball.y,8);}
     else if(this.combo>=5){AUDIO.playPerfect();this.showCenterMessage('AMAZING!','Combo x'+this.combo);}
 
-    PARTICLES.spawnExplosion(ball.x,ball.y,0,20,info.color);
+    PARTICLES.spawnExplosion(ball.x,ball.y,0,12,info.color);
     this.scorePopups.push({x:ball.x,y:ball.y,text:'+'+points,life:1.1,vy:-55});
-    if(ball.type==='GOLDEN'){PARTICLES.spawnConfetti(ball.x,ball.y,0,30);AUDIO.playPerfect();}
-    if(ball.type==='FIRE')PARTICLES.spawnFire(ball.x,ball.y,0,15);
-    if(ball.type==='ICE')PARTICLES.spawnSmoke(ball.x,ball.y,0,8);
-    if(ball.type==='RAINBOW')PARTICLES.spawnConfetti(ball.x,ball.y,0,20);
+    if(ball.type==='GOLDEN'){PARTICLES.spawnConfetti(ball.x,ball.y,0,16);AUDIO.playPerfect();}
+    if(ball.type==='FIRE')PARTICLES.spawnFire(ball.x,ball.y,0,8);
+    if(ball.type==='ICE')PARTICLES.spawnSmoke(ball.x,ball.y,0,4);
+    if(ball.type==='RAINBOW')PARTICLES.spawnConfetti(ball.x,ball.y,0,12);
 
     RENDERER.triggerShake(4,200);
 
@@ -2250,16 +2298,18 @@ const LOOP = {
     // FPS calculation
     GAME.updateFPS();
 
-    // Pose detection
+    // Pose detection (throttled — still smooth via keypoint lerp)
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
-      POSE.detect();
+      POSE.frameCount++;
+      const every=(navigator.maxTouchPoints>0||window.innerWidth<900)?3:(CONFIG.POSE_DETECT_EVERY_N||2);
+      if((POSE.frameCount % every)===0) POSE.detect();
     }
 
     // Calibration preview drawing
     if(CALIBRATION.active){
       const calCanvas=document.getElementById('calCanvas');
-      const calCtx=calCanvas.getContext('2d');
-      calCanvas.width=320;calCanvas.height=240;
+      if(calCanvas.width!==320){calCanvas.width=320;calCanvas.height=240;}
+      const calCtx=calCanvas.getContext('2d',{alpha:false});
       CALIBRATION.drawPreview(calCtx);
     }
 
