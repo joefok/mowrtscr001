@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.10.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.10.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.10.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.0"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -329,7 +330,7 @@ canvas{display:block}
 // CONFIGURATION
 // ============================================================
 const CONFIG = {
-  VERSION: '2.0.2',
+  VERSION: '2.1.0',
   TARGET_FPS_DESKTOP: 60,
   TARGET_FPS_MOBILE: 30,
   GAME_DURATION: 60,
@@ -355,6 +356,7 @@ const CONFIG = {
   SCREEN_SHAKE_INTENSITY: 10,
   CONFETTI_COUNT: 36,
   POSE_DETECT_EVERY_N: 3,
+  ADAPTIVE_PERF: true,
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
   SKELETON_CONNECTIONS: [[5,6],[5,7],[6,8],[7,9],[8,10],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]],
   BODY_PARTS: {
@@ -416,6 +418,7 @@ const MATH = {
   randInt(min,max){return Math.floor(this.rand(min,max+1))},
   randChoice(arr){return arr[Math.floor(Math.random()*arr.length)]},
   dist(x1,y1,x2,y2){return Math.sqrt((x2-x1)**2+(y2-y1)**2)},
+  distSq(x1,y1,x2,y2){const dx=x2-x1,dy=y2-y1;return dx*dx+dy*dy},
   dist3d(x1,y1,z1,x2,y2,z2){return Math.sqrt((x2-x1)**2+(y2-y1)**2+(z2-z1)**2)},
   angle(x1,y1,x2,y2){return Math.atan2(y2-y1,x2-x1)},
   smoothstep(e0,e1,x){const t=this.clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t)},
@@ -426,6 +429,84 @@ const MATH = {
   easeOutBack(t){const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2)},
   easeInOutCubic(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2},
   noise(x){return Math.sin(x*12.9898)*43758.5453-Math.floor(Math.sin(x*12.9898)*43758.5453)}
+};
+
+
+// ============================================================
+// ADAPTIVE PERFORMANCE ENGINE
+// Monitors FPS and silently trades AI rate / particles / quality
+// so the player always sees a stable frame-rate.
+// ============================================================
+const PERF = {
+  tier: 'high',          // high | medium | low
+  auto: true,
+  fpsHistory: [],
+  historyMax: 90,        // ~1.5s at 60fps
+  lastAdjust: 0,
+  adjustCooldownMs: 2500, // don't thrash tiers
+  aiIntervalMs: 1000/20, // target AI period (starts ~20 Hz)
+  lastAiTime: 0,
+  posePending: false,
+  maxParticlesOverride: null,
+  enabled: true,
+
+  // Tier tables — visual difference is intentionally tiny
+  tiers: {
+    high:   { aiHz: 24, particles: 160, quality: 'high',   detectEvery: 2 },
+    medium: { aiHz: 16, particles: 90,  quality: 'medium', detectEvery: 3 },
+    low:    { aiHz: 12, particles: 40,  quality: 'low',    detectEvery: 4 }
+  },
+
+  init(){
+    this.enabled = CONFIG.ADAPTIVE_PERF !== false;
+    this.applyTier('high', true);
+  },
+
+  recordFps(fps){
+    if(!this.enabled||!this.auto)return;
+    this.fpsHistory.push(fps);
+    if(this.fpsHistory.length>this.historyMax)this.fpsHistory.shift();
+    if(this.fpsHistory.length<30)return;
+    const now=performance.now();
+    if(now-this.lastAdjust<this.adjustCooldownMs)return;
+    let sum=0;for(let i=0;i<this.fpsHistory.length;i++)sum+=this.fpsHistory[i];
+    const avg=sum/this.fpsHistory.length;
+    // Hysteresis: need sustained pain to drop, sustained headroom to rise
+    if(avg<38 && this.tier!=='low'){
+      const next=this.tier==='high'?'medium':'low';
+      this.applyTier(next);
+      this.lastAdjust=now;
+      this.fpsHistory.length=0;
+    }else if(avg>54 && this.tier!=='high'){
+      const next=this.tier==='low'?'medium':'high';
+      this.applyTier(next);
+      this.lastAdjust=now;
+      this.fpsHistory.length=0;
+    }
+  },
+
+  applyTier(tier, force){
+    if(!force && tier===this.tier)return;
+    this.tier=tier;
+    const t=this.tiers[tier];
+    this.aiIntervalMs=1000/t.aiHz;
+    this.maxParticlesOverride=t.particles;
+    CONFIG.POSE_DETECT_EVERY_N=t.detectEvery;
+    // Only override renderer quality if user left it on high (auto mode)
+    if(SETTINGS && SETTINGS.values && SETTINGS.values.quality==='high'){
+      RENDERER.quality=t.quality;
+      if(RENDERER.ctx)RENDERER.rebuildStaticCaches();
+    }
+    if(typeof CONFIG!=='undefined')CONFIG.MAX_PARTICLES=t.particles;
+  },
+
+  // True when enough time has passed for another AI inference
+  shouldRunAi(now){
+    return (now-this.lastAiTime)>=this.aiIntervalMs && !this.posePending;
+  },
+
+  markAiStart(now){this.lastAiTime=now;this.posePending=true;},
+  markAiDone(){this.posePending=false;}
 };
 
 // ============================================================
@@ -536,7 +617,8 @@ const PARTICLES = {
   },
   acquire(){
     if(this.free.length)return this.free.pop();
-    if(this.pool.length>=CONFIG.MAX_PARTICLES)return null;
+    const maxP=PERF.maxParticlesOverride||CONFIG.MAX_PARTICLES;
+    if(this.pool.length>=maxP)return null;
     const p=new Particle();this.pool.push(p);return p;
   },
   spawn(x,y,z,vx,vy,vz,life,size,color,type,gravity,drag,count){
@@ -582,9 +664,10 @@ const PARTICLES = {
       else this.free.push(p);
     }
     act.length=write;
-    if(act.length>CONFIG.MAX_PARTICLES){
-      for(let i=CONFIG.MAX_PARTICLES;i<act.length;i++){act[i].active=false;this.free.push(act[i]);}
-      act.length=CONFIG.MAX_PARTICLES;
+    const maxP=PERF.maxParticlesOverride||CONFIG.MAX_PARTICLES;
+    if(act.length>maxP){
+      for(let i=maxP;i<act.length;i++){act[i].active=false;this.free.push(act[i]);}
+      act.length=maxP;
     }
   },
   clear(){
@@ -743,17 +826,31 @@ const POSE = {
       if(typeof tf==='undefined'||typeof poseDetection==='undefined'){
         throw new Error('AI engine failed to load (TensorFlow.js / pose-detection script did not reach the browser). Check your internet connection.');
       }
-      await tf.setBackend('webgl');
-      await tf.ready();
-      try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
-      // Always use Lightning — ~3x faster, same tracking quality for this game
+      // Prefer WASM on low-power / mobile (frees GPU for canvas). Fall back to WebGL.
+      const preferWasm = (navigator.maxTouchPoints>0) || (navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4) || /Android|iPhone|iPad/i.test(navigator.userAgent);
+      let backend='webgl';
+      if(preferWasm){
+        try{
+          await tf.setBackend('wasm');
+          await tf.ready();
+          backend='wasm';
+        }catch(e){console.warn('WASM backend unavailable, using WebGL',e);backend='webgl';}
+      }
+      if(backend==='webgl'){
+        await tf.setBackend('webgl');
+        await tf.ready();
+        try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
+      }else{
+        try{if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
+      }
       const modelType='SINGLEPOSE_LIGHTNING';
       this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
         modelType: poseDetection.movenet.modelType[modelType],
         enableSmoothing: false
       });
       this.isReady=true;
-      console.log('MoveNet loaded:',modelType);
+      this.backend=backend;
+      console.log('MoveNet loaded:',modelType,'backend:',backend);
     }catch(e){
       console.error('Pose init failed:',e);
       this.isReady=false;
@@ -776,7 +873,14 @@ const POSE = {
       this.videoH=this.video.videoHeight||240;
       // Scale raise threshold with actual resolution
       this.RAISE_THRESHOLD=Math.round(this.videoH*0.11);
-      this.video.play();resolve();
+      this.video.play();
+      // Prefer processing only when the camera produces a new frame
+      this._newFrame=true;
+      if('requestVideoFrameCallback' in HTMLVideoElement.prototype){
+        const onFrame=()=>{this._newFrame=true;try{this.video.requestVideoFrameCallback(onFrame);}catch(_){}};
+        try{this.video.requestVideoFrameCallback(onFrame);}catch(_){}
+      }
+      resolve();
     };});
   },
 
@@ -784,6 +888,7 @@ const POSE = {
     if(!this.detector||!this.video||this.video.readyState<2)return null;
     if(this._detecting)return this.lastPose; // previous call still in flight — never stack concurrent inference
     this._detecting=true;
+    PERF.markAiStart(performance.now());
     try{
       // We always request RAW (unflipped) poses and mirror the coordinates
       // ourselves below — the library's own flipHorizontal behaved
@@ -809,7 +914,7 @@ const POSE = {
         return this.lastPose;
       }
     }catch(e){console.warn('Detection error:',e);return this.lastPose;}
-    finally{this._detecting=false;}
+    finally{this._detecting=false;PERF.markAiDone();}
   },
 
   computeConfidence(pose){
@@ -821,14 +926,42 @@ const POSE = {
   },
 
   smoothPose(pose){
-    if(!this.smoothedKeypoints.length){this.smoothedKeypoints=pose.keypoints.map(kp=>({...kp}));this.keypointVelocities=pose.keypoints.map(()=>({vx:0,vy:0}));return;}
+    if(!this.smoothedKeypoints.length){
+      this.smoothedKeypoints=pose.keypoints.map(kp=>({x:kp.x,y:kp.y,score:kp.score,name:kp.name}));
+      this.keypointVelocities=pose.keypoints.map(()=>({vx:0,vy:0}));
+      this._lastDetectTs=performance.now();
+      return;
+    }
+    const now=performance.now();
+    const dtSec=Math.max(0.016, Math.min(0.2, (now-(this._lastDetectTs||now))/1000));
+    this._lastDetectTs=now;
     const alpha=CONFIG.SMOOTHING_FACTOR;
     for(let i=0;i<pose.keypoints.length;i++){
       const kp=pose.keypoints[i];const sk=this.smoothedKeypoints[i];const vel=this.keypointVelocities[i];
       if(kp.score>CONFIG.POSE_CONFIDENCE_THRESHOLD){
-        vel.vx=(kp.x-sk.x)*0.5;vel.vy=(kp.y-sk.y)*0.5;
-        sk.x=MATH.lerp(sk.x,kp.x,alpha);sk.y=MATH.lerp(sk.y,kp.y,alpha);sk.score=kp.score;
+        // velocity in px/frame-ish for extrapolation between AI frames
+        const nx=MATH.lerp(sk.x,kp.x,alpha), ny=MATH.lerp(sk.y,kp.y,alpha);
+        vel.vx=(nx-sk.x)/dtSec; vel.vy=(ny-sk.y)/dtSec;
+        sk.x=nx;sk.y=ny;sk.score=kp.score;
       }
+    }
+  },
+
+  // Advance smoothed keypoints with last known velocity so collision/draw
+  // stay smooth even when AI only runs at 12–24 Hz.
+  extrapolate(dt){
+    if(!this.smoothedKeypoints.length||!this.keypointVelocities.length)return;
+    // Cap extrapolation so we don't drift wildly if AI stalls
+    const maxStep=8;
+    for(let i=0;i<this.smoothedKeypoints.length;i++){
+      const sk=this.smoothedKeypoints[i], vel=this.keypointVelocities[i];
+      if(!sk||sk.score<CONFIG.POSE_CONFIDENCE_THRESHOLD)continue;
+      let dx=vel.vx*dt, dy=vel.vy*dt;
+      if(dx>maxStep)dx=maxStep; else if(dx<-maxStep)dx=-maxStep;
+      if(dy>maxStep)dy=maxStep; else if(dy<-maxStep)dy=-maxStep;
+      sk.x+=dx; sk.y+=dy;
+      // mild velocity decay so extrapolated motion settles
+      vel.vx*=0.92; vel.vy*=0.92;
     }
   },
 
@@ -1143,8 +1276,8 @@ const COLLISION = {
     if(nose&&nose.score>0.2){
       const headRadius=Math.max(20,(leftEye&&rightEye&&leftEye.score>0.2&&rightEye.score>0.2)?MATH.dist(leftEye.x,leftEye.y,rightEye.x,rightEye.y)*1.5:30);
       const hx=nose.x*scaleX,hy=nose.y*scaleY;
-      const d=MATH.dist(ball.x,ball.y,hx,hy);
-      if(d<ball.radius+headRadius)return{part:'HEAD',x:hx,y:hy};
+      const rSum=ball.radius+headRadius;
+      if(MATH.distSq(ball.x,ball.y,hx,hy)<rSum*rSum)return{part:'HEAD',x:hx,y:hy};
     }
 
     // Torso collision (capsule/rectangle)
@@ -1285,6 +1418,7 @@ const RENDERER = {
   init(){
     this.canvas=document.getElementById('gameCanvas');
     this.ctx=this.canvas.getContext('2d',{alpha:false,desynchronized:true});
+    if(this.ctx){this.ctx.imageSmoothingEnabled=false;}
     this.resize();
     window.addEventListener('resize',()=>this.resize());
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
@@ -2159,14 +2293,15 @@ const GAME = {
     const now=performance.now();
     if(now-this.lastFpsTime>=1000){
       this.fps=this.frameCount;this.frameCount=0;this.lastFpsTime=now;
-      if(SETTINGS.values.showFps)document.getElementById('hudFps').textContent=this.fps;
+      PERF.recordFps(this.fps);
+      if(SETTINGS.values.showFps)document.getElementById('hudFps').textContent=this.fps+(PERF.tier!=='high'?'·'+PERF.tier[0].toUpperCase():'');
       if(SETTINGS.values.debug){
         document.getElementById('adminFps').textContent=this.fps;
         document.getElementById('adminPose').textContent=(POSE.confidence*100).toFixed(0)+'%';
         document.getElementById('adminBalls').textContent=BALLS.active.length;
         document.getElementById('adminParticles').textContent=PARTICLES.active.length;
         document.getElementById('adminMemory').textContent=(performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):0)+'MB';
-        document.getElementById('adminState').textContent=this.state;
+        document.getElementById('adminState').textContent=this.state+'/'+PERF.tier;
       }
     }
   }
@@ -2314,10 +2449,11 @@ const LEADERBOARD = {
 // ============================================================
 MATH.circleLineCollision = function(cx,cy,r,x1,y1,x2,y2){
   const dx=x2-x1,dy=y2-y1;const len2=dx*dx+dy*dy;
-  if(len2===0)return this.dist(cx,cy,x1,y1)<=r;
+  const rPad=r+5;const r2=rPad*rPad;
+  if(len2===0)return this.distSq(cx,cy,x1,y1)<=r2;
   let t=((cx-x1)*dx+(cy-y1)*dy)/len2;t=Math.max(0,Math.min(1,t));
   const px=x1+t*dx,py=y1+t*dy;
-  return this.dist(cx,cy,px,py)<=r+5;
+  return this.distSq(cx,cy,px,py)<=r2;
 };
 
 // ============================================================
@@ -2331,7 +2467,7 @@ const LOOP = {
 
   start(){
     this.running=true;this.lastTime=performance.now();
-    PARTICLES.init();BALLS.init();RENDERER.init();GAME.init();
+    PARTICLES.init();BALLS.init();RENDERER.init();PERF.init();GAME.init();
     this._boundTick=this._boundTick||(t=>this.tick(t));
     requestAnimationFrame(this._boundTick);
   },
@@ -2345,11 +2481,11 @@ const LOOP = {
     // FPS calculation
     GAME.updateFPS();
 
-    // Pose detection (throttled — still smooth via keypoint lerp)
+    // Pose: extrapolate every frame for buttery collision; AI at adaptive rate
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
-      POSE.frameCount++;
-      const every=(navigator.maxTouchPoints>0||window.innerWidth<900)?4:(CONFIG.POSE_DETECT_EVERY_N||3);
-      if((POSE.frameCount % every)===0) POSE.detect();
+      POSE.extrapolate(dt);
+      const now=performance.now();
+      if(PERF.shouldRunAi(now) && (POSE._newFrame!==false)){POSE._newFrame=false;POSE.detect();}
     }
 
     // Calibration preview drawing
