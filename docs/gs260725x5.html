@@ -329,14 +329,14 @@ canvas{display:block}
 // CONFIGURATION
 // ============================================================
 const CONFIG = {
-  VERSION: '2.0.1',
+  VERSION: '2.0.2',
   TARGET_FPS_DESKTOP: 60,
   TARGET_FPS_MOBILE: 30,
   GAME_DURATION: 60,
   INITIAL_LIVES: 3,
-  BALL_POOL_SIZE: 24,
-  PARTICLE_POOL_SIZE: 180,
-  MAX_PARTICLES: 220,
+  BALL_POOL_SIZE: 20,
+  PARTICLE_POOL_SIZE: 140,
+  MAX_PARTICLES: 160,
   GOAL_WIDTH_RATIO: 0.7,
   GOAL_HEIGHT_RATIO: 0.35,
   BALL_RADIUS_MIN: 10,
@@ -353,8 +353,8 @@ const CONFIG = {
   POWERUP_DURATION: 8000,
   SCREEN_SHAKE_DURATION: 350,
   SCREEN_SHAKE_INTENSITY: 10,
-  CONFETTI_COUNT: 48,
-  POSE_DETECT_EVERY_N: 2,
+  CONFETTI_COUNT: 36,
+  POSE_DETECT_EVERY_N: 3,
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
   SKELETON_CONNECTIONS: [[5,6],[5,7],[6,8],[7,9],[8,10],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]],
   BODY_PARTS: {
@@ -616,7 +616,7 @@ class Ball {
     if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*20;}
     this.x+=this.vx*dt;this.y+=this.vy*dt;this.z+=this.vz*dt;
     this.vy+=0.15*dt*60;this.spin+=dt*5;
-    if(RENDERER.quality!=='low'){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>8)this.trail.shift();}
+    if(RENDERER.quality==='high'){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>6)this.trail.shift();}
     if(this.y>RENDERER.groundY-this.radius&&this.bounces<this.maxBounces){
       this.y=RENDERER.groundY-this.radius;this.vy*=-0.6;this.vx*=0.8;this.vz*=0.8;this.bounces++;
       AUDIO.playBounce();PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
@@ -731,8 +731,8 @@ const POSE = {
   initializing: false,
   baselineHandY: null,
   RAISE_THRESHOLD: 40, // relative to actual video height (~360)
-  videoW: 480,
-  videoH: 360,
+  videoW: 320,
+  videoH: 240,
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -745,6 +745,7 @@ const POSE = {
       }
       await tf.setBackend('webgl');
       await tf.ready();
+      try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
       // Always use Lightning — ~3x faster, same tracking quality for this game
       const modelType='SINGLEPOSE_LIGHTNING';
       this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
@@ -767,12 +768,12 @@ const POSE = {
       throw new Error('Camera API not available. Make sure the page is served over HTTPS or localhost.');
     }
     const stream=await navigator.mediaDevices.getUserMedia({
-      video: {width:{ideal:480},height:{ideal:360},facingMode:this.cameraFacing,frameRate:{ideal:24,max:30}},audio:false
+      video: {width:{ideal:320},height:{ideal:240},facingMode:this.cameraFacing,frameRate:{ideal:20,max:24}},audio:false
     });
     this.video.srcObject=stream;
     return new Promise(resolve=>{this.video.onloadedmetadata=()=>{
-      this.videoW=this.video.videoWidth||480;
-      this.videoH=this.video.videoHeight||360;
+      this.videoW=this.video.videoWidth||320;
+      this.videoH=this.video.videoHeight||240;
       // Scale raise threshold with actual resolution
       this.RAISE_THRESHOLD=Math.round(this.videoH*0.11);
       this.video.play();resolve();
@@ -794,7 +795,7 @@ const POSE = {
           // Front camera only: flip every keypoint horizontally so the player
           // sees a true mirror image — raise your real right hand and it
           // moves things on the right side of the screen, like a bathroom mirror.
-          const vw=this.videoW||this.video.videoWidth||480;
+          const vw=this.videoW||this.video.videoWidth||320;
           for(const kp of pose.keypoints)kp.x=vw-kp.x;
         }
         this.confidence=this.computeConfidence(pose);
@@ -1049,7 +1050,7 @@ const CALIBRATION = {
 
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
-    const sX=320/(POSE.videoW||480), sY=240/(POSE.videoH||360);
+    const sX=320/(POSE.videoW||320), sY=240/(POSE.videoH||240);
     const pt=(i)=>{const kp=kps[i];if(!kp||kp.score<0.2)return null;return{x:kp.x*sX,y:kp.y*sY};};
 
     const nose=pt(0),ls=pt(5),rs=pt(6),le=pt(7),re=pt(8),lw=pt(9),rw=pt(10),
@@ -1110,7 +1111,7 @@ const COLLISION = {
   checkBallPlayer(ball){
     if(!POSE.smoothedKeypoints.length||ball.collisionCooldown>0)return null;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=RENDERER.width/(POSE.videoW||480);const scaleY=RENDERER.height/(POSE.videoH||360);
+    const scaleX=RENDERER.width/(POSE.videoW||320);const scaleY=RENDERER.height/(POSE.videoH||240);
 
     // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
     const mode=GAME.currentMode;
@@ -1312,12 +1313,26 @@ const RENDERER = {
     this.vigGrad=ctx.createRadialGradient(w/2,h/2,w*0.3,w/2,h/2,w*0.8);
     this.vigGrad.addColorStop(0,'rgba(0,0,0,0)');this.vigGrad.addColorStop(1,'rgba(0,0,0,0.4)');
 
-    // The goal + net never move or animate, so pre-render them once to an
-    // offscreen canvas and just drawImage() it every frame instead of the
-    // dozen-plus stroke() calls (including a shadowBlur) it takes to draw.
+    // Lights + top/mid structure bars — drawn early (under clouds/crowd)
+    if(!this.bgCanvas)this.bgCanvas=document.createElement('canvas');
+    this.bgCanvas.width=w;this.bgCanvas.height=h;
+    const bctx=this.bgCanvas.getContext('2d',{alpha:true});
+    bctx.clearRect(0,0,w,h);
+    const lightCount=6,lightY=h*0.02;
+    for(let i=0;i<lightCount;i++){
+      const lx=(i+1)*(w/(lightCount+1));
+      bctx.fillStyle='rgba(255,255,200,0.1)';
+      bctx.beginPath();bctx.moveTo(lx-30,lightY);bctx.lineTo(lx+30,lightY);bctx.lineTo(lx+80,h*0.4);bctx.lineTo(lx-80,h*0.4);bctx.closePath();bctx.fill();
+      bctx.fillStyle='rgba(255,255,220,0.6)';bctx.beginPath();bctx.arc(lx,lightY,8,0,Math.PI*2);bctx.fill();
+      bctx.fillStyle='rgba(255,255,200,0.15)';bctx.beginPath();bctx.arc(lx,lightY,25,0,Math.PI*2);bctx.fill();
+    }
+    bctx.fillStyle='rgba(20,30,20,0.8)';bctx.fillRect(0,0,w,h*0.05);
+    bctx.fillStyle='rgba(30,40,30,0.6)';bctx.fillRect(0,h*0.22,w,h*0.03);
+
+    // Goal + net — drawn after grass (correct z-order)
     if(!this.goalCanvas)this.goalCanvas=document.createElement('canvas');
     this.goalCanvas.width=w;this.goalCanvas.height=h;
-    const gctx=this.goalCanvas.getContext('2d');
+    const gctx=this.goalCanvas.getContext('2d',{alpha:true});
     gctx.clearRect(0,0,w,h);
     this.drawGoal(gctx,w,h);
     this.drawGoalNet(gctx,w,h);
@@ -1338,8 +1353,8 @@ const RENDERER = {
   },
 
   initCrowd(){
-    this.crowdDots=[];const rows=this.quality==='low'?5:this.quality==='medium'?8:12;
-    const cols=this.quality==='low'?20:this.quality==='medium'?32:48;
+    this.crowdDots=[];const rows=this.quality==='low'?4:this.quality==='medium'?6:10;
+    const cols=this.quality==='low'?16:this.quality==='medium'?26:40;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
         this.crowdDots.push({
@@ -1390,8 +1405,8 @@ const RENDERER = {
       for(const s of this.stars){const op=0.3+Math.sin(this.time*2+s.phase)*0.3*s.opacity;ctx.fillStyle='rgba(255,255,255,'+op+')';ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();}
     }
 
-    // Stadium lights
-    this.drawStadiumLights(ctx,w,h);
+    // Static lights + structure (baked)
+    if(this.bgCanvas)ctx.drawImage(this.bgCanvas,0,0);
 
     // Clouds
     for(const c of this.clouds){
@@ -1472,9 +1487,7 @@ const RENDERER = {
       const bounce=motion?Math.sin(t+d.phase)*1.5:0;
       ctx.fillStyle=d.color;ctx.beginPath();ctx.arc(d.x,d.y+bounce,d.size,0,Math.PI*2);ctx.fill();
     }
-    // Stadium structure
-    ctx.fillStyle='rgba(20,30,20,0.8)';ctx.fillRect(0,0,w,h*0.05);
-    ctx.fillStyle='rgba(30,40,30,0.6)';ctx.fillRect(0,h*0.22,w,h*0.03);
+    // Stadium structure bars are baked into goalCanvas
   },
 
   drawGoal(ctx,w,h){
@@ -1485,11 +1498,11 @@ const RENDERER = {
     ctx.strokeStyle='rgba(220,220,220,0.9)';ctx.lineWidth=6;ctx.lineCap='round';
     ctx.beginPath();ctx.moveTo(goalX,goalY+goalH);ctx.lineTo(goalX,goalY);ctx.lineTo(goalX+goalW,goalY);ctx.lineTo(goalX+goalW,goalY+goalH);ctx.stroke();
 
-    // Goal crossbar glow
-    ctx.shadowColor='rgba(255,255,255,0.3)';ctx.shadowBlur=15;
-    ctx.strokeStyle='rgba(255,255,255,0.8)';ctx.lineWidth=3;
+    // Goal crossbar highlight (no shadowBlur — baked once to offscreen canvas)
+    ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(goalX,goalY);ctx.lineTo(goalX+goalW,goalY);ctx.stroke();
-    ctx.shadowBlur=0;
+    ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=8;
+    ctx.beginPath();ctx.moveTo(goalX,goalY);ctx.lineTo(goalX+goalW,goalY);ctx.stroke();
 
     // Goal depth lines
     ctx.strokeStyle='rgba(200,200,200,0.3)';ctx.lineWidth=2;
@@ -1537,7 +1550,7 @@ const RENDERER = {
       ctx.beginPath();ctx.ellipse(screenX,shadowY,radius*shadowScale*0.8,radius*shadowScale*0.3,0,0,Math.PI*2);ctx.fill();
 
       // Trail
-      if(ball.trail.length>1&&this.quality!=='low'){
+      if(ball.trail.length>1&&this.quality==='high'){
         for(let i=1;i<ball.trail.length;i++){
           const t1=ball.trail[i-1],t2=ball.trail[i];
           const alpha=(i/ball.trail.length)*0.3;
@@ -1551,17 +1564,22 @@ const RENDERER = {
       let color=info.color;
       if(color==='rainbow'){color='hsl('+ball.rainbowHue+',100%,60%)';}
 
-      ctx.shadowColor=info.glow;ctx.shadowBlur=20;
-
-      // Ball body
+      // Soft glow without full shadowBlur (very expensive). High quality gets a
+      // cheap outer halo; body uses a simple 2-stop radial that looks identical.
+      if(this.quality==='high'){
+        ctx.fillStyle=info.glow;ctx.beginPath();ctx.arc(screenX,screenY,radius*1.35,0,Math.PI*2);ctx.fill();
+      }
       const ballGrad=ctx.createRadialGradient(screenX-radius*0.3,screenY-radius*0.3,radius*0.1,screenX,screenY,radius);
-      ballGrad.addColorStop(0,'rgba(255,255,255,0.9)');ballGrad.addColorStop(0.3,color);ballGrad.addColorStop(1,this.darkenColor(color,0.5));
+      ballGrad.addColorStop(0,'rgba(255,255,255,0.9)');ballGrad.addColorStop(0.35,color);ballGrad.addColorStop(1,this.darkenColor(color,0.5));
       ctx.fillStyle=ballGrad;ctx.beginPath();ctx.arc(screenX,screenY,radius,0,Math.PI*2);ctx.fill();
-      ctx.shadowBlur=0;
 
       // Ball pattern
       if(ball.type==='NORMAL'){
-        this.drawSoccerPattern(ctx,screenX,screenY,radius,ball.spin);
+        if(this.quality==='high')this.drawSoccerPattern(ctx,screenX,screenY,radius,ball.spin);
+        else if(this.quality==='medium'){
+          ctx.strokeStyle='rgba(20,20,20,0.55)';ctx.lineWidth=Math.max(1,radius*0.08);
+          ctx.beginPath();ctx.arc(screenX,screenY,radius*0.45,ball.spin,ball.spin+Math.PI*1.2);ctx.stroke();
+        }
       }else if(ball.type==='GOLDEN'){
         ctx.strokeStyle='rgba(255,215,0,0.8)';ctx.lineWidth=2;
         ctx.beginPath();ctx.arc(screenX,screenY,radius*0.6,0,Math.PI*2);ctx.stroke();
@@ -1604,8 +1622,6 @@ const RENDERER = {
         ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(0,0,size,0,Math.PI*2);ctx.fill();
       }else{
         ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(0,0,size,0,Math.PI*2);ctx.fill();
-        ctx.shadowColor=p.color;ctx.shadowBlur=size*2;
-        ctx.fill();ctx.shadowBlur=0;
       }
       ctx.restore();
     }
@@ -1667,7 +1683,7 @@ const RENDERER = {
   drawPlayerOverlay(ctx){
     if(!POSE.smoothedKeypoints.length)return;
     const kps=POSE.smoothedKeypoints;
-    const scaleX=this.width/(POSE.videoW||480);const scaleY=this.height/(POSE.videoH||360);
+    const scaleX=this.width/(POSE.videoW||320);const scaleY=this.height/(POSE.videoH||240);
     const isCatchMode=GAME.currentMode&&GAME.currentMode.handOnly;
 
     if(!isCatchMode){
@@ -1701,7 +1717,7 @@ const RENDERER = {
     ctx.save();ctx.translate(x,y);
     const scale=raised?1.25:0.85;
     ctx.scale(scale,scale);
-    ctx.shadowColor=raised?'rgba(255,255,255,0.7)':'rgba(0,0,0,0.4)';ctx.shadowBlur=raised?18:8;
+    ctx.shadowColor=raised?'rgba(255,255,255,0.55)':'rgba(0,0,0,0.35)';ctx.shadowBlur=raised?8:0;
     ctx.globalAlpha=raised?1:0.6;
     // Palm
     ctx.fillStyle=color;
@@ -2027,11 +2043,12 @@ const GAME = {
   },
 
   updatePowerups(dt){
+    let changed=false;
     for(let i=this.activePowerups.length-1;i>=0;i--){
       const p=this.activePowerups[i];p.timeLeft-=dt*1000;
-      if(p.timeLeft<=0){this.powerups[p.type]=false;this.activePowerups.splice(i,1);}
+      if(p.timeLeft<=0){this.powerups[p.type]=false;this.activePowerups.splice(i,1);changed=true;}
     }
-    this.updatePowerupDisplay();
+    if(changed)this.updatePowerupDisplay();
   },
 
   updateScorePopups(dt){
@@ -2330,7 +2347,7 @@ const LOOP = {
     // Pose detection (throttled — still smooth via keypoint lerp)
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
       POSE.frameCount++;
-      const every=(navigator.maxTouchPoints>0||window.innerWidth<900)?3:(CONFIG.POSE_DETECT_EVERY_N||2);
+      const every=(navigator.maxTouchPoints>0||window.innerWidth<900)?4:(CONFIG.POSE_DETECT_EVERY_N||3);
       if((POSE.frameCount % every)===0) POSE.detect();
     }
 
