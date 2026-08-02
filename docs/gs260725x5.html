@@ -410,6 +410,14 @@ const CONFIG = {
 // ============================================================
 // MATH UTILITIES
 // ============================================================
+// Defers non-critical work (localStorage saves) to idle time instead of
+// blocking whatever frame it was called from - falls back to a short
+// setTimeout on browsers without requestIdleCallback (e.g. Safari).
+function idleTask(fn){
+  if('requestIdleCallback'in window)requestIdleCallback(fn,{timeout:2000});
+  else setTimeout(fn,0);
+}
+
 const MATH = {
   lerp(a,b,t){return a+(b-a)*t},
   clamp(v,min,max){return Math.max(min,Math.min(max,v))},
@@ -1320,7 +1328,10 @@ const RENDERER = {
     this.canvas=document.getElementById('gameCanvas');
     this.ctx=this.canvas.getContext('2d',{alpha:false,desynchronized:true});
     this.resize();
-    window.addEventListener('resize',()=>this.resize());
+    window.addEventListener('resize',()=>{
+      clearTimeout(this._resizeDebounce);
+      this._resizeDebounce=setTimeout(()=>this.resize(),150);
+    });
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
   },
 
@@ -2299,7 +2310,7 @@ const SETTINGS = {
   },
 
   save(){
-    try{localStorage.setItem('gk_settings',JSON.stringify(this.values));}catch(e){}
+    idleTask(()=>{try{localStorage.setItem('gk_settings',JSON.stringify(this.values));}catch(e){}});
   },
 
   apply(){
@@ -2349,7 +2360,7 @@ const LEADERBOARD = {
   },
 
   save(){
-    try{localStorage.setItem('gk_leaderboard',JSON.stringify(this.entries));}catch(e){}
+    idleTask(()=>{try{localStorage.setItem('gk_leaderboard',JSON.stringify(this.entries));}catch(e){}});
   },
 
   add(entry){
@@ -2541,10 +2552,17 @@ window.addEventListener('DOMContentLoaded',()=>{
   MOBILE.init();
   LOOP.start();
 
-  // Handle page visibility for audio
+  // Handle page visibility for audio + camera (stop the camera actually
+  // decoding frames in the background too — not just pausing game logic —
+  // for real battery savings when the tab/screen is hidden)
   document.addEventListener('visibilitychange',()=>{
-    if(document.hidden){AUDIO.stopMusic();}
-    else if(GAME.state==='playing'){AUDIO.startMusic();}
+    if(document.hidden){
+      AUDIO.stopMusic();
+      if(POSE.video&&!POSE.video.paused)POSE.video.pause();
+    }else{
+      if(GAME.state==='playing')AUDIO.startMusic();
+      if(POSE.video&&POSE.video.srcObject)POSE.video.play().catch(()=>{});
+    }
   });
 });
 
