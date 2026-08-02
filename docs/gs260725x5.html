@@ -781,6 +781,8 @@ const POSE = {
 
   async detect(){
     if(!this.detector||!this.video||this.video.readyState<2)return null;
+    if(this._detecting)return this.lastPose; // previous call still in flight — never stack concurrent inference
+    this._detecting=true;
     try{
       // We always request RAW (unflipped) poses and mirror the coordinates
       // ourselves below — the library's own flipHorizontal behaved
@@ -806,6 +808,7 @@ const POSE = {
         return this.lastPose;
       }
     }catch(e){console.warn('Detection error:',e);return this.lastPose;}
+    finally{this._detecting=false;}
   },
 
   computeConfidence(pose){
@@ -1240,10 +1243,13 @@ const KICKER = {
     ctx.fillStyle='#2a2a2a';ctx.fillRect(-scale*0.13,scale*0.38,scale*0.26,scale*0.12);
     ctx.restore();
 
-    // Body
-    const bodyGrad=ctx.createRadialGradient(-scale*0.15,-scale*0.2,scale*0.1,0,0,scale*0.62);
-    bodyGrad.addColorStop(0,'#8477e0');bodyGrad.addColorStop(1,'#4c3fa8');
-    ctx.fillStyle=bodyGrad;
+    // Body (gradient cached per scale — identical every frame until resize)
+    if(this._bodyGradScale!==scale){
+      this._bodyGradScale=scale;
+      this._bodyGrad=ctx.createRadialGradient(-scale*0.15,-scale*0.2,scale*0.1,0,0,scale*0.62);
+      this._bodyGrad.addColorStop(0,'#8477e0');this._bodyGrad.addColorStop(1,'#4c3fa8');
+    }
+    ctx.fillStyle=this._bodyGrad;
     ctx.beginPath();ctx.ellipse(0,0,scale*0.5,scale*0.62,0,0,Math.PI*2);ctx.fill();
 
     // Horns
@@ -1286,6 +1292,35 @@ const RENDERER = {
     this.canvas.width=this.width;this.canvas.height=this.height;
     this.groundY=this.height*0.72;
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
+    this.rebuildStaticCaches();
+  },
+
+  // Gradients and the goal/net only depend on canvas size (and quality) —
+  // rebuilding them every frame was pure waste. We compute them once here
+  // and reuse the cached objects/canvas every frame; pixel output is
+  // identical, it's just no longer recomputed 60 times a second.
+  rebuildStaticCaches(){
+    const ctx=this.ctx,w=this.width,h=this.height;
+    if(!ctx||!w||!h)return;
+
+    this.skyGrad=ctx.createLinearGradient(0,0,0,h*0.5);
+    this.skyGrad.addColorStop(0,'#0a1a3a');this.skyGrad.addColorStop(0.5,'#1a3a5a');this.skyGrad.addColorStop(1,'#2a5a3a');
+
+    this.grassGrad=ctx.createLinearGradient(0,this.groundY,0,h);
+    this.grassGrad.addColorStop(0,'#1a5a1a');this.grassGrad.addColorStop(0.3,'#2a7a2a');this.grassGrad.addColorStop(1,'#1a4a1a');
+
+    this.vigGrad=ctx.createRadialGradient(w/2,h/2,w*0.3,w/2,h/2,w*0.8);
+    this.vigGrad.addColorStop(0,'rgba(0,0,0,0)');this.vigGrad.addColorStop(1,'rgba(0,0,0,0.4)');
+
+    // The goal + net never move or animate, so pre-render them once to an
+    // offscreen canvas and just drawImage() it every frame instead of the
+    // dozen-plus stroke() calls (including a shadowBlur) it takes to draw.
+    if(!this.goalCanvas)this.goalCanvas=document.createElement('canvas');
+    this.goalCanvas.width=w;this.goalCanvas.height=h;
+    const gctx=this.goalCanvas.getContext('2d');
+    gctx.clearRect(0,0,w,h);
+    this.drawGoal(gctx,w,h);
+    this.drawGoalNet(gctx,w,h);
   },
 
   initClouds(){
@@ -1347,10 +1382,8 @@ const RENDERER = {
     // Flash
     if(this.flashIntensity>0){ctx.fillStyle='rgba(255,255,255,'+this.flashIntensity*0.3+')';ctx.fillRect(0,0,w,h);this.flashIntensity-=dt*3;}
 
-    // Sky gradient
-    const skyGrad=ctx.createLinearGradient(0,0,0,h*0.5);
-    skyGrad.addColorStop(0,'#0a1a3a');skyGrad.addColorStop(0.5,'#1a3a5a');skyGrad.addColorStop(1,'#2a5a3a');
-    ctx.fillStyle=skyGrad;ctx.fillRect(0,0,w,h);
+    // Sky gradient (cached — rebuilt only on resize, identical pixels)
+    ctx.fillStyle=this.skyGrad||'#1a3a5a';ctx.fillRect(0,0,w,h);
 
     // Stars
     if(this.quality!=='low'){
@@ -1379,10 +1412,8 @@ const RENDERER = {
       ctx.strokeStyle='rgba(255,215,0,0.5)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.x,f.y+30);ctx.stroke();
     }
 
-    // Field / Grass
-    const grassGrad=ctx.createLinearGradient(0,this.groundY,0,h);
-    grassGrad.addColorStop(0,'#1a5a1a');grassGrad.addColorStop(0.3,'#2a7a2a');grassGrad.addColorStop(1,'#1a4a1a');
-    ctx.fillStyle=grassGrad;ctx.fillRect(0,this.groundY,w,h-this.groundY);
+    // Field / Grass (cached gradient)
+    ctx.fillStyle=this.grassGrad||'#2a7a2a';ctx.fillRect(0,this.groundY,w,h-this.groundY);
 
     // Field lines
     ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=2;
@@ -1390,11 +1421,9 @@ const RENDERER = {
     ctx.beginPath();ctx.ellipse(w/2,this.groundY+h*0.15,w*0.15,h*0.08,0,0,Math.PI*2);ctx.stroke();
     ctx.beginPath();ctx.moveTo(w/2,this.groundY);ctx.lineTo(w/2,this.groundY+h*0.15);ctx.stroke();
 
-    // Goal
-    this.drawGoal(ctx,w,h);
-
-    // Goal net
-    this.drawGoalNet(ctx,w,h);
+    // Goal + net — pre-rendered to an offscreen canvas (static shape, never
+    // animates), so this is one drawImage instead of ~15 stroke calls.
+    if(this.goalCanvas)ctx.drawImage(this.goalCanvas,0,0);
 
     // Kicker mascot — the "far center" character the player watches kick the ball out
     if(GAME.state==='playing'||GAME.state==='countdown')KICKER.draw(ctx);
@@ -1416,11 +1445,9 @@ const RENDERER = {
       this.drawPlayerOverlay(ctx);
     }
 
-    // Vignette (skip on low quality)
-    if(this.quality!=='low'){
-      const vig=ctx.createRadialGradient(w/2,h/2,w*0.3,w/2,h/2,w*0.8);
-      vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(0,0,0,0.4)');
-      ctx.fillStyle=vig;ctx.fillRect(0,0,w,h);
+    // Vignette (skip on low quality) — cached gradient
+    if(this.quality!=='low'&&this.vigGrad){
+      ctx.fillStyle=this.vigGrad;ctx.fillRect(0,0,w,h);
     }
 
     ctx.restore();
@@ -2162,6 +2189,7 @@ const SETTINGS = {
     AUDIO.setMusicEnabled(this.values.music);
     AUDIO.setSfxEnabled(this.values.sfx);
     RENDERER.quality=this.values.quality;
+    if(RENDERER.ctx)RENDERER.rebuildStaticCaches();
     if(POSE.isReady&&POSE.cameraFacing!==this.values.camera)POSE.switchCamera(this.values.camera);
     if(this.values.kioskMode)GAME.enableKioskMode();
     if(this.values.debug)document.getElementById('adminPanel').classList.remove('hidden');
@@ -2286,7 +2314,8 @@ const LOOP = {
   start(){
     this.running=true;this.lastTime=performance.now();
     PARTICLES.init();BALLS.init();RENDERER.init();GAME.init();
-    requestAnimationFrame(t=>this.tick(t));
+    this._boundTick=this._boundTick||(t=>this.tick(t));
+    requestAnimationFrame(this._boundTick);
   },
 
   tick(timestamp){
@@ -2328,7 +2357,7 @@ const LOOP = {
     // Render
     RENDERER.render(dt);
 
-    requestAnimationFrame(t=>this.tick(t));
+    requestAnimationFrame(this._boundTick);
   },
 
   update(dt){
