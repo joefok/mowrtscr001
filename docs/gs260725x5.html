@@ -684,7 +684,8 @@ const BALLS = {
       targetY=MATH.rand(h*0.28,h*0.60);
     }
     const targetZ=100;
-    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
+    const perfSpeed=(PERF.gameplayByTier[RENDERER.quality]||{speed:1}).speed;
+    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult*perfSpeed;
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
     const vx=(dx/dist)*speed*60,vy=(dy/dist)*speed*60,vz=(dz/dist)*speed*60;
@@ -707,7 +708,8 @@ const BALLS = {
     const canSpawn=!mode.singleBall||this.active.filter(b=>b.active).length===0;
     if(this.spawnTimer<=0&&GAME.state==='playing'&&canSpawn){
       this.spawn();
-      const baseInterval=mode.spawnInterval/this.difficultyMult;
+      const perfSpawn=(PERF.gameplayByTier[RENDERER.quality]||{spawn:1}).spawn;
+      const baseInterval=(mode.spawnInterval/this.difficultyMult)*perfSpawn;
       this.spawnTimer=MATH.rand(baseInterval*0.7,baseInterval*1.3);
     }
     const act=this.active;let w=0;
@@ -1820,11 +1822,28 @@ const PERF = {
   lastChangeTime: 0,
   MIN_SAMPLES: 5,           // don't react until we have ~5s of real data
   MIN_CHANGE_INTERVAL: 5000,// never change tier more than once per 5s (no flapping)
+  // 'low' tier is a sustainable target (~45fps on weak mobile hardware), not
+  // a punishment tier — we stop trying to force 60fps once a device clearly
+  // can't hold it, rather than repeatedly downgrading/upgrading around it.
   DOWNGRADE_BELOW: 40,
   UPGRADE_ABOVE: 55,
 
   aiEveryByTier:{low:5,medium:3,high:2},
   maxParticlesByTier:{low:50,medium:100,high:160},
+  // Modest gameplay-fairness coupling: on a struggling device, ease off ball
+  // speed and give slightly more time between throws so reaction time in
+  // real seconds stays roughly fair even though visual smoothness is lower.
+  // Deliberately gentle (not the 30-40% cuts some guides suggest) since this
+  // should only ever be a small assist, never a different game.
+  gameplayByTier:{low:{speed:0.88,spawn:1.12},medium:{speed:0.96,spawn:1.05},high:{speed:1,spawn:1}},
+
+  // Fast circuit breaker for sudden severe drops (e.g. mid-session thermal
+  // throttling) — the once-a-second rolling average above is great for
+  // steady-state tuning but can take several seconds to react to a cliff;
+  // this catches it within a few hundred ms instead.
+  thermalDropCount:0,
+  thermalCooldownEnd:0,
+  lastFrameTimeThermal:0,
 
   sample(fps){
     if(!this.enabled)return;
@@ -1842,10 +1861,34 @@ const PERF = {
     if(avg<this.DOWNGRADE_BELOW&&idx>0){
       this.lastChangeTime=now;
       this.applyTier(this.tiers[idx-1]);
-    }else if(avg>this.UPGRADE_ABOVE&&idx<this.tiers.length-1){
+    }else if(avg>this.UPGRADE_ABOVE&&idx<this.tiers.length-1&&now>this.thermalCooldownEnd){
       this.lastChangeTime=now;
       this.applyTier(this.tiers[idx+1]);
     }
+  },
+
+  // Called every render frame with the raw (unclamped) frame delta - cheap
+  // enough to run unconditionally, and reacts far faster than the 1s sampler.
+  checkThermal(rawDtMs){
+    if(!this.enabled||!this.lastFrameTimeThermal){this.lastFrameTimeThermal=performance.now();return;}
+    if(rawDtMs>50){ // this single frame took >50ms (under 20fps)
+      this.thermalDropCount++;
+      const now=performance.now();
+      if(this.thermalDropCount>=3&&now>this.thermalCooldownEnd){
+        this.forceTier('low');
+        this.thermalCooldownEnd=now+30000; // 30s before we'll try upgrading again
+        console.warn('[PERF] sudden severe frame drops detected — forcing low tier for 30s');
+      }
+    }else{
+      this.thermalDropCount=Math.max(0,this.thermalDropCount-1);
+    }
+  },
+
+  // Immediately jumps to a tier, bypassing the normal change cooldown -
+  // used only by the thermal circuit breaker above for a fast response.
+  forceTier(tier){
+    this.lastChangeTime=performance.now();
+    this.applyTier(tier);
   },
 
   applyTier(tier){
@@ -2451,6 +2494,7 @@ const LOOP = {
     const rawDt=(timestamp-this.lastTime)/1000;
     this.lastTime=timestamp;
     const dt=Math.min(rawDt,0.05);
+    PERF.checkThermal(rawDt*1000);
 
     // FPS calculation
     GAME.updateFPS();
@@ -2537,10 +2581,12 @@ const MOBILE = {
     }
     // Touch controls intentionally not shown — this is a fully automatic
     // kiosk experience, on-screen pause/screenshot buttons aren't needed.
-    // Fullscreen on tap
+    // Fullscreen on tap (iOS Safari needs the webkit-prefixed fallback)
     document.addEventListener('click',()=>{
       const el=document.documentElement;
-      if(el.requestFullscreen&&!document.fullscreenElement)el.requestFullscreen().catch(()=>{});
+      if(document.fullscreenElement)return;
+      if(el.requestFullscreen)el.requestFullscreen().catch(()=>{});
+      else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
     });
   }
 };
