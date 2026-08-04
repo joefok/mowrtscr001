@@ -373,10 +373,10 @@ const CONFIG = {
   // Detection always stays high-priority; visuals are flexible.
   ACID_TEST_DURATION_MS: 2200,
   ACID_TEST_MIN_SAMPLES: 12,
-  // Relaxed thresholds — only drop to classic when the device is clearly struggling
-  ACID_TEST_FPS_THRESHOLD: 30,       // below this → classic8bit (was 38)
-  ACID_TEST_DETECT_MS_THRESHOLD: 60, // avg detect cost above this → classic8bit (was 45)
-  CLASSIC_PIXEL_SCALE: 4,            // internal low-res canvas scale factor
+  // Further relaxed — classic only on extremely low-power devices
+  ACID_TEST_FPS_THRESHOLD: 22,       // below this → classic8bit
+  ACID_TEST_DETECT_MS_THRESHOLD: 85, // avg detect cost above this → classic8bit
+  CLASSIC_PIXEL_SCALE: 6,            // coarser pixels = less work + more "Game Boy" look
   VISUAL_STYLE_DEFAULT: 'auto',      // 'auto' | 'modern' | 'classic8bit'
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
   SKELETON_CONNECTIONS: [[5,6],[5,7],[6,8],[7,9],[8,10],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]],
@@ -1092,8 +1092,8 @@ const CALIBRATION = {
       const style=await PERF.runAcidTest();
       if(style==='classic8bit'){
         document.getElementById('calTitle').textContent='Classic Mode';
-        document.getElementById('calDesc').textContent='8-bit style selected for smooth play!';
-        document.getElementById('calDescAlt').textContent='Inspired by NES / Famicom / Game Boy soccer classics';
+        document.getElementById('calDesc').textContent='Ultra-low 8-bit graphics for max responsiveness';
+        document.getElementById('calDescAlt').textContent='Game Boy / Famicom style — pose tracking prioritized';
       }else{
         document.getElementById('calTitle').textContent='Modern Mode';
         document.getElementById('calDesc').textContent='Full visuals unlocked — enjoy!';
@@ -1387,9 +1387,9 @@ const RENDERER = {
     this.width=window.innerWidth;this.height=window.innerHeight;
     this.canvas.width=this.width;this.canvas.height=this.height;
     this.groundY=this.height*0.72;
-    const scale=CONFIG.CLASSIC_PIXEL_SCALE||4;
-    this.lowResCanvas.width=Math.max(160,Math.floor(this.width/scale));
-    this.lowResCanvas.height=Math.max(120,Math.floor(this.height/scale));
+    const scale=CONFIG.CLASSIC_PIXEL_SCALE||6;
+    this.lowResCanvas.width=Math.max(80,Math.floor(this.width/scale));
+    this.lowResCanvas.height=Math.max(60,Math.floor(this.height/scale));
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
     this.rebuildStaticCaches();
   },
@@ -1594,38 +1594,19 @@ const RENDERER = {
     // Hard clear every frame — previous ball/hand pixels are fully erased
     ctx.clearRect(0,0,lw,lh);
 
-    // Flat sky (NES-style solid + simple bands)
-    ctx.fillStyle='#0055aa';ctx.fillRect(0,0,lw,Math.floor(lh*0.45));
-    ctx.fillStyle='#0077cc';ctx.fillRect(0,Math.floor(lh*0.35),lw,Math.floor(lh*0.12));
-    // Simple cloud blocks
-    ctx.fillStyle='#aabbcc';
-    for(const c of this.clouds){
-      const cx=Math.floor((c.x%this.width)*sx), cy=Math.floor(c.y*sy);
-      ctx.fillRect(cx,cy,12,4);ctx.fillRect(cx+3,cy-3,8,4);
-    }
-    // Stadium strip
-    ctx.fillStyle='#222222';ctx.fillRect(0,0,lw,6);
-    ctx.fillStyle='#333333';ctx.fillRect(0,Math.floor(lh*0.22),lw,4);
-    // Crowd as colored pixel rows (very cheap)
-    ctx.fillStyle='#1a3a1a';
-    for(let r=0;r<4;r++){
-      for(let c=0;c<lw;c+=3){
-        if(((c+r*2)%5)===0)ctx.fillRect(c,6+r*3,2,2);
-      }
-    }
+    // Ultra-minimal background (solid fills only — no loops, no arcs, no dots)
+    // Sky
+    ctx.fillStyle='#0055aa';ctx.fillRect(0,0,lw,groundY);
     // Grass
     ctx.fillStyle='#228822';ctx.fillRect(0,groundY,lw,lh-groundY);
-    ctx.fillStyle='#33aa33';ctx.fillRect(0,groundY,lw,3);
-    // Field lines (pixel)
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(0,groundY,lw,1);
-    ctx.fillRect(Math.floor(lw/2),groundY,1,Math.floor(lh*0.12));
-    // Center circle approx
-    const ccx=Math.floor(lw/2), ccy=groundY+Math.floor(lh*0.08);
-    ctx.strokeStyle='#ffffff';ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(ccx,ccy,Math.floor(lw*0.1),0,Math.PI*2);ctx.stroke();
+    // Top stadium bar
+    ctx.fillStyle='#111111';ctx.fillRect(0,0,lw,4);
+    // Goal line
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,groundY,lw,1);
+    // Center line
+    ctx.fillRect(Math.floor(lw/2),groundY,1,Math.max(4,Math.floor(lh*0.1)));
 
-    // Goal (simple posts + crossbar)
+    // Goal posts only (no net grid)
     const goalW=Math.floor(lw*CONFIG.GOAL_WIDTH_RATIO);
     const goalH=Math.floor(lh*CONFIG.GOAL_HEIGHT_RATIO);
     const goalX=Math.floor((lw-goalW)/2);
@@ -1634,55 +1615,38 @@ const RENDERER = {
     ctx.fillRect(goalX,goalY,2,goalH);
     ctx.fillRect(goalX+goalW-2,goalY,2,goalH);
     ctx.fillRect(goalX,goalY,goalW,2);
-    // Net dots
-    ctx.fillStyle='#cccccc';
-    for(let nx=goalX+4;nx<goalX+goalW-4;nx+=4){
-      for(let ny=goalY+4;ny<goalY+goalH-2;ny+=4){
-        ctx.fillRect(nx,ny,1,1);
-      }
-    }
 
-    // Kicker (tiny pixel character)
+    // Kicker — 3 rectangles only
     if(GAME.state==='playing'||GAME.state==='countdown'){
       const kx=Math.floor(lw*0.5), ky=Math.floor(lh*0.36);
-      ctx.fillStyle='#5544aa';ctx.fillRect(kx-4,ky-6,8,10); // body
-      ctx.fillStyle='#ffcc99';ctx.fillRect(kx-3,ky-10,6,4); // head
-      ctx.fillStyle='#ffffff';ctx.fillRect(kx-2,ky+4,3,6); // leg
-      if(KICKER.kickTimer>0)ctx.fillRect(kx+2,ky+2,6,3); // kicking leg
+      ctx.fillStyle='#5544aa';ctx.fillRect(kx-3,ky-5,6,8);
+      ctx.fillStyle='#ffcc99';ctx.fillRect(kx-2,ky-8,4,3);
+      ctx.fillStyle='#ffffff';ctx.fillRect(kx-1,ky+3,2,4);
+      if(KICKER.kickTimer>0)ctx.fillRect(kx+1,ky+1,4,2);
     }
 
-    // Balls — current position only (no trail, no persistence after move)
+    // Balls — current position only (no trail, no pattern detail)
     for(const ball of BALLS.active){
       if(!ball.active)continue;
-      // Classic mode intentionally ignores ball.trail so nothing lingers
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const r=Math.max(2,Math.floor(ball.radius*zScale*sx));
       const bx=Math.floor(ball.x*sx), by=Math.floor(ball.y*sy);
       const info=CONFIG.BALL_TYPES[ball.type];
       let col=info.color;
-      if(col==='rainbow')col='hsl('+ball.rainbowHue+',100%,60%)';
-      ctx.fillStyle='#000000';ctx.fillRect(bx-r,groundY-1,r*2,2);
+      if(col==='rainbow')col='#ff00ff';
+      // Shadow
+      ctx.fillStyle='#000000';ctx.fillRect(bx-r,groundY-1,r*2,1);
       ctx.fillStyle=col;
       ctx.fillRect(bx-r,by-r,r*2,r*2);
-      if(ball.type==='NORMAL'){
-        ctx.fillStyle='#111111';
-        ctx.fillRect(bx-1,by-r+1,2,r*2-2);
-        ctx.fillRect(bx-r+1,by-1,r*2-2,2);
+    }
+
+    // Score popups only (skip particles in classic for max responsiveness)
+    if(GAME.scorePopups.length){
+      ctx.font='8px monospace';ctx.textAlign='center';
+      for(const p of GAME.scorePopups){
+        ctx.fillStyle='#ffff00';
+        ctx.fillText(p.text,Math.floor(p.x*sx),Math.floor(p.y*sy));
       }
-    }
-
-    // Minimal particles (only a few sparkles)
-    for(const p of PARTICLES.active){
-      if(!p.active||p.alpha<0.3)continue;
-      ctx.fillStyle=p.color;
-      ctx.fillRect(Math.floor(p.x*sx),Math.floor(p.y*sy),2,2);
-    }
-
-    // Score popups
-    ctx.font='8px monospace';ctx.textAlign='center';
-    for(const p of GAME.scorePopups){
-      ctx.fillStyle='#ffff00';
-      ctx.fillText(p.text,Math.floor(p.x*sx),Math.floor(p.y*sy));
     }
 
     // Player gloves / skeleton (pixel)
@@ -2119,10 +2083,17 @@ const PERF = {
     RENDERER.visualStyle=style;
     document.body.classList.toggle('classic8bit',style==='classic8bit');
     if(style==='classic8bit'){
-      // Classic mode forces lean rendering so pose detection stays responsive
-      this.applyTier('low');
-      CONFIG.MAX_PARTICLES=Math.min(CONFIG.MAX_PARTICLES,40);
-      CONFIG.CONFETTI_COUNT=12;
+      // Extreme low-power path: lowest tier, almost no particles, coarser pixels
+      this.applyTier('minimal');
+      CONFIG.MAX_PARTICLES=12;
+      CONFIG.CONFETTI_COUNT=4;
+      CONFIG.PARTICLE_POOL_SIZE=Math.min(CONFIG.PARTICLE_POOL_SIZE,24);
+      // Re-size low-res buffer for coarser scale if already inited
+      if(RENDERER.lowResCanvas&&RENDERER.width){
+        const s=CONFIG.CLASSIC_PIXEL_SCALE||6;
+        RENDERER.lowResCanvas.width=Math.max(80,Math.floor(RENDERER.width/s));
+        RENDERER.lowResCanvas.height=Math.max(60,Math.floor(RENDERER.height/s));
+      }
     }
     console.log('[PERF] visual style →',style);
   },
