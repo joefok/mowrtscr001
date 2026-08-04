@@ -1397,22 +1397,22 @@ const RENDERER = {
   },
 
   initClouds(){
-    this.clouds=[];const count=this.quality==='low'?2:this.quality==='medium'?3:5;
+    this.clouds=[];const count=this.quality==='minimal'?1:this.quality==='low'?2:this.quality==='medium'?3:5;
     for(let i=0;i<count;i++){
       this.clouds.push({x:Math.random()*this.width,y:Math.random()*this.height*0.25,speed:0.2+Math.random()*0.4,size:50+Math.random()*90,opacity:0.3+Math.random()*0.3});
     }
   },
 
   initFlags(){
-    this.flags=[];const count=this.quality==='low'?4:6;
+    this.flags=[];const count=this.quality==='minimal'?2:this.quality==='low'?4:6;
     for(let i=0;i<count;i++){
       this.flags.push({x:(i+1)*(this.width/(count+1)),y:this.height*0.05,color:Math.random()>0.5?'#ff0000':'#0000ff',phase:Math.random()*Math.PI*2});
     }
   },
 
   initCrowd(){
-    this.crowdDots=[];const rows=this.quality==='low'?4:this.quality==='medium'?6:10;
-    const cols=this.quality==='low'?16:this.quality==='medium'?26:40;
+    this.crowdDots=[];const rows=this.quality==='minimal'?2:this.quality==='low'?4:this.quality==='medium'?6:10;
+    const cols=this.quality==='minimal'?8:this.quality==='low'?16:this.quality==='medium'?26:40;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
         this.crowdDots.push({
@@ -1424,7 +1424,7 @@ const RENDERER = {
   },
 
   initStars(){
-    this.stars=[];const n=this.quality==='low'?12:this.quality==='medium'?22:30;
+    this.stars=[];const n=this.quality==='minimal'?0:this.quality==='low'?12:this.quality==='medium'?22:30;
     for(let i=0;i<n;i++){this.stars.push({x:Math.random()*this.width,y:Math.random()*this.height*0.35,size:Math.random()*2,opacity:Math.random(),phase:Math.random()*Math.PI*2});}
   },
 
@@ -1459,7 +1459,7 @@ const RENDERER = {
     ctx.fillStyle=this.skyGrad||'#1a3a5a';ctx.fillRect(0,0,w,h);
 
     // Stars
-    if(this.quality!=='low'){
+    if(this.quality==='medium'||this.quality==='high'){
       for(const s of this.stars){const op=0.3+Math.sin(this.time*2+s.phase)*0.3*s.opacity;ctx.fillStyle='rgba(255,255,255,'+op+')';ctx.beginPath();ctx.arc(s.x,s.y,s.size,0,Math.PI*2);ctx.fill();}
     }
 
@@ -1519,7 +1519,7 @@ const RENDERER = {
     }
 
     // Vignette (skip on low quality) — cached gradient
-    if(this.quality!=='low'&&this.vigGrad){
+    if((this.quality==='medium'||this.quality==='high')&&this.vigGrad){
       ctx.fillStyle=this.vigGrad;ctx.fillRect(0,0,w,h);
     }
 
@@ -1571,7 +1571,7 @@ const RENDERER = {
   },
 
   drawGoalNet(ctx,w,h){
-    if(this.quality==='low')return;
+    if(this.quality==='low'||this.quality==='minimal')return;
     const goalW=w*CONFIG.GOAL_WIDTH_RATIO;const goalH=h*CONFIG.GOAL_HEIGHT_RATIO;
     const goalX=(w-goalW)/2;const goalY=h*0.25;
     const netDepth=25;
@@ -1608,7 +1608,7 @@ const RENDERER = {
       ctx.beginPath();ctx.ellipse(screenX,shadowY,radius*shadowScale*0.8,radius*shadowScale*0.3,0,0,Math.PI*2);ctx.fill();
 
       // Trail
-      if(ball.trail.length>1&&this.quality!=='low'){
+      if(ball.trail.length>1&&(this.quality==='medium'||this.quality==='high')){
         for(let i=1;i<ball.trail.length;i++){
           const t1=ball.trail[i-1],t2=ball.trail[i];
           const alpha=(i/ball.trail.length)*0.3;
@@ -1651,7 +1651,7 @@ const RENDERER = {
       }
 
       // Spin lines
-      if(this.quality!=='low'){
+      if(this.quality==='medium'||this.quality==='high'){
         ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;
         ctx.beginPath();ctx.arc(screenX,screenY,radius*0.5,ball.spin,ball.spin+Math.PI);ctx.stroke();
       }
@@ -1815,7 +1815,7 @@ const RENDERER = {
 // the trade-off happening — just a stable framerate.
 const PERF = {
   enabled: true,
-  tiers: ['low','medium','high'],
+  tiers: ['minimal','low','medium','high'],
   fpsHistory: [],
   lastChangeTime: 0,
   MIN_SAMPLES: 5,           // don't react until we have ~5s of real data
@@ -1828,7 +1828,7 @@ const PERF = {
 
   // AI polling rate is intentionally NOT tier-adjustable — see note above.
   // It stays at CONFIG.POSE_DETECT_EVERY_N's fixed default for every device.
-  maxParticlesByTier:{low:50,medium:100,high:160},
+  maxParticlesByTier:{minimal:20,low:50,medium:100,high:160},
   // IMPORTANT: PERF only ever adjusts rendering detail and AI polling rate.
   // It must NEVER touch ball speed, spawn timing, lives, or round length —
   // a struggling device should look simpler, not play an easier or shorter
@@ -2003,6 +2003,7 @@ const GAME = {
     this.state='playing';
     this.score=0;this.lives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
     this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
+    this.roundStartTime=performance.now();
     this.accuracy=100;this.powerups={};this.activePowerups=[];
     BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;
     document.getElementById('gameOver').classList.add('hidden');
@@ -2014,12 +2015,20 @@ const GAME = {
     if(this.currentMode.time>0){
       this.timerInterval=setInterval(()=>{
         if(this.state!=='playing')return;
-        this.timeLeft--;
-        if(this.timeLeft<=10&&this.timeLeft>0)AUDIO.playCountdown();
-        if(this.timeLeft===10&&!this.finalCountdownShown){this.finalCountdownShown=true;this.showCenterMessage('FINAL 10 SECONDS!','Go go go!');}
-        if(this.timeLeft<=0){this.timeLeft=0;this.endGame();}
-        this.updateHUD();
-      },1000);
+        // Computed fresh from real elapsed time every tick (not accumulated
+        // by repeated decrements) so the round length is exact even if a
+        // heavily loaded device delays some of these callbacks slightly -
+        // it always self-corrects instead of drifting.
+        const elapsed=(performance.now()-this.roundStartTime)/1000;
+        const newTimeLeft=Math.max(0,Math.ceil(this.currentMode.time-elapsed));
+        if(newTimeLeft!==this.timeLeft){
+          this.timeLeft=newTimeLeft;
+          if(this.timeLeft<=10&&this.timeLeft>0)AUDIO.playCountdown();
+          if(this.timeLeft===10&&!this.finalCountdownShown){this.finalCountdownShown=true;this.showCenterMessage('FINAL 10 SECONDS!','Go go go!');}
+          this.updateHUD();
+        }
+        if(this.timeLeft<=0)this.endGame();
+      },250);
     }
 
     if(this.currentMode.key==='boss')this.startBossPattern();
