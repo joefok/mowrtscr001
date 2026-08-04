@@ -684,8 +684,7 @@ const BALLS = {
       targetY=MATH.rand(h*0.28,h*0.60);
     }
     const targetZ=100;
-    const perfSpeed=(PERF.gameplayByTier[RENDERER.quality]||{speed:1}).speed;
-    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult*perfSpeed;
+    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
     const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
     const vx=(dx/dist)*speed*60,vy=(dy/dist)*speed*60,vz=(dz/dist)*speed*60;
@@ -708,8 +707,7 @@ const BALLS = {
     const canSpawn=!mode.singleBall||this.active.filter(b=>b.active).length===0;
     if(this.spawnTimer<=0&&GAME.state==='playing'&&canSpawn){
       this.spawn();
-      const perfSpawn=(PERF.gameplayByTier[RENDERER.quality]||{spawn:1}).spawn;
-      const baseInterval=(mode.spawnInterval/this.difficultyMult)*perfSpawn;
+      const baseInterval=mode.spawnInterval/this.difficultyMult;
       this.spawnTimer=MATH.rand(baseInterval*0.7,baseInterval*1.3);
     }
     const act=this.active;let w=0;
@@ -1828,14 +1826,18 @@ const PERF = {
   DOWNGRADE_BELOW: 40,
   UPGRADE_ABOVE: 55,
 
-  aiEveryByTier:{low:5,medium:3,high:2},
+  // AI polling rate is intentionally NOT tier-adjustable — see note above.
+  // It stays at CONFIG.POSE_DETECT_EVERY_N's fixed default for every device.
   maxParticlesByTier:{low:50,medium:100,high:160},
-  // Modest gameplay-fairness coupling: on a struggling device, ease off ball
-  // speed and give slightly more time between throws so reaction time in
-  // real seconds stays roughly fair even though visual smoothness is lower.
-  // Deliberately gentle (not the 30-40% cuts some guides suggest) since this
-  // should only ever be a small assist, never a different game.
-  gameplayByTier:{low:{speed:0.88,spawn:1.12},medium:{speed:0.96,spawn:1.05},high:{speed:1,spawn:1}},
+  // IMPORTANT: PERF only ever adjusts rendering detail and AI polling rate.
+  // It must NEVER touch ball speed, spawn timing, lives, or round length —
+  // a struggling device should look simpler, not play an easier or shorter
+  // game. (An earlier version coupled ball speed/spawn timing to tier as a
+  // "fairness assist" — that backfired: since a round actually ends when
+  // lives run out rather than strictly on the clock, slower balls + longer
+  // gaps between throws changed how long 15 lives took to burn through,
+  // so fast and slow devices experienced measurably different round
+  // lengths. Removed for exactly that reason — do not re-add.)
 
   // Fast circuit breaker for sudden severe drops (e.g. mid-session thermal
   // throttling) — the once-a-second rolling average above is great for
@@ -1893,7 +1895,6 @@ const PERF = {
 
   applyTier(tier){
     RENDERER.setQuality(tier);
-    CONFIG.POSE_DETECT_EVERY_N=this.aiEveryByTier[tier];
     CONFIG.MAX_PARTICLES=this.maxParticlesByTier[tier];
     console.log('[PERF] adapted to',tier,'tier');
   }
