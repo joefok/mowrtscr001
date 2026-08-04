@@ -136,18 +136,6 @@ canvas{display:block;touch-action:none}
 .boot-error h2{color:#ff5555;font-size:28px;margin-bottom:12px}
 .boot-error p{color:#ddd;font-size:15px;max-width:480px;line-height:1.6;margin-bottom:10px}
 .boot-error button{margin-top:16px}
-/* Classic 8-bit visual style (NES / Famicom / Game Boy inspired) */
-body.classic8bit #gameCanvas{image-rendering:pixelated;image-rendering:crisp-edges}
-body.classic8bit .hud-panel{background:#000;border:2px solid #fff;border-radius:0;font-family:'Press Start 2P',monospace;font-size:10px}
-body.classic8bit .hud-panel .label{font-size:8px;color:#ff0;letter-spacing:1px}
-body.classic8bit .hud-panel .value{font-size:14px;color:#0f0}
-body.classic8bit .menu-logo{font-size:22px;text-shadow:3px 3px 0 #000}
-body.classic8bit .cal-box{border-radius:0;border:3px solid #ff0;font-family:'Press Start 2P',monospace}
-body.classic8bit .cal-title{font-size:16px}
-body.classic8bit .cal-btn{border-radius:0;font-family:'Press Start 2P',monospace;font-size:12px}
-body.classic8bit .center-message .msg-title{font-family:'Press Start 2P',monospace;font-size:18px;text-shadow:2px 2px 0 #000}
-body.classic8bit .instruction-bar{border-radius:0;font-family:'Press Start 2P',monospace;font-size:10px}
-body.classic8bit .combo-display .combo-text{font-family:'Press Start 2P',monospace;font-size:20px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
 @media(orientation:portrait) and (max-width:600px){.rotate-warning{display:flex}}
 </style>
@@ -203,7 +191,7 @@ body.classic8bit .combo-display .combo-text{font-family:'Press Start 2P',monospa
     <button class="menu-btn" onclick="GAME.showSettings()">&#9881; SETTINGS</button>
     <button class="menu-btn" onclick="GAME.showTutorial()">&#10067; HOW TO PLAY</button>
   </div>
-  <div style="margin-top:20px;color:#666;font-size:11px;text-align:center">Powered by TensorFlow.js MoveNet · v2.1 Adaptive 8-bit</div>
+  <div style="margin-top:20px;color:#666;font-size:11px;text-align:center">Powered by TensorFlow.js MoveNet</div>
 </div>
 <div class="main-menu hidden" id="modeSelect">
   <div class="menu-logo" style="font-size:48px">SELECT MODE</div>
@@ -295,7 +283,6 @@ body.classic8bit .combo-display .combo-text{font-family:'Press Start 2P',monospa
     <div class="setting-row"><label>Sound Effects</label><div class="setting-toggle on" id="toggleSfx" onclick="SETTINGS.toggle('sfx')"></div></div>
     <div class="setting-row"><label>Camera</label><select class="setting-select" id="cameraSelect" onchange="SETTINGS.changeCamera(this.value)"><option value="user">Front Camera</option><option value="environment">Rear Camera</option></select></div>
     <div class="setting-row"><label>Graphics Quality</label><select class="setting-select" id="qualitySelect" onchange="SETTINGS.changeQuality(this.value)"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>
-    <div class="setting-row"><label>Visual Style</label><select class="setting-select" id="visualStyleSelect" onchange="SETTINGS.changeVisualStyle(this.value)"><option value="auto">Auto (Acid Test)</option><option value="modern">Modern</option><option value="classic8bit">Classic 8-bit</option></select></div>
     <div class="setting-row"><label>Difficulty</label><select class="setting-select" id="difficultySelect" onchange="SETTINGS.changeDifficulty(this.value)"><option value="kids">Kids</option><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option><option value="expert">Expert</option></select></div>
     <div class="setting-row"><label>Reduced Motion</label><div class="setting-toggle" id="toggleReducedMotion" onclick="SETTINGS.toggle('reducedMotion')"></div></div>
     <div class="setting-row"><label>Color Blind Mode</label><div class="setting-toggle" id="toggleColorBlind" onclick="SETTINGS.toggle('colorBlind')"></div></div>
@@ -343,7 +330,7 @@ body.classic8bit .combo-display .combo-text{font-family:'Press Start 2P',monospa
 // CONFIGURATION
 // ============================================================
 const CONFIG = {
-  VERSION: '2.1.0',
+  VERSION: '2.0.2',
   TARGET_FPS_DESKTOP: 60,
   TARGET_FPS_MOBILE: 30,
   GAME_DURATION: 60,
@@ -369,15 +356,6 @@ const CONFIG = {
   SCREEN_SHAKE_INTENSITY: 10,
   CONFETTI_COUNT: 36,
   POSE_DETECT_EVERY_N: 3,
-  // Adaptive visual style (classic 8-bit inspired by NES/Famicom/Game Boy Goal! / Soccer)
-  // Detection always stays high-priority; visuals are flexible.
-  ACID_TEST_DURATION_MS: 2200,
-  ACID_TEST_MIN_SAMPLES: 12,
-  // Further relaxed — classic only on extremely low-power devices
-  ACID_TEST_FPS_THRESHOLD: 22,       // below this → classic8bit
-  ACID_TEST_DETECT_MS_THRESHOLD: 85, // avg detect cost above this → classic8bit
-  CLASSIC_PIXEL_SCALE: 6,            // coarser pixels = less work + more "Game Boy" look
-  VISUAL_STYLE_DEFAULT: 'auto',      // 'auto' | 'modern' | 'classic8bit'
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
   SKELETON_CONNECTIONS: [[5,6],[5,7],[6,8],[7,9],[8,10],[5,11],[6,12],[11,12],[11,13],[12,14],[13,15],[14,16]],
   BODY_PARTS: {
@@ -978,6 +956,10 @@ const CALIBRATION = {
     this.active=true;this.step=0;this.updateUI();document.getElementById('calibrationOverlay').classList.remove('hidden');
     // The camera feed itself is never shown — drawPreview() renders a live
     // cartoon avatar driven by the tracked pose instead.
+    // Acid test: sample real frame times for the duration of calibration
+    // (camera + AI are already actively running here, so it's genuinely
+    // representative of gameplay load) to decide retro vs modern rendering.
+    this.perfSamples=[];
     this.startStep();
   },
 
@@ -1080,31 +1062,24 @@ const CALIBRATION = {
     },100);
   },
 
-  async finish(){
+  finish(){
     this.clearAutoTimer();
-    // Run adaptive acid test (pose + render cost) so weak devices get classic 8-bit visuals
-    // while strong devices keep the modern look. Detection always stays prioritized.
-    document.getElementById('calTitle').textContent='Performance Test';
-    document.getElementById('calDesc').textContent='Checking device speed for best experience...';
-    document.getElementById('calDescAlt').textContent='Measuring pose detection & frame rate';
-    document.getElementById('calProgressBar').style.width='100%';
-    try{
-      const style=await PERF.runAcidTest();
-      if(style==='classic8bit'){
-        document.getElementById('calTitle').textContent='Classic Mode';
-        document.getElementById('calDesc').textContent='Ultra-low 8-bit graphics for max responsiveness';
-        document.getElementById('calDescAlt').textContent='Game Boy / Famicom style — pose tracking prioritized';
-      }else{
-        document.getElementById('calTitle').textContent='Modern Mode';
-        document.getElementById('calDesc').textContent='Full visuals unlocked — enjoy!';
-        document.getElementById('calDescAlt').textContent='';
-      }
-    }catch(e){
-      console.warn('Acid test failed, defaulting modern',e);
-      PERF.setVisualStyle('modern');
-    }
-    await new Promise(r=>setTimeout(r,900));
     this.active=false;document.getElementById('calibrationOverlay').classList.add('hidden');
+
+    // Acid test result: decide retro vs modern from what actually happened
+    // during calibration (camera + AI under real load), not a guess. Needs
+    // a reasonable sample size before we trust it — if calibration raced
+    // through too fast to gather enough data, default to modern rather than
+    // downgrade on a hunch.
+    if(this.perfSamples&&this.perfSamples.length>=20){
+      const avg=this.perfSamples.reduce((a,b)=>a+b,0)/this.perfSamples.length;
+      const wantRetro=avg<38;
+      if(wantRetro!==RENDERER.retroMode){
+        RENDERER.retroMode=wantRetro;
+        console.log('[ACID TEST] calibration avg '+avg.toFixed(1)+'fps ->',wantRetro?'retro 8-bit mode':'modern mode');
+      }
+    }
+
     AUDIO.playWhistle();GAME.startCountdown();
   },
 
@@ -1367,14 +1342,27 @@ const RENDERER = {
   shakeIntensity: 0, shakeTimer: 0, flashIntensity: 0,
   clouds: [], flags: [], crowdDots: [], stars: [],
   time: 0, quality: 'high',
-  visualStyle: 'modern', // 'modern' | 'classic8bit'
-  lowResCanvas: null, lowResCtx: null, // for classic 8-bit pixel scale
+  // Retro mode: a genuinely different, low-internal-resolution flat-color
+  // render path (no gradients, no shadowBlur, no crowd/cloud/particle glow)
+  // inspired by how classic console sports games stayed responsive on
+  // extremely limited hardware. Decided once per calibration by a real
+  // measured benchmark (see CALIBRATION below), not guessed.
+  retroMode: false,
+  retroCanvas: null, retroCtx: null, retroScale: 1,
+
+  setupRetroCanvas(){
+    if(!this.retroCanvas)this.retroCanvas=document.createElement('canvas');
+    const baseW=240; // classic-console-ish internal resolution
+    const rw=baseW,rh=Math.max(60,Math.round(baseW*(this.height/this.width)));
+    this.retroCanvas.width=rw;this.retroCanvas.height=rh;
+    this.retroCtx=this.retroCanvas.getContext('2d',{alpha:false});
+    this.retroScale=rw/this.width;
+    this.retroGroundY=rh*0.72;
+  },
 
   init(){
     this.canvas=document.getElementById('gameCanvas');
     this.ctx=this.canvas.getContext('2d',{alpha:false,desynchronized:true});
-    this.lowResCanvas=document.createElement('canvas');
-    this.lowResCtx=this.lowResCanvas.getContext('2d',{alpha:false});
     this.resize();
     window.addEventListener('resize',()=>{
       clearTimeout(this._resizeDebounce);
@@ -1387,11 +1375,9 @@ const RENDERER = {
     this.width=window.innerWidth;this.height=window.innerHeight;
     this.canvas.width=this.width;this.canvas.height=this.height;
     this.groundY=this.height*0.72;
-    const scale=CONFIG.CLASSIC_PIXEL_SCALE||6;
-    this.lowResCanvas.width=Math.max(80,Math.floor(this.width/scale));
-    this.lowResCanvas.height=Math.max(60,Math.floor(this.height/scale));
     this.initClouds();this.initFlags();this.initCrowd();this.initStars();
     this.rebuildStaticCaches();
+    this.setupRetroCanvas();
   },
 
   // Fully applies a quality tier: background element counts AND the cached
@@ -1493,10 +1479,7 @@ const RENDERER = {
   render(dt){
     this.time+=dt;
     this._frame=(this._frame|0)+1;
-    if(this.visualStyle==='classic8bit'){
-      this.renderClassic(dt);
-      return;
-    }
+    if(this.retroMode){this.renderRetro(dt);return;}
     const ctx=this.ctx;const w=this.width;const h=this.height;
     ctx.save();
 
@@ -1581,123 +1564,103 @@ const RENDERER = {
     ctx.restore();
   },
 
-  // Classic 8-bit path inspired by NES Soccer / Jaleco Goal! / Famicom soccer titles.
-  // Full clear + redraw every frame so balls and hands leave NO trails and never
-  // persist on the background once they move away. Collision / pose path unchanged.
-  renderClassic(dt){
-    const lw=this.lowResCanvas.width, lh=this.lowResCanvas.height;
-    const ctx=this.lowResCtx;
-    const sx=lw/this.width, sy=lh/this.height;
-    const groundY=Math.floor(this.groundY*sy);
+  // ============================================================
+  // RETRO MODE — classic-console-style render path
+  // ============================================================
+  // Same game state (ball position, kicker kick phase, tracked hand
+  // positions) as the modern path above, just drawn as flat-color blocky
+  // shapes at a low internal resolution (240px wide) that's then scaled up
+  // onto the real canvas with image smoothing OFF, which is both the
+  // authentic 8-bit look AND the actual performance win — filling a 240px
+  // canvas costs a tiny fraction of filling a full HD one.
+  renderRetro(dt){
+    if(!this.retroCtx)this.setupRetroCanvas();
+    const rctx=this.retroCtx,rw=this.retroCanvas.width,rh=this.retroCanvas.height;
+    const s=this.retroScale; // full-resolution game coordinates -> retro canvas coordinates
+    const gY=this.retroGroundY;
 
-    ctx.imageSmoothingEnabled=false;
-    // Hard clear every frame — previous ball/hand pixels are fully erased
-    ctx.clearRect(0,0,lw,lh);
+    // Flat sky + flat pitch (no gradients)
+    rctx.fillStyle='#1e3a5f';rctx.fillRect(0,0,rw,gY);
+    rctx.fillStyle='#2a7a2a';rctx.fillRect(0,gY,rw,rh-gY);
+    rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
+    rctx.beginPath();rctx.moveTo(0,gY);rctx.lineTo(rw,gY);rctx.stroke();
 
-    // Ultra-minimal background (solid fills only — no loops, no arcs, no dots)
-    // Sky
-    ctx.fillStyle='#0055aa';ctx.fillRect(0,0,lw,groundY);
-    // Grass
-    ctx.fillStyle='#228822';ctx.fillRect(0,groundY,lw,lh-groundY);
-    // Top stadium bar
-    ctx.fillStyle='#111111';ctx.fillRect(0,0,lw,4);
-    // Goal line
-    ctx.fillStyle='#ffffff';ctx.fillRect(0,groundY,lw,1);
-    // Center line
-    ctx.fillRect(Math.floor(lw/2),groundY,1,Math.max(4,Math.floor(lh*0.1)));
+    // Goal — a few flat lines, no net grid, no glow
+    const goalW=rw*CONFIG.GOAL_WIDTH_RATIO,goalX=(rw-goalW)/2,goalY=rh*0.25,goalH=rh*CONFIG.GOAL_HEIGHT_RATIO;
+    rctx.strokeStyle='#e8e8e8';rctx.lineWidth=2;
+    rctx.beginPath();rctx.moveTo(goalX,goalY+goalH);rctx.lineTo(goalX,goalY);rctx.lineTo(goalX+goalW,goalY);rctx.lineTo(goalX+goalW,goalY+goalH);rctx.stroke();
 
-    // Goal posts only (no net grid)
-    const goalW=Math.floor(lw*CONFIG.GOAL_WIDTH_RATIO);
-    const goalH=Math.floor(lh*CONFIG.GOAL_HEIGHT_RATIO);
-    const goalX=Math.floor((lw-goalW)/2);
-    const goalY=Math.floor(lh*0.25);
-    ctx.fillStyle='#eeeeee';
-    ctx.fillRect(goalX,goalY,2,goalH);
-    ctx.fillRect(goalX+goalW-2,goalY,2,goalH);
-    ctx.fillRect(goalX,goalY,goalW,2);
+    // Kicker — flat blocky shape (reuses the same kick animation state as the modern KICKER)
+    this.drawRetroKicker(rctx,rw,rh,s);
 
-    // Kicker — 3 rectangles only
-    if(GAME.state==='playing'||GAME.state==='countdown'){
-      const kx=Math.floor(lw*0.5), ky=Math.floor(lh*0.36);
-      ctx.fillStyle='#5544aa';ctx.fillRect(kx-3,ky-5,6,8);
-      ctx.fillStyle='#ffcc99';ctx.fillRect(kx-2,ky-8,4,3);
-      ctx.fillStyle='#ffffff';ctx.fillRect(kx-1,ky+3,2,4);
-      if(KICKER.kickTimer>0)ctx.fillRect(kx+1,ky+1,4,2);
-    }
-
-    // Balls — current position only (no trail, no pattern detail)
+    // Ball — flat circle, black outline, no gradient/glow/pattern
     for(const ball of BALLS.active){
       if(!ball.active)continue;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
-      const r=Math.max(2,Math.floor(ball.radius*zScale*sx));
-      const bx=Math.floor(ball.x*sx), by=Math.floor(ball.y*sy);
-      const info=CONFIG.BALL_TYPES[ball.type];
-      let col=info.color;
-      if(col==='rainbow')col='#ff00ff';
-      // Shadow
-      ctx.fillStyle='#000000';ctx.fillRect(bx-r,groundY-1,r*2,1);
-      ctx.fillStyle=col;
-      ctx.fillRect(bx-r,by-r,r*2,r*2);
+      const r=Math.max(2,ball.radius*zScale*s);
+      rctx.fillStyle='#ffffff';
+      rctx.beginPath();rctx.arc(ball.x*s,ball.y*s,r,0,Math.PI*2);rctx.fill();
+      rctx.strokeStyle='#1a1a1a';rctx.lineWidth=1;rctx.stroke();
     }
 
-    // Score popups only (skip particles in classic for max responsiveness)
-    if(GAME.scorePopups.length){
-      ctx.font='8px monospace';ctx.textAlign='center';
-      for(const p of GAME.scorePopups){
-        ctx.fillStyle='#ffff00';
-        ctx.fillText(p.text,Math.floor(p.x*sx),Math.floor(p.y*sy));
-      }
+    // Gloves — flat colored squares at the tracked wrist positions
+    if(GAME.currentMode&&GAME.currentMode.handOnly){
+      const{left:lw,right:rw2}=POSE.getWristsBySide();
+      const scaleX=this.width/640,scaleY=this.height/480;
+      if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',POSE.isHandRaised(lw));
+      if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',POSE.isHandRaised(rw2));
     }
 
-    // Player gloves / skeleton (pixel)
-    if((GAME.state==='playing'||GAME.state==='calibrating')&&POSE.smoothedKeypoints.length){
-      const kps=POSE.smoothedKeypoints;
-      const scaleX=lw/(POSE.videoW||320), scaleY=lh/(POSE.videoH||240);
-      if(GAME.currentMode&&GAME.currentMode.handOnly){
-        const{left:lwrist,right:rwrist}=POSE.getWristsBySide();
-        if(lwrist){
-          const hx=Math.floor(lwrist.x*scaleX), hy=Math.floor(lwrist.y*scaleY);
-          const raised=POSE.isHandRaised(lwrist);
-          ctx.fillStyle=raised?'#55ccff':'#3388aa';
-          ctx.fillRect(hx-5,hy-5,10,10);
-          if(raised){ctx.fillStyle='#ffffff';ctx.fillRect(hx-3,hy-3,6,6);}
-        }
-        if(rwrist){
-          const hx=Math.floor(rwrist.x*scaleX), hy=Math.floor(rwrist.y*scaleY);
-          const raised=POSE.isHandRaised(rwrist);
-          ctx.fillStyle=raised?'#ff5555':'#aa3333';
-          ctx.fillRect(hx-5,hy-5,10,10);
-          if(raised){ctx.fillStyle='#ffffff';ctx.fillRect(hx-3,hy-3,6,6);}
-        }
-      }else{
-        // Simple skeleton lines
-        ctx.strokeStyle='#00ff88';ctx.lineWidth=1;
-        for(const[a,b]of CONFIG.SKELETON_CONNECTIONS){
-          const k1=kps[a],k2=kps[b];
-          if(k1&&k2&&k1.score>0.2&&k2.score>0.2){
-            ctx.beginPath();
-            ctx.moveTo(Math.floor(k1.x*scaleX),Math.floor(k1.y*scaleY));
-            ctx.lineTo(Math.floor(k2.x*scaleX),Math.floor(k2.y*scaleY));
-            ctx.stroke();
-          }
-        }
-      }
+    // Particles — flat squares, no glow
+    for(const p of PARTICLES.active){
+      if(!p.active)continue;
+      rctx.globalAlpha=p.alpha;rctx.fillStyle=p.color;
+      const sz=Math.max(1,p.size*s);
+      rctx.fillRect(p.x*s-sz/2,p.y*s-sz/2,sz,sz);
     }
+    rctx.globalAlpha=1;
 
-    // Upscale nearest-neighbor to full canvas
-    const out=this.ctx;
-    out.imageSmoothingEnabled=false;
-    out.clearRect(0,0,this.width,this.height);
-    if(this.shakeTimer>0){
-      const shake=this.shakeIntensity*(this.shakeTimer/CONFIG.SCREEN_SHAKE_DURATION);
-      out.save();
-      out.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
-      out.drawImage(this.lowResCanvas,0,0,lw,lh,0,0,this.width,this.height);
-      out.restore();
-      this.shakeTimer-=dt*1000;
-    }else{
-      out.drawImage(this.lowResCanvas,0,0,lw,lh,0,0,this.width,this.height);
+    // Score popups — plain pixel-ish text
+    rctx.font='bold '+Math.max(8,Math.round(14*s*4))+'px monospace';
+    rctx.textAlign='center';rctx.fillStyle='#ffd700';
+    for(const p of GAME.scorePopups){
+      rctx.globalAlpha=Math.min(1,p.life/1.1);
+      rctx.fillText(p.text,p.x*s,p.y*s);
     }
+    rctx.globalAlpha=1;
+
+    // Stamp the low-res frame onto the real canvas, scaled up with hard
+    // pixel edges — this is what actually reads as "8-bit" to the eye.
+    const ctx=this.ctx;
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(this.retroCanvas,0,0,rw,rh,0,0,this.width,this.height);
+    ctx.imageSmoothingEnabled=true;
+  },
+
+  drawRetroKicker(rctx,rw,rh,s){
+    const x=rw*0.5,y=rh*0.36;
+    const scale=Math.min(rw,rh)*0.12;
+    const progress=1-(KICKER.kickTimer/KICKER.kickDuration);
+    const kickPhase=KICKER.kickTimer>0?Math.sin(progress*Math.PI):0;
+    rctx.save();rctx.translate(x,y);
+    rctx.fillStyle='#4c3fa8';
+    rctx.fillRect(-scale*0.32,scale*0.5,scale*0.18,scale*0.42); // back leg
+    rctx.save();rctx.translate(scale*0.14,scale*0.5);rctx.rotate(-kickPhase);
+    rctx.fillStyle='#ffffff';rctx.fillRect(-scale*0.09,0,scale*0.18,scale*0.42); // kicking leg
+    rctx.restore();
+    rctx.fillStyle='#4c3fa8';rctx.fillRect(-scale*0.4,-scale*0.5,scale*0.8,scale*0.9); // body block
+    rctx.fillStyle='#1a1a1a';
+    rctx.fillRect(-scale*0.2,-scale*0.2,scale*0.12,scale*0.12);
+    rctx.fillRect(scale*0.08,-scale*0.2,scale*0.12,scale*0.12); // eyes
+    rctx.restore();
+  },
+
+  drawRetroGlove(rctx,x,y,color,raised){
+    const size=raised?14:10;
+    rctx.fillStyle=color;
+    rctx.fillRect(x-size/2,y-size/2,size,size);
+    rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
+    rctx.strokeRect(x-size/2,y-size/2,size,size);
   },
 
   drawStadiumLights(ctx,w,h){
@@ -2021,10 +1984,6 @@ const PERF = {
   thermalCooldownEnd:0,
   lastFrameTimeThermal:0,
 
-  // Visual style chosen by acid test (or forced via settings)
-  visualStyle: 'modern', // 'modern' | 'classic8bit'
-  acidTestResult: null,
-
   sample(fps){
     if(!this.enabled)return;
     this.fpsHistory.push(fps);
@@ -2075,82 +2034,6 @@ const PERF = {
     RENDERER.setQuality(tier);
     CONFIG.MAX_PARTICLES=this.maxParticlesByTier[tier];
     console.log('[PERF] adapted to',tier,'tier');
-  },
-
-  setVisualStyle(style){
-    if(style!=='modern'&&style!=='classic8bit')return;
-    this.visualStyle=style;
-    RENDERER.visualStyle=style;
-    document.body.classList.toggle('classic8bit',style==='classic8bit');
-    if(style==='classic8bit'){
-      // Extreme low-power path: lowest tier, almost no particles, coarser pixels
-      this.applyTier('minimal');
-      CONFIG.MAX_PARTICLES=12;
-      CONFIG.CONFETTI_COUNT=4;
-      CONFIG.PARTICLE_POOL_SIZE=Math.min(CONFIG.PARTICLE_POOL_SIZE,24);
-      // Re-size low-res buffer for coarser scale if already inited
-      if(RENDERER.lowResCanvas&&RENDERER.width){
-        const s=CONFIG.CLASSIC_PIXEL_SCALE||6;
-        RENDERER.lowResCanvas.width=Math.max(80,Math.floor(RENDERER.width/s));
-        RENDERER.lowResCanvas.height=Math.max(60,Math.floor(RENDERER.height/s));
-      }
-    }
-    console.log('[PERF] visual style →',style);
-  },
-
-  // Fair acid test run during calibration: force frequent pose detection +
-  // full render path for a short window, measure real FPS and detect cost.
-  // Returns a Promise that resolves to the chosen style.
-  async runAcidTest(){
-    if(SETTINGS.values.visualStyle==='modern'||SETTINGS.values.visualStyle==='classic8bit'){
-      this.setVisualStyle(SETTINGS.values.visualStyle);
-      this.acidTestResult={forced:true,style:SETTINGS.values.visualStyle};
-      return SETTINGS.values.visualStyle;
-    }
-    // auto
-    if(!POSE.isReady||!POSE.detector){
-      this.setVisualStyle('modern');
-      return 'modern';
-    }
-    const samples=[];
-    const detectCosts=[];
-    const start=performance.now();
-    const duration=CONFIG.ACID_TEST_DURATION_MS;
-    let last=start;
-    // Temporarily force higher detection rate for the test
-    const prevEvery=CONFIG.POSE_DETECT_EVERY_N;
-    CONFIG.POSE_DETECT_EVERY_N=1;
-
-    return new Promise(resolve=>{
-      const tick=async(now)=>{
-        const dt=now-last;last=now;
-        const t0=performance.now();
-        try{
-          if(POSE.detector&&POSE.video&&POSE.video.readyState>=2){
-            await POSE.detect();
-          }
-        }catch(_){}
-        const detectMs=performance.now()-t0;
-        detectCosts.push(detectMs);
-        samples.push(dt);
-        // Keep the main loop rendering (it is already running)
-        if(performance.now()-start<duration&&samples.length<80){
-          requestAnimationFrame(tick);
-        }else{
-          CONFIG.POSE_DETECT_EVERY_N=prevEvery;
-          const avgDt=samples.reduce((a,b)=>a+b,0)/Math.max(1,samples.length);
-          const avgFps=1000/Math.max(1,avgDt);
-          const avgDetect=detectCosts.reduce((a,b)=>a+b,0)/Math.max(1,detectCosts.length);
-          const useClassic=avgFps<CONFIG.ACID_TEST_FPS_THRESHOLD||avgDetect>CONFIG.ACID_TEST_DETECT_MS_THRESHOLD;
-          const style=useClassic?'classic8bit':'modern';
-          this.acidTestResult={avgFps:Math.round(avgFps),avgDetectMs:Math.round(avgDetect),style,samples:samples.length};
-          this.setVisualStyle(style);
-          console.log('[PERF] acid test result',this.acidTestResult);
-          resolve(style);
-        }
-      };
-      requestAnimationFrame(tick);
-    });
   }
 };
 
@@ -2583,7 +2466,7 @@ const GAME = {
         document.getElementById('adminBalls').textContent=BALLS.active.length;
         document.getElementById('adminParticles').textContent=PARTICLES.active.length;
         document.getElementById('adminMemory').textContent=(performance.memory?Math.round(performance.memory.usedJSHeapSize/1048576):0)+'MB';
-        document.getElementById('adminState').textContent=this.state+'/'+(PERF.visualStyle||'modern');
+        document.getElementById('adminState').textContent=this.state;
       }
     }
   }
@@ -2605,8 +2488,7 @@ const SETTINGS = {
     showFps: true,
     kioskMode: true,
     debug: false,
-    language: 'en',
-    visualStyle: 'auto' // 'auto' | 'modern' | 'classic8bit'
+    language: 'en'
   },
 
   load(){
@@ -2630,10 +2512,6 @@ const SETTINGS = {
     if(this.values.kioskMode)GAME.enableKioskMode();
     if(this.values.debug)document.getElementById('adminPanel').classList.remove('hidden');
     else document.getElementById('adminPanel').classList.add('hidden');
-    // Force style only when user explicitly chose modern/classic; 'auto' is decided by acid test
-    if(this.values.visualStyle==='modern'||this.values.visualStyle==='classic8bit'){
-      PERF.setVisualStyle(this.values.visualStyle);
-    }
   },
 
   toggle(key){
@@ -2644,7 +2522,6 @@ const SETTINGS = {
   changeCamera(val){this.values.camera=val;this.apply();this.save();},
   changeQuality(val){this.values.quality=val;this.apply();this.save();},
   changeDifficulty(val){this.values.difficulty=val;this.save();},
-  changeVisualStyle(val){this.values.visualStyle=val;this.apply();this.save();},
 
   updateUI(){
     const toggles={music:'toggleMusic',sfx:'toggleSfx',reducedMotion:'toggleReducedMotion',colorBlind:'toggleColorBlind',showFps:'toggleFps',kioskMode:'toggleKiosk',debug:'toggleDebug',swapHands:'toggleSwapHands'};
@@ -2654,8 +2531,6 @@ const SETTINGS = {
     document.getElementById('cameraSelect').value=this.values.camera;
     document.getElementById('qualitySelect').value=this.values.quality;
     document.getElementById('difficultySelect').value=this.values.difficulty;
-    const vs=document.getElementById('visualStyleSelect');
-    if(vs)vs.value=this.values.visualStyle||'auto';
   }
 };
 
@@ -2785,6 +2660,7 @@ const LOOP = {
       if(calCanvas.width!==320){calCanvas.width=320;calCanvas.height=240;}
       const calCtx=calCanvas.getContext('2d',{alpha:false});
       CALIBRATION.drawPreview(calCtx);
+      if(rawDt>0)CALIBRATION.perfSamples.push(1/rawDt);
     }
 
     // Game logic
