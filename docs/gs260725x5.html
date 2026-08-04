@@ -373,8 +373,9 @@ const CONFIG = {
   // Detection always stays high-priority; visuals are flexible.
   ACID_TEST_DURATION_MS: 2200,
   ACID_TEST_MIN_SAMPLES: 12,
-  ACID_TEST_FPS_THRESHOLD: 38,       // below this → classic8bit
-  ACID_TEST_DETECT_MS_THRESHOLD: 45, // avg detect cost above this → classic8bit
+  // Relaxed thresholds — only drop to classic when the device is clearly struggling
+  ACID_TEST_FPS_THRESHOLD: 30,       // below this → classic8bit (was 38)
+  ACID_TEST_DETECT_MS_THRESHOLD: 60, // avg detect cost above this → classic8bit (was 45)
   CLASSIC_PIXEL_SCALE: 4,            // internal low-res canvas scale factor
   VISUAL_STYLE_DEFAULT: 'auto',      // 'auto' | 'modern' | 'classic8bit'
   KEYPOINT_NAMES: ['nose','left_eye','right_eye','left_ear','right_ear','left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','left_hip','right_hip','left_knee','right_knee','left_ankle','right_ankle'],
@@ -1581,16 +1582,18 @@ const RENDERER = {
   },
 
   // Classic 8-bit path inspired by NES Soccer / Jaleco Goal! / Famicom soccer titles.
-  // Draws at low internal resolution then nearest-neighbor upscales for authentic pixel look.
-  // Keeps collision / pose path identical — only pixels change.
+  // Full clear + redraw every frame so balls and hands leave NO trails and never
+  // persist on the background once they move away. Collision / pose path unchanged.
   renderClassic(dt){
-    const scale=CONFIG.CLASSIC_PIXEL_SCALE||4;
     const lw=this.lowResCanvas.width, lh=this.lowResCanvas.height;
     const ctx=this.lowResCtx;
     const sx=lw/this.width, sy=lh/this.height;
     const groundY=Math.floor(this.groundY*sy);
 
     ctx.imageSmoothingEnabled=false;
+    // Hard clear every frame — previous ball/hand pixels are fully erased
+    ctx.clearRect(0,0,lw,lh);
+
     // Flat sky (NES-style solid + simple bands)
     ctx.fillStyle='#0055aa';ctx.fillRect(0,0,lw,Math.floor(lh*0.45));
     ctx.fillStyle='#0077cc';ctx.fillRect(0,Math.floor(lh*0.35),lw,Math.floor(lh*0.12));
@@ -1648,16 +1651,16 @@ const RENDERER = {
       if(KICKER.kickTimer>0)ctx.fillRect(kx+2,ky+2,6,3); // kicking leg
     }
 
-    // Balls (pixel circles / squares)
+    // Balls — current position only (no trail, no persistence after move)
     for(const ball of BALLS.active){
       if(!ball.active)continue;
+      // Classic mode intentionally ignores ball.trail so nothing lingers
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const r=Math.max(2,Math.floor(ball.radius*zScale*sx));
       const bx=Math.floor(ball.x*sx), by=Math.floor(ball.y*sy);
       const info=CONFIG.BALL_TYPES[ball.type];
       let col=info.color;
       if(col==='rainbow')col='hsl('+ball.rainbowHue+',100%,60%)';
-      // Shadow
       ctx.fillStyle='#000000';ctx.fillRect(bx-r,groundY-1,r*2,2);
       ctx.fillStyle=col;
       ctx.fillRect(bx-r,by-r,r*2,r*2);
