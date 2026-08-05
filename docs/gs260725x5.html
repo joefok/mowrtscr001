@@ -898,10 +898,21 @@ const POSE = {
     const a=this.dispWrist9||this.smoothedKeypoints[9],b=this.dispWrist10||this.smoothedKeypoints[10];
     const aOk=a&&a.score>0.25,bOk=b&&b.score>0.25;
     let result;
-    if(aOk&&bOk)result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
-    else if(aOk)result={left:a,right:null};
-    else if(bOk)result={left:null,right:b};
-    else result={left:null,right:null};
+    if(aOk&&bOk){
+      result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
+    }else if(aOk){
+      // Only one hand tracked (common on weaker devices/AI throttling) — the
+      // bug was here: this used to always label it "left" just because it
+      // happened to be keypoint index 9, regardless of which side of the
+      // screen it was actually on. Now we check its real x-position instead,
+      // so a single detected hand on the right side of the frame correctly
+      // becomes the right glove.
+      result=(a.x<320)?{left:a,right:null}:{left:null,right:a};
+    }else if(bOk){
+      result=(b.x<320)?{left:b,right:null}:{left:null,right:b};
+    }else{
+      result={left:null,right:null};
+    }
     if(SETTINGS&&SETTINGS.values.swapHands){const t=result.left;result.left=result.right;result.right=t;}
     return result;
   },
@@ -1072,11 +1083,24 @@ const CALIBRATION = {
     // through too fast to gather enough data, default to modern rather than
     // downgrade on a hunch.
     if(this.perfSamples&&this.perfSamples.length>=20){
-      const avg=this.perfSamples.reduce((a,b)=>a+b,0)/this.perfSamples.length;
-      const wantRetro=avg<38;
+      const times=this.perfSamples;
+      const totalTime=times.reduce((a,b)=>a+b,0);
+      // Correct average FPS over the window (frames / total seconds) — NOT
+      // a naive mean of per-frame 1/dt values, which is biased optimistic:
+      // a few fast frames pull that kind of average up more than slow
+      // frames pull it down, so it can look fine even when the real
+      // experience wasn't.
+      const avgFps=times.length/totalTime;
+      // Extra guard against movement-induced stutter bursts: if a
+      // meaningful chunk of frames were janky (worse than ~30fps) even
+      // though the overall average looked OK, that's still a bad sign —
+      // count it, don't average it away.
+      const jankyCount=times.filter(t=>t>1/30).length;
+      const jankyFraction=jankyCount/times.length;
+      const wantRetro=avgFps<38||jankyFraction>0.25;
       if(wantRetro!==RENDERER.retroMode){
         RENDERER.retroMode=wantRetro;
-        console.log('[ACID TEST] calibration avg '+avg.toFixed(1)+'fps ->',wantRetro?'retro 8-bit mode':'modern mode');
+        console.log('[ACID TEST] avg '+avgFps.toFixed(1)+'fps, '+(jankyFraction*100).toFixed(0)+'% janky frames ->',wantRetro?'retro 8-bit mode':'modern mode');
       }
     }
 
@@ -1964,7 +1988,9 @@ const PERF = {
   UPGRADE_ABOVE: 55,
 
   // AI polling rate is intentionally NOT tier-adjustable — see note above.
-  // It stays at CONFIG.POSE_DETECT_EVERY_N's fixed default for every device.
+  // It's a fixed wall-clock target (set in the main tick loop) so real-world
+  // tracking responsiveness stays the same on every device, regardless of
+  // measured render performance.
   maxParticlesByTier:{minimal:20,low:50,medium:100,high:160},
   // IMPORTANT: PERF only ever adjusts rendering detail and AI polling rate.
   // It must NEVER touch ball speed, spawn timing, lives, or round length —
@@ -2646,11 +2672,19 @@ const LOOP = {
     // FPS calculation
     GAME.updateFPS();
 
-    // Pose detection (throttled — still smooth via per-frame keypoint easing below)
+    // Pose detection — throttled by wall-clock time, not frame count. Frame-
+    // count throttling ("every 3 frames") meant a 3x larger REAL-TIME gap
+    // between AI updates on a device running at 20fps vs 60fps, even though
+    // the setting never changed — that's what was causing hand tracking to
+    // feel laggy specifically on slow devices. A fixed millisecond target
+    // keeps the same real tracking responsiveness on every device.
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
-      POSE.frameCount++;
-      const every=(navigator.maxTouchPoints>0||window.innerWidth<900)?4:(CONFIG.POSE_DETECT_EVERY_N||3);
-      if((POSE.frameCount % every)===0) POSE.detect();
+      const now=performance.now();
+      const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?70:55; // ~14-18 real updates/sec, same on every device
+      if(now-(POSE.lastDetectTime||0)>=targetIntervalMs){
+        POSE.lastDetectTime=now;
+        POSE.detect();
+      }
       POSE.updateDisplayWrists();
     }
 
@@ -2660,7 +2694,7 @@ const LOOP = {
       if(calCanvas.width!==320){calCanvas.width=320;calCanvas.height=240;}
       const calCtx=calCanvas.getContext('2d',{alpha:false});
       CALIBRATION.drawPreview(calCtx);
-      if(rawDt>0)CALIBRATION.perfSamples.push(1/rawDt);
+      if(rawDt>0)CALIBRATION.perfSamples.push(rawDt);
     }
 
     // Game logic
