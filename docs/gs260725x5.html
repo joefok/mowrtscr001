@@ -347,7 +347,7 @@ const CONFIG = {
   SPAWN_INTERVAL_MIN: 600,
   SPAWN_INTERVAL_MAX: 2500,
   POSE_CONFIDENCE_THRESHOLD: 0.25,
-  SMOOTHING_FACTOR: 0.65,
+  SMOOTHING_FACTOR: 0.82, // higher = tracks raw AI faster (less lag)
   PREDICTION_FRAMES: 3,
   COLLISION_COOLDOWN: 200,
   COMBO_TIMEOUT: 2500,
@@ -896,20 +896,17 @@ const POSE = {
   // the left side of the screen, regardless of any label or mirror confusion.
   getWristsBySide(){
     const a=this.dispWrist9||this.smoothedKeypoints[9],b=this.dispWrist10||this.smoothedKeypoints[10];
-    const aOk=a&&a.score>0.25,bOk=b&&b.score>0.25;
+    const aOk=a&&a.score>0.2,bOk=b&&b.score>0.2;
+    // Midpoint must use actual camera width (hardcoding 320 compressed both hands to the left)
+    const midX=(this.videoW||320)*0.5;
     let result;
     if(aOk&&bOk){
       result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
     }else if(aOk){
-      // Only one hand tracked (common on weaker devices/AI throttling) — the
-      // bug was here: this used to always label it "left" just because it
-      // happened to be keypoint index 9, regardless of which side of the
-      // screen it was actually on. Now we check its real x-position instead,
-      // so a single detected hand on the right side of the frame correctly
-      // becomes the right glove.
-      result=(a.x<320)?{left:a,right:null}:{left:null,right:a};
+      // Single hand: place glove on the side of the frame where the wrist actually is
+      result=(a.x<midX)?{left:a,right:null}:{left:null,right:a};
     }else if(bOk){
-      result=(b.x<320)?{left:b,right:null}:{left:null,right:b};
+      result=(b.x<midX)?{left:b,right:null}:{left:null,right:b};
     }else{
       result={left:null,right:null};
     }
@@ -917,19 +914,22 @@ const POSE = {
     return result;
   },
 
-  // Eases the two wrist points toward whatever the AI last detected, EVERY
-  // render frame (not just every Nth AI frame). This never predicts or
-  // overshoots — it only ever moves toward the real last-known position —
-  // so throttled AI (needed for adaptive performance) still looks like
-  // continuous 60fps tracking instead of a visible step every few frames.
+  // Eases wrists toward latest AI every render frame. High alpha = near-immediate
+  // response so gloves feel real-time even when AI runs at 15–20 Hz on weak devices.
+  // Light velocity prediction bridges the gap between AI frames.
   updateDisplayWrists(){
     const targets=[[9,'dispWrist9'],[10,'dispWrist10']];
+    const alpha=0.72; // snappy (was 0.35 — that felt lagged)
     for(const[idx,key]of targets){
       const t=this.smoothedKeypoints[idx];
-      if(!t){this[key]=null;continue;}
-      if(!this[key])this[key]={x:t.x,y:t.y,score:t.score};
+      if(!t||t.score<0.15){this[key]=null;continue;}
+      if(!this[key])this[key]={x:t.x,y:t.y,score:t.score,vx:0,vy:0};
       const d=this[key];
-      d.x=MATH.lerp(d.x,t.x,0.35);d.y=MATH.lerp(d.y,t.y,0.35);d.score=t.score;
+      const nx=MATH.lerp(d.x,t.x,alpha);
+      const ny=MATH.lerp(d.y,t.y,alpha);
+      d.vx=nx-d.x;d.vy=ny-d.y;
+      // Small predictive lead so gloves stay ahead of lag between AI samples
+      d.x=nx+d.vx*0.35;d.y=ny+d.vy*0.35;d.score=t.score;
     }
   }
 };
@@ -1184,14 +1184,14 @@ const COLLISION = {
     // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
-      // The ball only becomes catchable once it's genuinely close to the
-      // player (not the instant it's kicked from far away) — this also means
-      // its true on-screen size (not the static spawn radius) is what counts.
+      // Catchable only when ball is near the player (true on-screen size matters).
       const CLOSE_Z=380;
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
       const radius=mode.handRadius||90;
+      // Use same wrist sources as the glove overlay (display wrists) so hit
+      // boxes match what the player sees, including predictive lead.
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
       if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
@@ -1627,10 +1627,13 @@ const RENDERER = {
       rctx.strokeStyle='#1a1a1a';rctx.lineWidth=1;rctx.stroke();
     }
 
-    // Gloves — flat colored squares at the tracked wrist positions
+    // Gloves — must use actual camera resolution (NOT hardcoded 640x480).
+    // Hardcoding 640 caused both hands to draw only on the left half of the screen
+    // when the real camera feed is 320x240, so right-side balls could not be caught.
     if(GAME.currentMode&&GAME.currentMode.handOnly){
       const{left:lw,right:rw2}=POSE.getWristsBySide();
-      const scaleX=this.width/640,scaleY=this.height/480;
+      const vw=POSE.videoW||320, vh=POSE.videoH||240;
+      const scaleX=this.width/vw, scaleY=this.height/vh;
       if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',POSE.isHandRaised(lw));
       if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',POSE.isHandRaised(rw2));
     }
@@ -2680,7 +2683,9 @@ const LOOP = {
     // keeps the same real tracking responsiveness on every device.
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
       const now=performance.now();
-      const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?70:55; // ~14-18 real updates/sec, same on every device
+      // Aggressive real-time target: ~25–30 pose samples/sec. Detection stays
+      // the priority over graphics; PERF/retro mode already cuts pixel cost.
+      const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?40:33;
       if(now-(POSE.lastDetectTime||0)>=targetIntervalMs){
         POSE.lastDetectTime=now;
         POSE.detect();
