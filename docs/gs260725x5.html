@@ -344,6 +344,10 @@ const CONFIG = {
   BALL_RADIUS_MAX: 24,
   BALL_SPEED_MIN: 3,
   BALL_SPEED_MAX: 14,
+  // Real-time flight duration (seconds) from kick to keeper plane.
+  // Same wall-clock time at 15fps or 60fps — only smoothness changes, not timing.
+  BALL_FLIGHT_SEC_MIN: 1.15,
+  BALL_FLIGHT_SEC_MAX: 1.85,
   SPAWN_INTERVAL_MIN: 600,
   SPAWN_INTERVAL_MAX: 2500,
   POSE_CONFIDENCE_THRESHOLD: 0.25,
@@ -621,14 +625,18 @@ class Ball {
   }
   update(dt,goalZ,goalRect){
     if(!this.active)return;
+    // dt is real seconds — motion is wall-clock based so flight duration is
+    // the same at 15fps or 60fps (only the number of drawn steps changes).
     if(this.collisionCooldown>0)this.collisionCooldown-=dt*1000;
-    if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*20;}
+    if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*40;}
     this.x+=this.vx*dt;this.y+=this.vy*dt;this.z+=this.vz*dt;
-    this.vy+=0.15*dt*60;this.spin+=dt*5;
-    if(RENDERER.quality==='high'){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>6)this.trail.shift();}
+    // Gravity in world-units/s² (matches velocity-per-second scale)
+    this.vy+=420*dt;this.spin+=dt*5;
+    if(RENDERER.quality==='high'&&!RENDERER.retroMode){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>6)this.trail.shift();}
     if(this.y>RENDERER.groundY-this.radius&&this.bounces<this.maxBounces){
-      this.y=RENDERER.groundY-this.radius;this.vy*=-0.6;this.vx*=0.8;this.vz*=0.8;this.bounces++;
-      AUDIO.playBounce();PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
+      this.y=RENDERER.groundY-this.radius;this.vy*=-0.55;this.vx*=0.8;this.vz*=0.8;this.bounces++;
+      AUDIO.playBounce();
+      if(!RENDERER.retroMode)PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
     }
     if(this.type==='RAINBOW')this.rainbowHue=(this.rainbowHue+dt*200)%360;
     if(this.type==='BOMB')this.pulsePhase+=dt*8;
@@ -684,14 +692,26 @@ const BALLS = {
       targetY=MATH.rand(h*0.28,h*0.60);
     }
     const targetZ=100;
-    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
+    // Flight time is wall-clock seconds (independent of FPS). Faster ball types
+    // and higher difficulty shorten duration; mode.speedMult does the same.
+    // At 15fps or 60fps the ball still arrives after the same real-time delay.
+    const tMin=CONFIG.BALL_FLIGHT_SEC_MIN||1.15, tMax=CONFIG.BALL_FLIGHT_SEC_MAX||1.85;
+    const typeFactor=1/Math.max(0.4,info.speed); // faster types → shorter flight
+    const modeFactor=1/Math.max(0.35,mode.speedMult||1);
+    const diffFactor=1/Math.max(0.7,this.difficultyMult||1);
+    let flightSec=MATH.rand(tMin,tMax)*typeFactor*modeFactor*diffFactor;
+    flightSec=MATH.clamp(flightSec,0.55,2.6);
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
-    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
-    const vx=(dx/dist)*speed*60,vy=(dy/dist)*speed*60,vz=(dz/dist)*speed*60;
+    // Velocity in world-units per second. Compensate gravity so the ball still
+    // arrives near targetY after flightSec (same real-time path at any FPS).
+    const GRAVITY=420;
+    const vx=dx/flightSec, vz=dz/flightSec;
+    const vy=dy/flightSec-0.5*GRAVITY*flightSec;
     const radius=MATH.rand(CONFIG.BALL_RADIUS_MIN,CONFIG.BALL_RADIUS_MAX)*MATH.lerp(1,1.5,1-startZ/1000);
     let b=this.free.length?this.free.pop():null;
     if(!b){b=new Ball();this.pool.push(b);}
     b.spawn(type,startX,startY,startZ,vx,vy,vz,radius);
+    b.flightSec=flightSec;
     this.active.push(b);
     KICKER.trigger();
   },
@@ -1099,7 +1119,7 @@ const CALIBRATION = {
       const jankyFraction=jankyCount/times.length;
       const wantRetro=avgFps<38||jankyFraction>0.25;
       if(wantRetro!==RENDERER.retroMode){
-        RENDERER.retroMode=wantRetro;
+        RENDERER.enableRetroMode(wantRetro);
         console.log('[ACID TEST] avg '+avgFps.toFixed(1)+'fps, '+(jankyFraction*100).toFixed(0)+'% janky frames ->',wantRetro?'retro 8-bit mode':'modern mode');
       }
     }
@@ -1376,12 +1396,23 @@ const RENDERER = {
 
   setupRetroCanvas(){
     if(!this.retroCanvas)this.retroCanvas=document.createElement('canvas');
-    const baseW=240; // classic-console-ish internal resolution
-    const rw=baseW,rh=Math.max(60,Math.round(baseW*(this.height/this.width)));
+    // Very low internal resolution = fewer pixels to fill every frame on weak devices
+    const baseW=160;
+    const rw=baseW,rh=Math.max(48,Math.round(baseW*(this.height/Math.max(1,this.width))));
     this.retroCanvas.width=rw;this.retroCanvas.height=rh;
     this.retroCtx=this.retroCanvas.getContext('2d',{alpha:false});
-    this.retroScale=rw/this.width;
-    this.retroGroundY=rh*0.72;
+    this.retroScale=rw/Math.max(1,this.width);
+    this.retroGroundY=Math.floor(rh*0.72);
+  },
+
+  enableRetroMode(on){
+    this.retroMode=!!on;
+    if(this.retroMode){
+      this.setQuality('minimal');
+      CONFIG.MAX_PARTICLES=8;
+      CONFIG.CONFETTI_COUNT=0;
+      this.setupRetroCanvas();
+    }
   },
 
   init(){
@@ -1600,36 +1631,37 @@ const RENDERER = {
   renderRetro(dt){
     if(!this.retroCtx)this.setupRetroCanvas();
     const rctx=this.retroCtx,rw=this.retroCanvas.width,rh=this.retroCanvas.height;
-    const s=this.retroScale; // full-resolution game coordinates -> retro canvas coordinates
+    const s=this.retroScale;
     const gY=this.retroGroundY;
 
-    // Flat sky + flat pitch (no gradients)
+    // Solid fills only — no paths, no stroke loops, no particles
     rctx.fillStyle='#1e3a5f';rctx.fillRect(0,0,rw,gY);
     rctx.fillStyle='#2a7a2a';rctx.fillRect(0,gY,rw,rh-gY);
-    rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
-    rctx.beginPath();rctx.moveTo(0,gY);rctx.lineTo(rw,gY);rctx.stroke();
+    rctx.fillStyle='#ffffff';rctx.fillRect(0,gY,rw,1);
 
-    // Goal — a few flat lines, no net grid, no glow
-    const goalW=rw*CONFIG.GOAL_WIDTH_RATIO,goalX=(rw-goalW)/2,goalY=rh*0.25,goalH=rh*CONFIG.GOAL_HEIGHT_RATIO;
-    rctx.strokeStyle='#e8e8e8';rctx.lineWidth=2;
-    rctx.beginPath();rctx.moveTo(goalX,goalY+goalH);rctx.lineTo(goalX,goalY);rctx.lineTo(goalX+goalW,goalY);rctx.lineTo(goalX+goalW,goalY+goalH);rctx.stroke();
+    // Goal posts as rects (cheaper than stroke path)
+    const goalW=Math.floor(rw*CONFIG.GOAL_WIDTH_RATIO);
+    const goalX=Math.floor((rw-goalW)/2);
+    const goalY=Math.floor(rh*0.25);
+    const goalH=Math.floor(rh*CONFIG.GOAL_HEIGHT_RATIO);
+    rctx.fillStyle='#e8e8e8';
+    rctx.fillRect(goalX,goalY,2,goalH);
+    rctx.fillRect(goalX+goalW-2,goalY,2,goalH);
+    rctx.fillRect(goalX,goalY,goalW,2);
 
-    // Kicker — flat blocky shape (reuses the same kick animation state as the modern KICKER)
     this.drawRetroKicker(rctx,rw,rh,s);
 
-    // Ball — flat circle, black outline, no gradient/glow/pattern
+    // Balls as fillRect squares (no arc) — same real-time position as physics
     for(const ball of BALLS.active){
       if(!ball.active)continue;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
-      const r=Math.max(2,ball.radius*zScale*s);
-      rctx.fillStyle='#ffffff';
-      rctx.beginPath();rctx.arc(ball.x*s,ball.y*s,r,0,Math.PI*2);rctx.fill();
-      rctx.strokeStyle='#1a1a1a';rctx.lineWidth=1;rctx.stroke();
+      const r=Math.max(2,Math.floor(ball.radius*zScale*s));
+      const bx=Math.floor(ball.x*s), by=Math.floor(ball.y*s);
+      rctx.fillStyle='#000000';rctx.fillRect(bx-r,gY-1,r*2,1);
+      rctx.fillStyle='#ffffff';rctx.fillRect(bx-r,by-r,r*2,r*2);
     }
 
-    // Gloves — must use actual camera resolution (NOT hardcoded 640x480).
-    // Hardcoding 640 caused both hands to draw only on the left half of the screen
-    // when the real camera feed is 320x240, so right-side balls could not be caught.
+    // Gloves — actual video resolution for full left/right coverage
     if(GAME.currentMode&&GAME.currentMode.handOnly){
       const{left:lw,right:rw2}=POSE.getWristsBySide();
       const vw=POSE.videoW||320, vh=POSE.videoH||240;
@@ -1638,30 +1670,17 @@ const RENDERER = {
       if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',POSE.isHandRaised(rw2));
     }
 
-    // Particles — flat squares, no glow
-    for(const p of PARTICLES.active){
-      if(!p.active)continue;
-      rctx.globalAlpha=p.alpha;rctx.fillStyle=p.color;
-      const sz=Math.max(1,p.size*s);
-      rctx.fillRect(p.x*s-sz/2,p.y*s-sz/2,sz,sz);
+    // Score popups only (particles skipped in retro for FPS)
+    if(GAME.scorePopups.length){
+      rctx.font='bold 8px monospace';rctx.textAlign='center';rctx.fillStyle='#ffd700';
+      for(const p of GAME.scorePopups){
+        rctx.fillText(p.text,Math.floor(p.x*s),Math.floor(p.y*s));
+      }
     }
-    rctx.globalAlpha=1;
 
-    // Score popups — plain pixel-ish text
-    rctx.font='bold '+Math.max(8,Math.round(14*s*4))+'px monospace';
-    rctx.textAlign='center';rctx.fillStyle='#ffd700';
-    for(const p of GAME.scorePopups){
-      rctx.globalAlpha=Math.min(1,p.life/1.1);
-      rctx.fillText(p.text,p.x*s,p.y*s);
-    }
-    rctx.globalAlpha=1;
-
-    // Stamp the low-res frame onto the real canvas, scaled up with hard
-    // pixel edges — this is what actually reads as "8-bit" to the eye.
     const ctx=this.ctx;
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(this.retroCanvas,0,0,rw,rh,0,0,this.width,this.height);
-    ctx.imageSmoothingEnabled=true;
   },
 
   drawRetroKicker(rctx,rw,rh,s){
@@ -2702,15 +2721,14 @@ const LOOP = {
       if(rawDt>0)CALIBRATION.perfSamples.push(rawDt);
     }
 
-    // Game logic
+    // Game logic — variable timestep driven by real elapsed seconds.
+    // Ball flight duration is therefore the same wall-clock length at any FPS:
+    // low FPS just draws fewer intermediate positions along the same path.
     if(GAME.state==='playing'){
-      this.accumulator+=dt;
-      while(this.accumulator>=this.fixedDt){
-        this.update(this.fixedDt);
-        this.accumulator-=this.fixedDt;
-      }
+      // Cap so a single very slow frame cannot jump the ball too far in one step
+      const simDt=Math.min(dt,0.05);
+      this.update(simDt);
     }else if(GAME.state==='menu'||GAME.state==='gameover'||GAME.state==='attract'){
-      // Slow update for particles in menu/attract
       PARTICLES.update(dt*0.5);
     }
 
@@ -2731,14 +2749,13 @@ const LOOP = {
       }
     }
 
-    // Update balls
+    // Update balls (wall-clock dt — flight time independent of FPS)
     BALLS.update(dt);
     KICKER.update(dt);
 
-    // Update particles
-    PARTICLES.update(dt);
+    // Skip particle sim in retro — pure FPS win on weak devices
+    if(!RENDERER.retroMode)PARTICLES.update(dt);
 
-    // Update powerups
     GAME.updatePowerups(dt);
     GAME.updateScorePopups(dt);
 
