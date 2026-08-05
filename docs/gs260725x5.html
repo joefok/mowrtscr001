@@ -344,14 +344,10 @@ const CONFIG = {
   BALL_RADIUS_MAX: 24,
   BALL_SPEED_MIN: 3,
   BALL_SPEED_MAX: 14,
-  // Real-time flight duration (seconds) from kick to keeper plane.
-  // Same wall-clock time at 15fps or 60fps — only smoothness changes, not timing.
-  BALL_FLIGHT_SEC_MIN: 1.15,
-  BALL_FLIGHT_SEC_MAX: 1.85,
   SPAWN_INTERVAL_MIN: 600,
   SPAWN_INTERVAL_MAX: 2500,
   POSE_CONFIDENCE_THRESHOLD: 0.25,
-  SMOOTHING_FACTOR: 0.82, // higher = tracks raw AI faster (less lag)
+  SMOOTHING_FACTOR: 0.78, // higher = the tracked target itself catches up to raw AI faster (less inherent lag)
   PREDICTION_FRAMES: 3,
   COLLISION_COOLDOWN: 200,
   COMBO_TIMEOUT: 2500,
@@ -625,18 +621,14 @@ class Ball {
   }
   update(dt,goalZ,goalRect){
     if(!this.active)return;
-    // dt is real seconds — motion is wall-clock based so flight duration is
-    // the same at 15fps or 60fps (only the number of drawn steps changes).
     if(this.collisionCooldown>0)this.collisionCooldown-=dt*1000;
-    if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*40;}
+    if(this.type==='CURVE'&&this.curveAmp>0){this.curvePhase+=dt*3;this.vx+=Math.sin(this.curvePhase)*this.curveAmp*dt*20;}
     this.x+=this.vx*dt;this.y+=this.vy*dt;this.z+=this.vz*dt;
-    // Gravity in world-units/s² (matches velocity-per-second scale)
-    this.vy+=420*dt;this.spin+=dt*5;
-    if(RENDERER.quality==='high'&&!RENDERER.retroMode){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>6)this.trail.shift();}
+    this.vy+=0.15*dt*60;this.spin+=dt*5;
+    if(RENDERER.quality==='high'){this.trail.push({x:this.x,y:this.y,z:this.z});if(this.trail.length>6)this.trail.shift();}
     if(this.y>RENDERER.groundY-this.radius&&this.bounces<this.maxBounces){
-      this.y=RENDERER.groundY-this.radius;this.vy*=-0.55;this.vx*=0.8;this.vz*=0.8;this.bounces++;
-      AUDIO.playBounce();
-      if(!RENDERER.retroMode)PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
+      this.y=RENDERER.groundY-this.radius;this.vy*=-0.6;this.vx*=0.8;this.vz*=0.8;this.bounces++;
+      AUDIO.playBounce();PARTICLES.spawnSmoke(this.x,RENDERER.groundY,this.z,5);
     }
     if(this.type==='RAINBOW')this.rainbowHue=(this.rainbowHue+dt*200)%360;
     if(this.type==='BOMB')this.pulsePhase+=dt*8;
@@ -692,26 +684,14 @@ const BALLS = {
       targetY=MATH.rand(h*0.28,h*0.60);
     }
     const targetZ=100;
-    // Flight time is wall-clock seconds (independent of FPS). Faster ball types
-    // and higher difficulty shorten duration; mode.speedMult does the same.
-    // At 15fps or 60fps the ball still arrives after the same real-time delay.
-    const tMin=CONFIG.BALL_FLIGHT_SEC_MIN||1.15, tMax=CONFIG.BALL_FLIGHT_SEC_MAX||1.85;
-    const typeFactor=1/Math.max(0.4,info.speed); // faster types → shorter flight
-    const modeFactor=1/Math.max(0.35,mode.speedMult||1);
-    const diffFactor=1/Math.max(0.7,this.difficultyMult||1);
-    let flightSec=MATH.rand(tMin,tMax)*typeFactor*modeFactor*diffFactor;
-    flightSec=MATH.clamp(flightSec,0.55,2.6);
+    const speed=CONFIG.BALL_SPEED_MIN+(CONFIG.BALL_SPEED_MAX-CONFIG.BALL_SPEED_MIN)*info.speed*mode.speedMult*this.difficultyMult;
     const dx=targetX-startX,dy=targetY-startY,dz=targetZ-startZ;
-    // Velocity in world-units per second. Compensate gravity so the ball still
-    // arrives near targetY after flightSec (same real-time path at any FPS).
-    const GRAVITY=420;
-    const vx=dx/flightSec, vz=dz/flightSec;
-    const vy=dy/flightSec-0.5*GRAVITY*flightSec;
+    const dist=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    const vx=(dx/dist)*speed*60,vy=(dy/dist)*speed*60,vz=(dz/dist)*speed*60;
     const radius=MATH.rand(CONFIG.BALL_RADIUS_MIN,CONFIG.BALL_RADIUS_MAX)*MATH.lerp(1,1.5,1-startZ/1000);
     let b=this.free.length?this.free.pop():null;
     if(!b){b=new Ball();this.pool.push(b);}
     b.spawn(type,startX,startY,startZ,vx,vy,vz,radius);
-    b.flightSec=flightSec;
     this.active.push(b);
     KICKER.trigger();
   },
@@ -916,14 +896,20 @@ const POSE = {
   // the left side of the screen, regardless of any label or mirror confusion.
   getWristsBySide(){
     const a=this.dispWrist9||this.smoothedKeypoints[9],b=this.dispWrist10||this.smoothedKeypoints[10];
-    const aOk=a&&a.score>0.2,bOk=b&&b.score>0.2;
-    // Midpoint must use actual camera width (hardcoding 320 compressed both hands to the left)
+    const aOk=a&&a.score>0.25,bOk=b&&b.score>0.25;
+    // Use the ACTUAL camera capture width, not an assumed 640 — camera
+    // resolution was reduced elsewhere for performance, so a hardcoded 320
+    // midpoint was wrong whenever the real capture width wasn't 640. This
+    // was the actual bug behind "everything shows up on the left."
     const midX=(this.videoW||320)*0.5;
     let result;
     if(aOk&&bOk){
       result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
     }else if(aOk){
-      // Single hand: place glove on the side of the frame where the wrist actually is
+      // Only one hand tracked (common on weaker devices/AI throttling) —
+      // decide its side from its real x-position relative to the actual
+      // frame width, so a single detected hand on the right side of the
+      // frame correctly becomes the right glove.
       result=(a.x<midX)?{left:a,right:null}:{left:null,right:a};
     }else if(bOk){
       result=(b.x<midX)?{left:b,right:null}:{left:null,right:b};
@@ -934,22 +920,25 @@ const POSE = {
     return result;
   },
 
-  // Eases wrists toward latest AI every render frame. High alpha = near-immediate
-  // response so gloves feel real-time even when AI runs at 15–20 Hz on weak devices.
-  // Light velocity prediction bridges the gap between AI frames.
+  // Eases the two wrist points toward whatever the AI last detected, EVERY
+  // render frame (not just every Nth AI frame). This never predicts or
+  // overshoots — it only ever moves toward the real last-known position —
+  // so throttled AI (needed for adaptive performance) still looks like
+  // continuous 60fps tracking instead of a visible step every few frames.
   updateDisplayWrists(){
     const targets=[[9,'dispWrist9'],[10,'dispWrist10']];
-    const alpha=0.72; // snappy (was 0.35 — that felt lagged)
     for(const[idx,key]of targets){
       const t=this.smoothedKeypoints[idx];
-      if(!t||t.score<0.15){this[key]=null;continue;}
-      if(!this[key])this[key]={x:t.x,y:t.y,score:t.score,vx:0,vy:0};
+      if(!t){this[key]=null;continue;}
+      if(!this[key])this[key]={x:t.x,y:t.y,score:t.score};
       const d=this[key];
-      const nx=MATH.lerp(d.x,t.x,alpha);
-      const ny=MATH.lerp(d.y,t.y,alpha);
-      d.vx=nx-d.x;d.vy=ny-d.y;
-      // Small predictive lead so gloves stay ahead of lag between AI samples
-      d.x=nx+d.vx*0.35;d.y=ny+d.vy*0.35;d.score=t.score;
+      // Snappier than before (was 0.35) — safe to raise now that AI itself
+      // updates ~2x more often (see the polling interval above), so there's
+      // less distance to cover per ease step. No predictive extrapolation
+      // here on purpose: guessing ahead of the last real reading can
+      // overshoot if a hand suddenly stops or changes direction, which
+      // would hurt catch fairness more than the latency it saves.
+      d.x=MATH.lerp(d.x,t.x,0.55);d.y=MATH.lerp(d.y,t.y,0.55);d.score=t.score;
     }
   }
 };
@@ -1119,7 +1108,7 @@ const CALIBRATION = {
       const jankyFraction=jankyCount/times.length;
       const wantRetro=avgFps<38||jankyFraction>0.25;
       if(wantRetro!==RENDERER.retroMode){
-        RENDERER.enableRetroMode(wantRetro);
+        RENDERER.retroMode=wantRetro;
         console.log('[ACID TEST] avg '+avgFps.toFixed(1)+'fps, '+(jankyFraction*100).toFixed(0)+'% janky frames ->',wantRetro?'retro 8-bit mode':'modern mode');
       }
     }
@@ -1204,14 +1193,14 @@ const COLLISION = {
     // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
-      // Catchable only when ball is near the player (true on-screen size matters).
+      // The ball only becomes catchable once it's genuinely close to the
+      // player (not the instant it's kicked from far away) — this also means
+      // its true on-screen size (not the static spawn radius) is what counts.
       const CLOSE_Z=380;
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
       const radius=mode.handRadius||90;
-      // Use same wrist sources as the glove overlay (display wrists) so hit
-      // boxes match what the player sees, including predictive lead.
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
       if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
@@ -1396,23 +1385,12 @@ const RENDERER = {
 
   setupRetroCanvas(){
     if(!this.retroCanvas)this.retroCanvas=document.createElement('canvas');
-    // Very low internal resolution = fewer pixels to fill every frame on weak devices
-    const baseW=160;
-    const rw=baseW,rh=Math.max(48,Math.round(baseW*(this.height/Math.max(1,this.width))));
+    const baseW=240; // classic-console-ish internal resolution
+    const rw=baseW,rh=Math.max(60,Math.round(baseW*(this.height/this.width)));
     this.retroCanvas.width=rw;this.retroCanvas.height=rh;
     this.retroCtx=this.retroCanvas.getContext('2d',{alpha:false});
-    this.retroScale=rw/Math.max(1,this.width);
-    this.retroGroundY=Math.floor(rh*0.72);
-  },
-
-  enableRetroMode(on){
-    this.retroMode=!!on;
-    if(this.retroMode){
-      this.setQuality('minimal');
-      CONFIG.MAX_PARTICLES=8;
-      CONFIG.CONFETTI_COUNT=0;
-      this.setupRetroCanvas();
-    }
+    this.retroScale=rw/this.width;
+    this.retroGroundY=rh*0.72;
   },
 
   init(){
@@ -1631,56 +1609,65 @@ const RENDERER = {
   renderRetro(dt){
     if(!this.retroCtx)this.setupRetroCanvas();
     const rctx=this.retroCtx,rw=this.retroCanvas.width,rh=this.retroCanvas.height;
-    const s=this.retroScale;
+    const s=this.retroScale; // full-resolution game coordinates -> retro canvas coordinates
     const gY=this.retroGroundY;
 
-    // Solid fills only — no paths, no stroke loops, no particles
+    // Flat sky + flat pitch (no gradients)
     rctx.fillStyle='#1e3a5f';rctx.fillRect(0,0,rw,gY);
     rctx.fillStyle='#2a7a2a';rctx.fillRect(0,gY,rw,rh-gY);
-    rctx.fillStyle='#ffffff';rctx.fillRect(0,gY,rw,1);
+    rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
+    rctx.beginPath();rctx.moveTo(0,gY);rctx.lineTo(rw,gY);rctx.stroke();
 
-    // Goal posts as rects (cheaper than stroke path)
-    const goalW=Math.floor(rw*CONFIG.GOAL_WIDTH_RATIO);
-    const goalX=Math.floor((rw-goalW)/2);
-    const goalY=Math.floor(rh*0.25);
-    const goalH=Math.floor(rh*CONFIG.GOAL_HEIGHT_RATIO);
-    rctx.fillStyle='#e8e8e8';
-    rctx.fillRect(goalX,goalY,2,goalH);
-    rctx.fillRect(goalX+goalW-2,goalY,2,goalH);
-    rctx.fillRect(goalX,goalY,goalW,2);
+    // Goal — a few flat lines, no net grid, no glow
+    const goalW=rw*CONFIG.GOAL_WIDTH_RATIO,goalX=(rw-goalW)/2,goalY=rh*0.25,goalH=rh*CONFIG.GOAL_HEIGHT_RATIO;
+    rctx.strokeStyle='#e8e8e8';rctx.lineWidth=2;
+    rctx.beginPath();rctx.moveTo(goalX,goalY+goalH);rctx.lineTo(goalX,goalY);rctx.lineTo(goalX+goalW,goalY);rctx.lineTo(goalX+goalW,goalY+goalH);rctx.stroke();
 
+    // Kicker — flat blocky shape (reuses the same kick animation state as the modern KICKER)
     this.drawRetroKicker(rctx,rw,rh,s);
 
-    // Balls as fillRect squares (no arc) — same real-time position as physics
+    // Ball — flat circle, black outline, no gradient/glow/pattern
     for(const ball of BALLS.active){
       if(!ball.active)continue;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
-      const r=Math.max(2,Math.floor(ball.radius*zScale*s));
-      const bx=Math.floor(ball.x*s), by=Math.floor(ball.y*s);
-      rctx.fillStyle='#000000';rctx.fillRect(bx-r,gY-1,r*2,1);
-      rctx.fillStyle='#ffffff';rctx.fillRect(bx-r,by-r,r*2,r*2);
+      const r=Math.max(2,ball.radius*zScale*s);
+      rctx.fillStyle='#ffffff';
+      rctx.beginPath();rctx.arc(ball.x*s,ball.y*s,r,0,Math.PI*2);rctx.fill();
+      rctx.strokeStyle='#1a1a1a';rctx.lineWidth=1;rctx.stroke();
     }
 
-    // Gloves — actual video resolution for full left/right coverage
+    // Gloves — flat colored squares at the tracked wrist positions
     if(GAME.currentMode&&GAME.currentMode.handOnly){
       const{left:lw,right:rw2}=POSE.getWristsBySide();
-      const vw=POSE.videoW||320, vh=POSE.videoH||240;
-      const scaleX=this.width/vw, scaleY=this.height/vh;
+      const scaleX=this.width/(POSE.videoW||320),scaleY=this.height/(POSE.videoH||240);
       if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',POSE.isHandRaised(lw));
       if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',POSE.isHandRaised(rw2));
     }
 
-    // Score popups only (particles skipped in retro for FPS)
-    if(GAME.scorePopups.length){
-      rctx.font='bold 8px monospace';rctx.textAlign='center';rctx.fillStyle='#ffd700';
-      for(const p of GAME.scorePopups){
-        rctx.fillText(p.text,Math.floor(p.x*s),Math.floor(p.y*s));
-      }
+    // Particles — flat squares, no glow
+    for(const p of PARTICLES.active){
+      if(!p.active)continue;
+      rctx.globalAlpha=p.alpha;rctx.fillStyle=p.color;
+      const sz=Math.max(1,p.size*s);
+      rctx.fillRect(p.x*s-sz/2,p.y*s-sz/2,sz,sz);
     }
+    rctx.globalAlpha=1;
 
+    // Score popups — plain pixel-ish text
+    rctx.font='bold '+Math.max(8,Math.round(14*s*4))+'px monospace';
+    rctx.textAlign='center';rctx.fillStyle='#ffd700';
+    for(const p of GAME.scorePopups){
+      rctx.globalAlpha=Math.min(1,p.life/1.1);
+      rctx.fillText(p.text,p.x*s,p.y*s);
+    }
+    rctx.globalAlpha=1;
+
+    // Stamp the low-res frame onto the real canvas, scaled up with hard
+    // pixel edges — this is what actually reads as "8-bit" to the eye.
     const ctx=this.ctx;
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(this.retroCanvas,0,0,rw,rh,0,0,this.width,this.height);
+    ctx.imageSmoothingEnabled=true;
   },
 
   drawRetroKicker(rctx,rw,rh,s){
@@ -2688,7 +2675,12 @@ const LOOP = {
     if(!this.running)return;
     const rawDt=(timestamp-this.lastTime)/1000;
     this.lastTime=timestamp;
-    const dt=Math.min(rawDt,0.05);
+    // Only clamp genuinely catastrophic gaps (tab switch, huge stall) — the
+    // old 50ms (20fps) cap silently put every device slower than 20fps into
+    // permanent slow motion, since real elapsed time was being discarded
+    // every single frame. A device sustaining even 8-10fps should still
+    // simulate at real wall-clock speed, just with fewer drawn steps.
+    const dt=Math.min(rawDt,0.25);
     PERF.checkThermal(rawDt*1000);
 
     // FPS calculation
@@ -2702,9 +2694,7 @@ const LOOP = {
     // keeps the same real tracking responsiveness on every device.
     if(POSE.isReady&&(GAME.state==='playing'||GAME.state==='calibrating')){
       const now=performance.now();
-      // Aggressive real-time target: ~25–30 pose samples/sec. Detection stays
-      // the priority over graphics; PERF/retro mode already cuts pixel cost.
-      const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?40:33;
+      const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?40:33; // ~25-30 real updates/sec, same on every device
       if(now-(POSE.lastDetectTime||0)>=targetIntervalMs){
         POSE.lastDetectTime=now;
         POSE.detect();
@@ -2721,14 +2711,19 @@ const LOOP = {
       if(rawDt>0)CALIBRATION.perfSamples.push(rawDt);
     }
 
-    // Game logic — variable timestep driven by real elapsed seconds.
-    // Ball flight duration is therefore the same wall-clock length at any FPS:
-    // low FPS just draws fewer intermediate positions along the same path.
+    // Game logic
     if(GAME.state==='playing'){
-      // Cap so a single very slow frame cannot jump the ball too far in one step
-      const simDt=Math.min(dt,0.05);
-      this.update(simDt);
+      this.accumulator+=dt;
+      let steps=0;
+      const MAX_STEPS=10; // ~166ms of catch-up per frame before we just drop the backlog
+      while(this.accumulator>=this.fixedDt&&steps<MAX_STEPS){
+        this.update(this.fixedDt);
+        this.accumulator-=this.fixedDt;
+        steps++;
+      }
+      if(steps>=MAX_STEPS)this.accumulator=0;
     }else if(GAME.state==='menu'||GAME.state==='gameover'||GAME.state==='attract'){
+      // Slow update for particles in menu/attract
       PARTICLES.update(dt*0.5);
     }
 
@@ -2749,13 +2744,14 @@ const LOOP = {
       }
     }
 
-    // Update balls (wall-clock dt — flight time independent of FPS)
+    // Update balls
     BALLS.update(dt);
     KICKER.update(dt);
 
-    // Skip particle sim in retro — pure FPS win on weak devices
-    if(!RENDERER.retroMode)PARTICLES.update(dt);
+    // Update particles
+    PARTICLES.update(dt);
 
+    // Update powerups
     GAME.updatePowerups(dt);
     GAME.updateScorePopups(dt);
 
