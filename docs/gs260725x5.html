@@ -23,11 +23,12 @@ canvas{display:block;touch-action:none}
 .ui-layer{position:fixed;z-index:10;pointer-events:none;width:100%;height:100%;top:0;left:0}
 .ui-layer.interactive{pointer-events:auto}
 .hud-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 20px;position:fixed;top:0;left:0;right:0;z-index:20;pointer-events:none}
-.hud-panel{background:rgba(0,20,0,0.75);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:10px 18px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);backdrop-filter:blur(8px);min-width:120px;text-align:center}
+.hud-panel{background:rgba(0,20,0,0.75);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:10px 18px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);backdrop-filter:blur(8px);min-width:100px;max-width:160px;text-align:center}
 .hud-panel .label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#ffd700;opacity:0.8;margin-bottom:2px}
-.hud-panel .value{font-size:28px;font-weight:900;color:#fff;line-height:1}
+.hud-panel .value{font-size:28px;font-weight:900;color:#fff;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-panel .sub{font-size:11px;color:#aaa;margin-top:2px}
-.hud-left,.hud-right{display:flex;gap:10px;align-items:flex-start}
+.hud-left,.hud-right{display:flex;gap:10px;align-items:flex-start;flex-wrap:nowrap}
+#hudLives{white-space:nowrap;max-width:120px;overflow:hidden}
 .center-message{position:fixed;top:50%;left:0;right:0;transform:translateY(-50%) translateZ(0);will-change:transform,opacity;z-index:30;display:flex;justify-content:space-between;padding:0 3vw;pointer-events:none;opacity:0.68;transition:opacity 0.2s ease}
 .center-message .msg-side{max-width:36vw}
 .center-message .msg-side.msg-right{text-align:right}
@@ -1086,31 +1087,37 @@ const CALIBRATION = {
     this.clearAutoTimer();
     this.active=false;document.getElementById('calibrationOverlay').classList.add('hidden');
 
-    // Acid test result: decide retro vs modern from what actually happened
-    // during calibration (camera + AI under real load), not a guess. Needs
-    // a reasonable sample size before we trust it — if calibration raced
-    // through too fast to gather enough data, default to modern rather than
-    // downgrade on a hunch.
-    if(this.perfSamples&&this.perfSamples.length>=20){
-      const times=this.perfSamples;
-      const totalTime=times.reduce((a,b)=>a+b,0);
-      // Correct average FPS over the window (frames / total seconds) — NOT
-      // a naive mean of per-frame 1/dt values, which is biased optimistic:
-      // a few fast frames pull that kind of average up more than slow
-      // frames pull it down, so it can look fine even when the real
-      // experience wasn't.
-      const avgFps=times.length/totalTime;
-      // Extra guard against movement-induced stutter bursts: if a
-      // meaningful chunk of frames were janky (worse than ~30fps) even
-      // though the overall average looked OK, that's still a bad sign —
-      // count it, don't average it away.
-      const jankyCount=times.filter(t=>t>1/30).length;
-      const jankyFraction=jankyCount/times.length;
-      const wantRetro=avgFps<38||jankyFraction>0.25;
-      if(wantRetro!==RENDERER.retroMode){
+    // Acid test: bias strongly toward modern. Medium/high-power devices often
+    // look "janky" during the first seconds of calibration (model warm-up,
+    // first WebGL compiles, camera settle) — that must NOT force 8-bit mode.
+    // Only switch to retro when the device is clearly struggling after warmup.
+    if(this.perfSamples&&this.perfSamples.length>=30){
+      // Drop first ~1/3 of samples (warmup noise)
+      const skip=Math.min(25,Math.floor(this.perfSamples.length*0.35));
+      const times=this.perfSamples.slice(skip);
+      if(times.length>=15){
+        const totalTime=times.reduce((a,b)=>a+b,0);
+        const avgFps=times.length/Math.max(1e-6,totalTime);
+        // Median frame time is more robust than mean against single spikes
+        const sorted=times.slice().sort((a,b)=>a-b);
+        const medianDt=sorted[Math.floor(sorted.length/2)];
+        const medianFps=1/Math.max(1e-6,medianDt);
+        // "Janky" = worse than ~20fps (was 30 — too strict for mid-range devices)
+        const jankyCount=times.filter(t=>t>1/20).length;
+        const jankyFraction=jankyCount/times.length;
+        // BOTH average and median must be low, AND a large share of frames
+        // must be truly bad — otherwise stay modern.
+        const wantRetro=avgFps<22&&medianFps<24&&jankyFraction>0.45;
         RENDERER.retroMode=wantRetro;
-        console.log('[ACID TEST] avg '+avgFps.toFixed(1)+'fps, '+(jankyFraction*100).toFixed(0)+'% janky frames ->',wantRetro?'retro 8-bit mode':'modern mode');
+        console.log('[ACID TEST] avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+
+          ' janky='+(jankyFraction*100).toFixed(0)+'% n='+times.length+
+          ' -> '+(wantRetro?'retro 8-bit':'modern'));
+      }else{
+        RENDERER.retroMode=false;
       }
+    }else{
+      // Not enough data → default modern (never downgrade on a hunch)
+      RENDERER.retroMode=false;
     }
 
     AUDIO.playWhistle();GAME.startCountdown();
@@ -2422,8 +2429,19 @@ const GAME = {
     document.getElementById('hudScore').textContent=this.score;
     document.getElementById('hudCombo').textContent='x'+this.combo;
     document.getElementById('hudTime').textContent=this.timeLeft;
-    const hearts='&#10084;'.repeat(this.lives);
-    document.getElementById('hudLives').innerHTML=hearts;
+    // Compact lives: never spam the HUD with a wall of hearts (Catch! has 15).
+    // Max 3 heart glyphs + numeric count so the panel stays one line on all DPIs.
+    const livesEl=document.getElementById('hudLives');
+    const n=Math.max(0,this.lives|0);
+    if(n<=0){
+      livesEl.innerHTML='0';
+    }else if(n<=3){
+      livesEl.innerHTML='&#10084;'.repeat(n);
+    }else{
+      livesEl.innerHTML='&#10084;&#10084;&#10084;<span style="font-size:0.55em;margin-left:4px">x'+n+'</span>';
+    }
+    livesEl.style.whiteSpace='nowrap';
+    livesEl.style.fontSize=n>3?'20px':'28px';
     document.getElementById('hudAccuracy').textContent=this.accuracy+'%';
     document.getElementById('hudSaves').textContent=this.savedBalls+'/'+this.totalBalls;
   },
