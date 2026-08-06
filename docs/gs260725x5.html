@@ -154,7 +154,7 @@ canvas{display:block;touch-action:none}
   <div class="hud-left">
     <div class="hud-panel"><div class="label">Score</div><div class="value" id="hudScore">0</div></div>
     <div class="hud-panel"><div class="label">Combo</div><div class="value" id="hudCombo" style="color:#ff6b35">x0</div></div>
-    <div class="hud-panel" style="min-width:110px"><div class="label">HP</div><div class="value" id="hudLives" style="padding:0"><div id="hpBarTrack" style="width:88px;height:14px;margin:6px auto 2px;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.25);border-radius:7px;overflow:hidden"><div id="hpBarFill" style="width:100%;height:100%;background:#22c55e;border-radius:6px;transition:width 0.25s ease,background 0.25s ease"></div></div><div id="hpBarText" style="font-size:11px;color:#ccc;line-height:1">3/3</div></div></div>
+    <div class="hud-panel" style="min-width:110px"><div class="label">Lives</div><div class="value" id="hudLives" style="padding:0"><div id="hpBarTrack" style="width:88px;height:14px;margin:6px auto 2px;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.25);border-radius:7px;overflow:hidden"><div id="hpBarFill" style="width:100%;height:100%;background:#22c55e;border-radius:6px;transition:width 0.25s ease,background 0.25s ease"></div></div><div id="hpBarText" style="font-size:11px;color:#ccc;line-height:1">3/3</div></div></div>
   </div>
   <div class="hud-right">
     <div class="hud-panel"><div class="label">Time</div><div class="value" id="hudTime">60</div></div>
@@ -202,12 +202,12 @@ canvas{display:block;touch-action:none}
   <div style="max-width:500px;padding:20px;color:#fff;text-align:center">
     <div class="menu-logo" style="font-size:42px">HOW TO PLAY</div>
     <div style="text-align:left;margin:20px 0;line-height:1.8;font-size:15px;color:#ccc">
-      <p><strong style="color:#ffd700">1.</strong> Stand in front of the camera so your full body is visible.</p>
-      <p><strong style="color:#ffd700">2.</strong> The game will track your pose using AI.</p>
-      <p><strong style="color:#ffd700">3.</strong> Balls will fly toward the goal -- block them with your body!</p>
-      <p><strong style="color:#ffd700">4.</strong> Use your hands, arms, head, legs -- any body part counts.</p>
-      <p><strong style="color:#ffd700">5.</strong> Build combos for bonus points. Do not let balls get past you!</p>
-      <p><strong style="color:#ffd700">6.</strong> Catch special balls for power-ups and extra effects.</p>
+      <p id="tut1"><strong style="color:#ffd700">1.</strong> Stand in front of the camera so your full body is visible.</p>
+      <p id="tut2"><strong style="color:#ffd700">2.</strong> The game will track your pose using AI.</p>
+      <p id="tut3"><strong style="color:#ffd700">3.</strong> Balls will fly toward the goal -- block them with your body!</p>
+      <p id="tut4"><strong style="color:#ffd700">4.</strong> Use your hands, arms, head, legs -- any body part counts.</p>
+      <p id="tut5"><strong style="color:#ffd700">5.</strong> Build combos for bonus points. Do not let balls get past you!</p>
+      <p id="tut6"><strong style="color:#ffd700">6.</strong> Catch special balls for power-ups and extra effects.</p>
     </div>
     <button class="menu-btn" onclick="GAME.backToMenu()">GOT IT!</button>
   </div>
@@ -2164,8 +2164,11 @@ const GAME = {
   },
 
   startModeSelect(){
-    this.state='menu';document.getElementById('mainMenu').classList.add('hidden');
+    // Distinct state so attract overlay cannot cover the mode grid
+    this.state='modeSelect';
+    document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('modeSelect').classList.remove('hidden');
+    document.getElementById('attractOverlay').style.display='none';
     AUDIO.init();AUDIO.resume();
   },
 
@@ -2173,7 +2176,26 @@ const GAME = {
     this.currentMode={...CONFIG.GAME_MODES[modeKey],key:modeKey};
     document.getElementById('mainMenu').classList.add('hidden');
     document.getElementById('modeSelect').classList.add('hidden');
+    document.getElementById('attractOverlay').style.display='none';
+    this.applyModeTexts(this.currentMode);
     this.startCalibration();
+  },
+
+  // Tutorial + instruction bar must match hand-only vs full-body rules
+  applyModeTexts(mode){
+    const hand=!!(mode&&mode.handOnly);
+    const t3=document.getElementById('tut3');
+    const t4=document.getElementById('tut4');
+    if(t3)t3.innerHTML=hand
+      ? '<strong style="color:#ffd700">3.</strong> Balls will fly toward you — catch them with your hands!'
+      : '<strong style="color:#ffd700">3.</strong> Balls will fly toward the goal -- block them with your body!';
+    if(t4)t4.innerHTML=hand
+      ? '<strong style="color:#ffd700">4.</strong> Only your hands count in this mode — raise a hand to catch!'
+      : '<strong style="color:#ffd700">4.</strong> Use your hands, arms, head, legs -- any body part counts.';
+    const bar=document.getElementById('instructionBar');
+    if(bar)bar.textContent=hand
+      ? 'Raise your hand to catch the ball!'
+      : 'Stand in front of camera and use your body to block the ball!';
   },
 
   updateModeSelect(){
@@ -2195,9 +2217,10 @@ const GAME = {
   startCountdown(){
     this.state='countdown';this.countdownValue=3;
     document.getElementById('hudTop').style.display='flex';
+    if(this.currentMode)this.applyModeTexts(this.currentMode);
     document.getElementById('instructionBar').style.display='block';
     this.updateHUD();
-    this.showCenterMessage('READY?','Get into position!');
+    this.showCenterMessage('READY?',this.currentMode&&this.currentMode.handOnly?'Raise a hand to catch!':'Get into position!');
     const interval=setInterval(()=>{
       if(this.countdownValue>0){
         AUDIO.playCountdown();this.showCenterMessage(this.countdownValue.toString(),'');this.countdownValue--;
@@ -2298,18 +2321,27 @@ const GAME = {
   },
 
   endGame(){
+    if(this.state==='gameover')return;
     this.state='gameover';
     if(this.timerInterval){clearInterval(this.timerInterval);this.timerInterval=null;}
     AUDIO.stopMusic();AUDIO.playCrowdCheer();
-    // No full-screen modal — keep the stadium and HUD visible behind the
-    // result so the scene never feels like it "stops"; just flash the score.
     document.getElementById('instructionBar').style.display='none';
-    this.showCenterMessage('ROUND OVER!','Score '+this.score+'  \u2022  Best Combo x'+this.maxCombo,2400);
+    document.getElementById('centerMessage').style.display='none';
+
+    // Fill and show the full game-over overlay with stats
+    const acc=this.totalBalls>0?Math.round((this.savedBalls/this.totalBalls)*100):0;
+    this.accuracy=acc;
+    document.getElementById('goScore').textContent=this.score;
+    document.getElementById('goAccuracy').textContent=acc+'%';
+    document.getElementById('goMaxCombo').textContent=this.maxCombo;
+    document.getElementById('goSaves').textContent=this.savedBalls+'/'+this.totalBalls;
+    document.getElementById('gameOver').classList.remove('hidden');
+
     PARTICLES.spawnConfetti(RENDERER.width/2,RENDERER.height/2,0,CONFIG.CONFETTI_COUNT);
     RENDERER.triggerShake(15,600);
 
     if(SETTINGS.values.kioskMode){
-      setTimeout(()=>{this.saveScoreAuto();this.backToMenu();},3000);
+      setTimeout(()=>{this.saveScoreAuto();this.backToMenu();},4000);
     }
   },
 
@@ -2458,8 +2490,12 @@ const GAME = {
   updateHUD(){
     document.getElementById('hudScore').textContent=this.score;
     document.getElementById('hudCombo').textContent='x'+this.combo;
-    document.getElementById('hudTime').textContent=this.timeLeft;
-    // Traditional HP bar: green (full) → orange (mid) → red (low)
+    // Endless / training / arcade (time:0) show infinity, not "0"
+    const modeTime=this.currentMode?this.currentMode.time:60;
+    const timeEl=document.getElementById('hudTime');
+    if(modeTime<=0)timeEl.textContent='\u221E';
+    else timeEl.textContent=this.timeLeft;
+    // Lives bar: green (full) → orange (mid) → red (low)
     const maxL=Math.max(1,this.maxLives||this.currentMode&&this.currentMode.lives||3);
     const cur=Math.max(0,this.lives|0);
     const pct=Math.max(0,Math.min(1,cur/maxL));
@@ -2467,9 +2503,9 @@ const GAME = {
     const text=document.getElementById('hpBarText');
     if(fill){
       fill.style.width=(pct*100)+'%';
-      let col='#22c55e'; // green
-      if(pct<=0.34)col='#ef4444';      // red near empty
-      else if(pct<=0.67)col='#f59e0b'; // orange mid
+      let col='#22c55e';
+      if(pct<=0.34)col='#ef4444';
+      else if(pct<=0.67)col='#f59e0b';
       fill.style.background=col;
     }
     if(text)text.textContent=cur+'/'+maxL;
@@ -2505,12 +2541,23 @@ const GAME = {
   startAttractMode(){
     if(this.attractTimer)clearInterval(this.attractTimer);
     this.attractTimer=setInterval(()=>{
-      if(this.state==='menu'){
-        const idle=(performance.now()-this.lastActivity)/1000;
-        if(idle>15)document.getElementById('attractOverlay').style.display='flex';
-        else document.getElementById('attractOverlay').style.display='none';
-        if(idle>30&&SETTINGS.values.kioskMode){this.selectMode('catch');}
+      // Only pure main menu — never cover mode select, settings, tutorial, etc.
+      if(this.state!=='menu'){
+        document.getElementById('attractOverlay').style.display='none';
+        return;
       }
+      const modeOpen=!document.getElementById('modeSelect').classList.contains('hidden');
+      const tutOpen=!document.getElementById('tutorialScreen').classList.contains('hidden');
+      const setOpen=!document.getElementById('settingsPanel').classList.contains('hidden');
+      const lbOpen=!document.getElementById('leaderboardScreen').classList.contains('hidden');
+      if(modeOpen||tutOpen||setOpen||lbOpen){
+        document.getElementById('attractOverlay').style.display='none';
+        return;
+      }
+      const idle=(performance.now()-this.lastActivity)/1000;
+      if(idle>15)document.getElementById('attractOverlay').style.display='flex';
+      else document.getElementById('attractOverlay').style.display='none';
+      if(idle>30&&SETTINGS.values.kioskMode){this.selectMode('catch');}
     },1000);
   },
 
