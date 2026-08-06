@@ -23,12 +23,11 @@ canvas{display:block;touch-action:none}
 .ui-layer{position:fixed;z-index:10;pointer-events:none;width:100%;height:100%;top:0;left:0}
 .ui-layer.interactive{pointer-events:auto}
 .hud-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 20px;position:fixed;top:0;left:0;right:0;z-index:20;pointer-events:none}
-.hud-panel{background:rgba(0,20,0,0.75);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:10px 18px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);backdrop-filter:blur(8px);min-width:100px;max-width:160px;text-align:center}
+.hud-panel{background:rgba(0,20,0,0.75);border:2px solid rgba(255,215,0,0.4);border-radius:16px;padding:10px 18px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.8);backdrop-filter:blur(8px);min-width:120px;text-align:center}
 .hud-panel .label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#ffd700;opacity:0.8;margin-bottom:2px}
-.hud-panel .value{font-size:28px;font-weight:900;color:#fff;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-panel .value{font-size:28px;font-weight:900;color:#fff;line-height:1}
 .hud-panel .sub{font-size:11px;color:#aaa;margin-top:2px}
-.hud-left,.hud-right{display:flex;gap:10px;align-items:flex-start;flex-wrap:nowrap}
-#hudLives{white-space:nowrap;max-width:120px;overflow:hidden}
+.hud-left,.hud-right{display:flex;gap:10px;align-items:flex-start}
 .center-message{position:fixed;top:50%;left:0;right:0;transform:translateY(-50%) translateZ(0);will-change:transform,opacity;z-index:30;display:flex;justify-content:space-between;padding:0 3vw;pointer-events:none;opacity:0.68;transition:opacity 0.2s ease}
 .center-message .msg-side{max-width:36vw}
 .center-message .msg-side.msg-right{text-align:right}
@@ -155,7 +154,7 @@ canvas{display:block;touch-action:none}
   <div class="hud-left">
     <div class="hud-panel"><div class="label">Score</div><div class="value" id="hudScore">0</div></div>
     <div class="hud-panel"><div class="label">Combo</div><div class="value" id="hudCombo" style="color:#ff6b35">x0</div></div>
-    <div class="hud-panel"><div class="label">Lives</div><div class="value" id="hudLives" style="color:#ff4444">&#10084;&#10084;&#10084;</div></div>
+    <div class="hud-panel" style="min-width:110px"><div class="label">HP</div><div class="value" id="hudLives" style="padding:0"><div id="hpBarTrack" style="width:88px;height:14px;margin:6px auto 2px;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.25);border-radius:7px;overflow:hidden"><div id="hpBarFill" style="width:100%;height:100%;background:#22c55e;border-radius:6px;transition:width 0.25s ease,background 0.25s ease"></div></div><div id="hpBarText" style="font-size:11px;color:#ccc;line-height:1">3/3</div></div></div>
   </div>
   <div class="hud-right">
     <div class="hud-panel"><div class="label">Time</div><div class="value" id="hudTime">60</div></div>
@@ -1087,36 +1086,28 @@ const CALIBRATION = {
     this.clearAutoTimer();
     this.active=false;document.getElementById('calibrationOverlay').classList.add('hidden');
 
-    // Acid test: bias strongly toward modern. Medium/high-power devices often
-    // look "janky" during the first seconds of calibration (model warm-up,
-    // first WebGL compiles, camera settle) — that must NOT force 8-bit mode.
-    // Only switch to retro when the device is clearly struggling after warmup.
+    // Acid test result: decide retro vs modern from what actually happened
+    // during calibration (camera + AI under real load), not a guess. Needs
+    // a reasonable sample size before we trust it — if calibration raced
+    // through too fast to gather enough data, default to modern rather than
+    // downgrade on a hunch.
+    // Bias toward modern: medium/high devices often look janky only during
+    // calibration warm-up. Retro only if clearly struggling after warmup.
     if(this.perfSamples&&this.perfSamples.length>=30){
-      // Drop first ~1/3 of samples (warmup noise)
       const skip=Math.min(25,Math.floor(this.perfSamples.length*0.35));
       const times=this.perfSamples.slice(skip);
       if(times.length>=15){
         const totalTime=times.reduce((a,b)=>a+b,0);
         const avgFps=times.length/Math.max(1e-6,totalTime);
-        // Median frame time is more robust than mean against single spikes
         const sorted=times.slice().sort((a,b)=>a-b);
-        const medianDt=sorted[Math.floor(sorted.length/2)];
-        const medianFps=1/Math.max(1e-6,medianDt);
-        // "Janky" = worse than ~20fps (was 30 — too strict for mid-range devices)
-        const jankyCount=times.filter(t=>t>1/20).length;
-        const jankyFraction=jankyCount/times.length;
-        // BOTH average and median must be low, AND a large share of frames
-        // must be truly bad — otherwise stay modern.
+        const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
+        const jankyFraction=times.filter(t=>t>1/20).length/times.length;
         const wantRetro=avgFps<22&&medianFps<24&&jankyFraction>0.45;
         RENDERER.retroMode=wantRetro;
         console.log('[ACID TEST] avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+
-          ' janky='+(jankyFraction*100).toFixed(0)+'% n='+times.length+
-          ' -> '+(wantRetro?'retro 8-bit':'modern'));
-      }else{
-        RENDERER.retroMode=false;
-      }
+          ' janky='+(jankyFraction*100).toFixed(0)+'% -> '+(wantRetro?'retro':'modern'));
+      }else RENDERER.retroMode=false;
     }else{
-      // Not enough data → default modern (never downgrade on a hunch)
       RENDERER.retroMode=false;
     }
 
@@ -1197,25 +1188,25 @@ const COLLISION = {
     const kps=POSE.smoothedKeypoints;
     const scaleX=RENDERER.width/(POSE.videoW||320);const scaleY=RENDERER.height/(POSE.videoH||240);
 
-    // Hand-catch mode (kiosk "raise your hand" style): big forgiving radius on the wrists only
+    // Hand-catch mode: hit radius MUST match the painted glove size so mobile
+    // and desktop play equally fair (old fixed handRadius:90 was far larger
+    // than the drawn square/ellipse, especially on small screens).
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
-      // The ball only becomes catchable once it's genuinely close to the
-      // player (not the instant it's kicked from far away) — this also means
-      // its true on-screen size (not the static spawn radius) is what counts.
       const CLOSE_Z=380;
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
-      const radius=mode.handRadius||90;
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
       if(leftWrist&&POSE.isHandRaised(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
+        const radius=RENDERER.getGloveHitRadius(true);
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
         if(dx*dx+dy*dy<thr*thr)return{part:'LEFT_HAND',x:hx,y:hy};
       }
       if(rightWrist&&POSE.isHandRaised(rightWrist)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
+        const radius=RENDERER.getGloveHitRadius(true);
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
         if(dx*dx+dy*dy<thr*thr)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
@@ -1947,6 +1938,20 @@ const RENDERER = {
     }
   },
 
+  // Hit radius in full-screen pixels, matched to what drawGlove / drawRetroGlove
+  // actually paint. Tiny fudge (+2) for touch/pose jitter only — not a large
+  // invisible bonus. Scales correctly on phone and monitor.
+  getGloveHitRadius(raised){
+    if(this.retroMode){
+      // Retro glove is size 14 (raised) / 10 in low-res canvas units
+      const s=this.retroScale||(160/Math.max(1,this.width));
+      const size=raised?14:10;
+      return (size*0.5)/Math.max(1e-6,s)+2;
+    }
+    // Modern: palm ellipse ~20x24, raised scale 1.25 → ~30–36px reach
+    return raised?36:26;
+  },
+
   drawGlove(ctx,x,y,color,raised){
     ctx.save();ctx.translate(x,y);
     const scale=raised?1.25:0.85;
@@ -2180,7 +2185,7 @@ const GAME = {
 
   startGame(){
     this.state='playing';
-    this.score=0;this.lives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
+    this.score=0;this.lives=this.currentMode.lives;this.maxLives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
     this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
     this.roundStartTime=performance.now();
     this.accuracy=100;this.powerups={};this.activePowerups=[];
@@ -2429,19 +2434,20 @@ const GAME = {
     document.getElementById('hudScore').textContent=this.score;
     document.getElementById('hudCombo').textContent='x'+this.combo;
     document.getElementById('hudTime').textContent=this.timeLeft;
-    // Compact lives: never spam the HUD with a wall of hearts (Catch! has 15).
-    // Max 3 heart glyphs + numeric count so the panel stays one line on all DPIs.
-    const livesEl=document.getElementById('hudLives');
-    const n=Math.max(0,this.lives|0);
-    if(n<=0){
-      livesEl.innerHTML='0';
-    }else if(n<=3){
-      livesEl.innerHTML='&#10084;'.repeat(n);
-    }else{
-      livesEl.innerHTML='&#10084;&#10084;&#10084;<span style="font-size:0.55em;margin-left:4px">x'+n+'</span>';
+    // Traditional HP bar: green (full) → orange (mid) → red (low)
+    const maxL=Math.max(1,this.maxLives||this.currentMode&&this.currentMode.lives||3);
+    const cur=Math.max(0,this.lives|0);
+    const pct=Math.max(0,Math.min(1,cur/maxL));
+    const fill=document.getElementById('hpBarFill');
+    const text=document.getElementById('hpBarText');
+    if(fill){
+      fill.style.width=(pct*100)+'%';
+      let col='#22c55e'; // green
+      if(pct<=0.34)col='#ef4444';      // red near empty
+      else if(pct<=0.67)col='#f59e0b'; // orange mid
+      fill.style.background=col;
     }
-    livesEl.style.whiteSpace='nowrap';
-    livesEl.style.fontSize=n>3?'20px':'28px';
+    if(text)text.textContent=cur+'/'+maxL;
     document.getElementById('hudAccuracy').textContent=this.accuracy+'%';
     document.getElementById('hudSaves').textContent=this.savedBalls+'/'+this.totalBalls;
   },
