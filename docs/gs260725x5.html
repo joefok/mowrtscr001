@@ -877,13 +877,25 @@ const POSE = {
     this.setupCamera().catch(e=>console.warn('Camera switch failed:',e));
   },
 
-  // True once a wrist has risen a meaningful amount above the calibrated resting
-  // height (falls back to "always true" if no baseline was captured, so the
-  // game still works if calibration was skipped).
+  // Visual cue: hand is "active" (big glove) when lifted above resting baseline
+  // or when a ball is already in the catch zone. Soft threshold so natural
+  // keeper stance still counts.
   isHandRaised(kp){
+    // Visual "active" state only — catching no longer depends on this.
+    // Any tracked wrist is treated as active while a ball is in flight so
+    // the glove stays large and matches the hitbox the player aims with.
+    if(!kp||kp.score<0.2)return false;
+    if(typeof BALLS!=='undefined'&&BALLS.active){
+      for(const b of BALLS.active){if(b.active&&b.z<700)return true;}
+    }
     if(this.baselineHandY==null)return true;
-    if(!kp||kp.score<0.25)return false;
-    return kp.y<this.baselineHandY-this.RAISE_THRESHOLD;
+    const thr=Math.max(8,(this.RAISE_THRESHOLD||40)*0.35);
+    return kp.y<this.baselineHandY-thr;
+  },
+
+  // Collision: any tracked wrist can catch — raise is NOT required.
+  canCatchWith(kp){
+    return !!(kp&&kp.score>=0.18);
   },
 
   // Reads the current wrist index for a screen side, honoring the on-device
@@ -1188,25 +1200,24 @@ const COLLISION = {
     const kps=POSE.smoothedKeypoints;
     const scaleX=RENDERER.width/(POSE.videoW||320);const scaleY=RENDERER.height/(POSE.videoH||240);
 
-    // Hand-catch mode: hit radius MUST match the painted glove size so mobile
-    // and desktop play equally fair (old fixed handRadius:90 was far larger
-    // than the drawn square/ellipse, especially on small screens).
+    // Hand-catch mode: any tracked wrist can catch (not only the "big" raised
+    // glove). Hit radius always matches the active/big glove size so the small
+    // resting hand does not become an invisible dead zone.
     const mode=GAME.currentMode;
     if(mode&&mode.handOnly){
       const CLOSE_Z=380;
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
+      const radius=RENDERER.getGloveHitRadius(true); // always active size
       const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
-      if(leftWrist&&POSE.isHandRaised(leftWrist)){
+      if(POSE.canCatchWith(leftWrist)){
         const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
-        const radius=RENDERER.getGloveHitRadius(true);
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
         if(dx*dx+dy*dy<thr*thr)return{part:'LEFT_HAND',x:hx,y:hy};
       }
-      if(rightWrist&&POSE.isHandRaised(rightWrist)){
+      if(POSE.canCatchWith(rightWrist)){
         const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
-        const radius=RENDERER.getGloveHitRadius(true);
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
         if(dx*dx+dy*dy<thr*thr)return{part:'RIGHT_HAND',x:hx,y:hy};
       }
@@ -1687,11 +1698,14 @@ const RENDERER = {
   },
 
   drawRetroGlove(rctx,x,y,color,raised){
-    const size=raised?14:10;
+    // Always the active size so visual = hitbox (matches getGloveHitRadius)
+    const size=14;
+    rctx.globalAlpha=raised?1:0.9;
     rctx.fillStyle=color;
     rctx.fillRect(x-size/2,y-size/2,size,size);
     rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
     rctx.strokeRect(x-size/2,y-size/2,size,size);
+    rctx.globalAlpha=1;
   },
 
   drawStadiumLights(ctx,w,h){
@@ -1943,21 +1957,22 @@ const RENDERER = {
   // invisible bonus. Scales correctly on phone and monitor.
   getGloveHitRadius(raised){
     if(this.retroMode){
-      // Retro glove is size 14 (raised) / 10 in low-res canvas units
+      // Always use the active (larger) retro square so small vs big is not a trap
       const s=this.retroScale||(160/Math.max(1,this.width));
-      const size=raised?14:10;
-      return (size*0.5)/Math.max(1e-6,s)+2;
+      return (14*0.5)/Math.max(1e-6,s)+2;
     }
-    // Modern: palm ellipse ~20x24, raised scale 1.25 → ~30–36px reach
-    return raised?36:26;
+    // Modern: matches active glove paint size
+    return 38;
   },
 
   drawGlove(ctx,x,y,color,raised){
     ctx.save();ctx.translate(x,y);
-    const scale=raised?1.25:0.85;
+    // Always draw at the catchable size (matches getGloveHitRadius ~38px).
+    // "Raised" only changes brightness — never shrinks the aim target.
+    const scale=1.2;
     ctx.scale(scale,scale);
-    ctx.shadowColor=raised?'rgba(255,255,255,0.7)':'rgba(0,0,0,0.4)';ctx.shadowBlur=raised?18:8;
-    ctx.globalAlpha=raised?1:0.6;
+    ctx.shadowColor=raised?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.35)';ctx.shadowBlur=raised?16:8;
+    ctx.globalAlpha=raised?1:0.9;
     // Palm
     ctx.fillStyle=color;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.fill();
@@ -1966,7 +1981,7 @@ const RENDERER = {
       ctx.beginPath();ctx.ellipse(i*9,-16,6,14,0,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
-    ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;
+    ctx.strokeStyle='rgba(255,255,255,0.75)';ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=1;
     ctx.restore();
