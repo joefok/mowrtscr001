@@ -1099,13 +1099,11 @@ const CALIBRATION = {
     this.active=false;document.getElementById('calibrationOverlay').classList.add('hidden');
 
     // Acid test result: decide retro vs modern from what actually happened
-    // during calibration (camera + AI under real load), not a guess. Needs
-    // a reasonable sample size before we trust it — if calibration raced
-    // through too fast to gather enough data, default to modern rather than
-    // downgrade on a hunch.
-    // Bias toward modern: medium/high devices often look janky only during
-    // calibration warm-up. Retro only if clearly struggling after warmup.
+    // during calibration (camera + AI under real load), not a guess.
     if(this.perfSamples&&this.perfSamples.length>=30){
+      // Adaptive warmup skip: shader compilation / JIT warmup on the first
+      // portion of samples skews readings pessimistic even on capable
+      // hardware and isn't representative of steady state.
       const skip=Math.min(25,Math.floor(this.perfSamples.length*0.35));
       const times=this.perfSamples.slice(skip);
       if(times.length>=15){
@@ -1114,13 +1112,26 @@ const CALIBRATION = {
         const sorted=times.slice().sort((a,b)=>a-b);
         const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
         const jankyFraction=times.filter(t=>t>1/20).length/times.length;
-        const wantRetro=avgFps<22&&medianFps<24&&jankyFraction>0.45;
-        RENDERER.retroMode=wantRetro;
-        console.log('[ACID TEST] avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+
-          ' janky='+(jankyFraction*100).toFixed(0)+'% -> '+(wantRetro?'retro':'modern'));
-      }else RENDERER.retroMode=false;
-    }else{
-      RENDERER.retroMode=false;
+        const rawVerdict=avgFps<22&&medianFps<24&&jankyFraction>0.45;
+        // Hysteresis across rounds: a single reading — even a good one —
+        // can't flip the mode by itself. Only commit a change once the SAME
+        // verdict shows up on two calibrations in a row. This is what
+        // actually stops the mode from flapping between rounds; directly
+        // overwriting retroMode every calibration (the previous version
+        // here) is exactly what caused that.
+        if(rawVerdict===this._pendingRetroVerdict){
+          if(rawVerdict!==RENDERER.retroMode){
+            RENDERER.retroMode=rawVerdict;
+            console.log('[ACID TEST] confirmed twice — avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+' janky='+(jankyFraction*100).toFixed(0)+'% ->',rawVerdict?'retro':'modern');
+          }
+        }else{
+          console.log('[ACID TEST] avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+' janky='+(jankyFraction*100).toFixed(0)+'% — differs from last round, waiting for confirmation');
+        }
+        this._pendingRetroVerdict=rawVerdict;
+      }
+      // else: not enough post-warmup samples this round — leave retroMode
+      // and the pending verdict untouched rather than forcing modern, which
+      // would silently override a correct prior decision.
     }
 
     AUDIO.playWhistle();GAME.startCountdown();
@@ -1956,13 +1967,12 @@ const RENDERER = {
   // actually paint. Tiny fudge (+2) for touch/pose jitter only — not a large
   // invisible bonus. Scales correctly on phone and monitor.
   getGloveHitRadius(raised){
-    if(this.retroMode){
-      // Always use the active (larger) retro square so small vs big is not a trap
-      const s=this.retroScale||(160/Math.max(1,this.width));
-      return (14*0.5)/Math.max(1e-6,s)+2;
-    }
-    // Modern: matches active glove paint size
-    return 38;
+    // Generous, screen-proportional hit radius — NOT a flat pixel count
+    // that could be tiny on a large kiosk display. The previous "38" here
+    // was the actual bug behind catches never registering: on any real
+    // screen size, 38px is a minuscule target, a big regression from the
+    // 90px value that was previously working.
+    return Math.max(70,Math.min(RENDERER.width,RENDERER.height)*0.09);
   },
 
   drawGlove(ctx,x,y,color,raised){
