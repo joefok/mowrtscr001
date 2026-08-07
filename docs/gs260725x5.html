@@ -1707,13 +1707,15 @@ const RENDERER = {
   },
 
   drawRetroGlove(rctx,x,y,color,raised){
-    // Always the active size so visual = hitbox (matches getGloveHitRadius)
-    const size=14;
+    // Convert full-screen gloveScale into low-res canvas pixels so classic
+    // mode keeps the same relative size as modern on every resolution.
+    const s=this.retroScale||(160/Math.max(1,this.width));
+    const size=Math.max(4,Math.round(this.gloveScale()*2*s)); // diameter in retro px
     rctx.globalAlpha=raised?1:0.9;
     rctx.fillStyle=color;
-    rctx.fillRect(x-size/2,y-size/2,size,size);
+    rctx.fillRect(Math.floor(x-size/2),Math.floor(y-size/2),size,size);
     rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
-    rctx.strokeRect(x-size/2,y-size/2,size,size);
+    rctx.strokeRect(Math.floor(x-size/2),Math.floor(y-size/2),size,size);
     rctx.globalAlpha=1;
   },
 
@@ -1961,42 +1963,36 @@ const RENDERER = {
     }
   },
 
-  // Hit radius in full-screen pixels, matched to what drawGlove / drawRetroGlove
-  // actually paint. Tiny fudge (+2) for touch/pose jitter only — not a large
-  // invisible bonus. Scales correctly on phone and monitor.
-  // Single source of truth for glove size, shared by the hitbox and the
-  // visual draw below, so they always match and both scale as a fraction
-  // of screen size rather than a fixed pixel count. A fixed pixel radius
-  // covers a much bigger fraction of a small screen than a large one,
-  // which was making small screens objectively easier - proportional
-  // sizing keeps the same relative difficulty on any device.
+  // Single source of truth: glove radius as a fraction of the short screen
+  // edge (~1/32 ≈ 3%). Fixed pixels made small screens easier (glove covered
+  // more of the goal). Floor/ceiling keep it usable on tiny phones and
+  // huge kiosks. Shared by hitbox + modern + classic draw paths.
   gloveScale(){
-    return Math.max(24,Math.min(RENDERER.width,RENDERER.height)*0.09);
+    const short=Math.min(this.width||320,this.height||240);
+    // ~1/32 of short side; clamp so catch stays fair on all DPIs
+    return Math.max(14,Math.min(48,short/32));
   },
 
   getGloveHitRadius(raised){
-    return this.gloveScale();
+    // +2px only for pose jitter — not a large invisible bonus
+    return this.gloveScale()+2;
   },
 
   drawGlove(ctx,x,y,color,raised){
     ctx.save();ctx.translate(x,y);
-    // Scale matches gloveScale() (shared with the hitbox above) so the
-    // drawn glove always visually represents its real catch area,
-    // proportional to screen size rather than a fixed pixel multiplier.
-    // The shape below has a natural reference radius of ~24px.
-    const scale=RENDERER.gloveScale()/24;
+    // Reference shape radius ≈ 24px; scale so painted size = gloveScale()
+    const scale=this.gloveScale()/24;
     ctx.scale(scale,scale);
-    ctx.shadowColor=raised?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.35)';ctx.shadowBlur=raised?16:8;
+    ctx.shadowColor=raised?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.35)';
+    ctx.shadowBlur=raised?Math.max(6,12*scale):Math.max(4,6*scale);
     ctx.globalAlpha=raised?1:0.9;
-    // Palm
     ctx.fillStyle=color;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.fill();
-    // Fingers
     for(let i=-2;i<=2;i++){
       ctx.beginPath();ctx.ellipse(i*9,-16,6,14,0,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
-    ctx.strokeStyle='rgba(255,255,255,0.75)';ctx.lineWidth=2;
+    ctx.strokeStyle='rgba(255,255,255,0.75)';ctx.lineWidth=Math.max(1,2/Math.max(0.5,scale));
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=1;
     ctx.restore();
