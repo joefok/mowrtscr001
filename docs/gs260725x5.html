@@ -753,14 +753,25 @@ const POSE = {
       await tf.setBackend('webgl');
       await tf.ready();
       try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
-      // Always use Lightning — ~3x faster, same tracking quality for this game
-      const modelType='SINGLEPOSE_LIGHTNING';
-      this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
-        modelType: poseDetection.movenet.modelType[modelType],
-        enableSmoothing: false
-      });
+      // Prefer multipose so several people can play together; fall back to single.
+      this.allHands=[];
+      try{
+        this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
+          modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
+          enableSmoothing: false,
+          multiPoseMaxPoses: 4,
+          multiPoseMinPoseScore: 0.25
+        });
+        console.log('MoveNet loaded: MULTIPOSE_LIGHTNING');
+      }catch(multiErr){
+        console.warn('Multipose unavailable, using single-pose:',multiErr);
+        this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+          enableSmoothing: false
+        });
+        console.log('MoveNet loaded: SINGLEPOSE_LIGHTNING');
+      }
       this.isReady=true;
-      console.log('MoveNet loaded:',modelType);
     }catch(e){
       console.error('Pose init failed:',e);
       this.isReady=false;
@@ -797,26 +808,30 @@ const POSE = {
       // ourselves below — the library's own flipHorizontal behaved
       // inconsistently, which is what caused the left/right confusion.
       const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false});
-      // Smoothed inference cost (ms) — used to grow gloves when tracking is slow
       const cost=performance.now()-t0;
       this.detectMs=this.detectMs==null?cost:this.detectMs*0.85+cost*0.15;
       if(poses&&poses.length>0){
-        const pose=poses[0];
+        const vw=this.videoW||this.video.videoWidth||320;
+        // Mirror every pose for front-camera mirror play
         if(this.mirror){
-          // Front camera only: flip every keypoint horizontally so the player
-          // sees a true mirror image — raise your real right hand and it
-          // moves things on the right side of the screen, like a bathroom mirror.
-          const vw=this.videoW||this.video.videoWidth||320;
-          for(const kp of pose.keypoints)kp.x=vw-kp.x;
+          for(const pose of poses){
+            for(const kp of pose.keypoints)kp.x=vw-kp.x;
+          }
         }
+        // Primary pose (largest / first) still drives body-mode + calibration
+        const pose=poses[0];
         this.confidence=this.computeConfidence(pose);
         this.lostFrames=0;
         this.smoothPose(pose);
         this.lastPose=pose;
+        // Collect every wrist from every person for co-op catch play
+        this.allHands=this.collectAllHands(poses);
         return pose;
       }else{
         this.lostFrames++;
-        if(this.lostFrames>this.maxLostFrames){this.lastPose=null;this.smoothedKeypoints=[];}
+        if(this.lostFrames>this.maxLostFrames){
+          this.lastPose=null;this.smoothedKeypoints=[];this.allHands=[];
+        }
         return this.lastPose;
       }
     }catch(e){console.warn('Detection error:',e);return this.lastPose;}
@@ -932,6 +947,33 @@ const POSE = {
     }
     if(SETTINGS&&SETTINGS.values.swapHands){const t=result.left;result.left=result.right;result.right=t;}
     return result;
+  },
+
+  // Pull every wrist from every multipose person (co-op / multiple players)
+  collectAllHands(poses){
+    const hands=[];
+    if(!poses)return hands;
+    for(let p=0;p<poses.length;p++){
+      const kps=poses[p].keypoints;
+      if(!kps)continue;
+      for(const idx of [9,10]){ // left_wrist, right_wrist
+        const kp=kps[idx];
+        if(kp&&kp.score>=0.2){
+          hands.push({x:kp.x,y:kp.y,score:kp.score,person:p,side:idx===9?'left':'right'});
+        }
+      }
+    }
+    return hands;
+  },
+
+  // All catchable hands: multipose list if available, else single-pose wrists
+  getAllCatchHands(){
+    if(this.allHands&&this.allHands.length)return this.allHands;
+    const{left,right}=this.getWristsBySide();
+    const out=[];
+    if(left)out.push({x:left.x,y:left.y,score:left.score||0.5,person:0,side:'left'});
+    if(right)out.push({x:right.x,y:right.y,score:right.score||0.5,person:0,side:'right'});
+    return out;
   },
 
   // Eases the two wrist points toward whatever the AI last detected, EVERY
@@ -1222,17 +1264,16 @@ const COLLISION = {
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
-      const radius=RENDERER.getGloveHitRadius(true); // always active size
-      const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
-      if(POSE.canCatchWith(leftWrist)){
-        const hx=leftWrist.x*scaleX,hy=leftWrist.y*scaleY;
+      const radius=RENDERER.getGloveHitRadius(true);
+      // Every tracked hand from every person can catch (co-op play)
+      const hands=POSE.getAllCatchHands();
+      for(const h of hands){
+        if(!h||h.score<0.18)continue;
+        const hx=h.x*scaleX,hy=h.y*scaleY;
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
-        if(dx*dx+dy*dy<thr*thr)return{part:'LEFT_HAND',x:hx,y:hy};
-      }
-      if(POSE.canCatchWith(rightWrist)){
-        const hx=rightWrist.x*scaleX,hy=rightWrist.y*scaleY;
-        const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
-        if(dx*dx+dy*dy<thr*thr)return{part:'RIGHT_HAND',x:hx,y:hy};
+        if(dx*dx+dy*dy<thr*thr){
+          return{part:h.side==='right'?'RIGHT_HAND':'LEFT_HAND',x:hx,y:hy,person:h.person};
+        }
       }
       return null;
     }
@@ -1662,8 +1703,18 @@ const RENDERER = {
     if(GAME.currentMode&&GAME.currentMode.handOnly){
       const{left:lw,right:rw2}=POSE.getWristsBySide();
       const scaleX=this.width/(POSE.videoW||320),scaleY=this.height/(POSE.videoH||240);
-      if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',POSE.isHandRaised(lw));
-      if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',POSE.isHandRaised(rw2));
+      // Draw every co-op hand (multipose); fall back to side wrists
+      const hands=POSE.getAllCatchHands();
+      const colors=['#3ec1ff','#ff5a5a','#7bed9f','#f9ca24','#a29bfe','#fd79a8'];
+      if(hands.length){
+        for(let i=0;i<hands.length;i++){
+          const h=hands[i];
+          this.drawRetroGlove(rctx,h.x*scaleX*s,h.y*scaleY*s,colors[i%colors.length],true);
+        }
+      }else{
+        if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',true);
+        if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',true);
+      }
     }
 
     // Particles — flat squares, no glow
@@ -1961,29 +2012,40 @@ const RENDERER = {
 
     // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
-      if(leftWrist)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',POSE.isHandRaised(leftWrist));
-      if(rightWrist)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',POSE.isHandRaised(rightWrist));
+      // Draw every co-op hand so multiple players see their gloves
+      const hands=POSE.getAllCatchHands();
+      const colors=['#3ec1ff','#ff5a5a','#7bed9f','#f9ca24','#a29bfe','#fd79a8'];
+      if(hands.length){
+        for(let i=0;i<hands.length;i++){
+          const h=hands[i];
+          this.drawGlove(ctx,h.x*scaleX,h.y*scaleY,colors[i%colors.length],true);
+        }
+      }else{
+        const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
+        if(leftWrist)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',true);
+        if(rightWrist)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',true);
+      }
     }
   },
 
-  // Screen-relative glove + lag compensation. Slow pose + tiny glove feels
-  // unfair; grow the catch area when detect is sluggish so play stays fun.
+  // Screen-relative glove + lag compensation. Classic/retro uses a smaller
+  // base so low-power 8-bit mode does not cover half the goal.
   gloveScale(){
     const short=Math.min(this.width||320,this.height||240);
-    // Base ~1/20 of short side (a bit larger — easier, more fun)
-    let r=short/20;
-    // Pose cost: fast ~20–35ms → 1.0×; 60ms → ~1.3×; 100ms+ → ~1.7×
+    // Modern ~1/20; classic ~1/28 (noticeably smaller on weak devices)
+    let r=short/(this.retroMode?28:20);
     const ms=(typeof POSE!=='undefined'&&POSE.detectMs!=null)?POSE.detectMs:30;
-    const lagBoost=1+Math.max(0,Math.min(0.75,(ms-25)/100));
+    // Milder lag boost in classic so gloves stay compact
+    const maxBoost=this.retroMode?0.35:0.75;
+    const lagBoost=1+Math.max(0,Math.min(maxBoost,(ms-25)/100));
     r*=lagBoost;
-    // Sparse samples (long gap between detects) also enlarge the target
     const gap=(typeof POSE!=='undefined'&&POSE.detectIntervalMs!=null)
       ?POSE.detectIntervalMs:40;
-    if(gap>45)r*=1+Math.min(0.35,(gap-45)/100);
-    // Low FPS device → extra forgiveness
-    if(typeof GAME!=='undefined'&&GAME.fps>0&&GAME.fps<28)r*=1.15;
-    return Math.max(22,Math.min(80,r));
+    if(gap>45)r*=1+Math.min(this.retroMode?0.15:0.35,(gap-45)/100);
+    if(!this.retroMode&&typeof GAME!=='undefined'&&GAME.fps>0&&GAME.fps<28)r*=1.15;
+    const lo=this.retroMode?14:22;
+    const hi=this.retroMode?42:80;
+    return Math.max(lo,Math.min(hi,r));
   },
 
   getGloveHitRadius(raised){
@@ -2228,14 +2290,23 @@ const GAME = {
 
   startGame(){
     this.state='playing';
-    this.score=0;this.lives=this.currentMode.lives;this.maxLives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
+    // Full reset — treat every start as new players (no leftover UI/score)
+    if(this.timerInterval){clearInterval(this.timerInterval);this.timerInterval=null;}
+    this.score=0;this.lives=this.currentMode.lives;this.maxLives=this.currentMode.lives;
+    this.combo=0;this.maxCombo=0;this.idleTime=0;
     this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
     this.roundStartTime=performance.now();
     this.accuracy=100;this.powerups={};this.activePowerups=[];
-    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;this.lastCatchAt=performance.now();
+    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();
+    this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;
+    this.lastCatchAt=performance.now();
     document.getElementById('gameOver').classList.add('hidden');
     document.getElementById('pauseMenu').classList.add('hidden');
     document.getElementById('attractOverlay').style.display='none';
+    document.getElementById('centerMessage').style.display='none';
+    document.getElementById('comboDisplay').style.display='none';
+    const pui=document.getElementById('powerupIndicator');if(pui)pui.innerHTML='';
+    this.updateHUD();
     if('vibrate'in navigator)navigator.vibrate(200);
     AUDIO.playWhistle();AUDIO.startMusic();
 
