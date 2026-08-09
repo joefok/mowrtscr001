@@ -1187,7 +1187,10 @@ const CALIBRATION = {
         const sorted=times.slice().sort((a,b)=>a-b);
         const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
         const jankyFraction=times.filter(t=>t>1/20).length/times.length;
-        const rawVerdict=avgFps<22&&medianFps<24&&jankyFraction>0.45;
+        // Relax the acid test so moderately capable devices still keep the
+        // low-res classic path when performance is sketchy. This avoids sharp
+        // transitions and gives more stable 8-bit fallback on medium devices.
+        const rawVerdict=avgFps<24&&medianFps<26&&jankyFraction>0.35;
         // Hysteresis across rounds: a single reading — even a good one —
         // can't flip the mode by itself. Only commit a change once the SAME
         // verdict shows up on two calibrations in a row. This is what
