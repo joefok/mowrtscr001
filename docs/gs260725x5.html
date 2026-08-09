@@ -740,8 +740,6 @@ const POSE = {
   RAISE_THRESHOLD: 40, // relative to actual video height (~360)
   videoW: 320,
   videoH: 240,
-  lastHands: [],
-  HAND_FALLBACK_MS: 500,
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -755,25 +753,15 @@ const POSE = {
       await tf.setBackend('webgl');
       await tf.ready();
       try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
-      // Prefer multipose so several people can play together; fall back to single.
-      this.allHands=[];
-      try{
-        this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
-          modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
-          enableSmoothing: false,
-          multiPoseMaxPoses: 4,
-          multiPoseMinPoseScore: 0.25
-        });
-        console.log('MoveNet loaded: MULTIPOSE_LIGHTNING');
-      }catch(multiErr){
-        console.warn('Multipose unavailable, using single-pose:',multiErr);
-        this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
-          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-          enableSmoothing: false
-        });
-        console.log('MoveNet loaded: SINGLEPOSE_LIGHTNING');
-      }
+      // MultiPose Lightning — detects several people at once (needed for
+      // multiplayer). Slightly heavier than SinglePose, but the existing
+      // adaptive PERF/retro-mode system already exists to absorb exactly
+      // this kind of extra load gracefully on weaker devices.
+      this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
+        modelType: poseDetection.movenet.modelType['MULTIPOSE_LIGHTNING']
+      });
       this.isReady=true;
+      console.log('MoveNet loaded: MULTIPOSE_LIGHTNING');
     }catch(e){
       console.error('Pose init failed:',e);
       this.isReady=false;
@@ -804,45 +792,31 @@ const POSE = {
     if(!this.detector||!this.video||this.video.readyState<2)return null;
     if(this._detecting)return this.lastPose; // previous call still in flight — never stack concurrent inference
     this._detecting=true;
-    const t0=performance.now();
     try{
       // We always request RAW (unflipped) poses and mirror the coordinates
       // ourselves below — the library's own flipHorizontal behaved
       // inconsistently, which is what caused the left/right confusion.
-      const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false});
-      const cost=performance.now()-t0;
-      this.detectMs=this.detectMs==null?cost:this.detectMs*0.85+cost*0.15;
+      const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false,maxPoses:4});
       if(poses&&poses.length>0){
-        const vw=this.videoW||this.video.videoWidth||320;
-        // Mirror every pose for front-camera mirror play
         if(this.mirror){
-          for(const pose of poses){
-            for(const kp of pose.keypoints)kp.x=vw-kp.x;
-          }
+          const vw=this.videoW||this.video.videoWidth||320;
+          for(const pose of poses)for(const kp of pose.keypoints)kp.x=vw-kp.x;
         }
-        // Primary pose (largest / first) still drives body-mode + calibration
-        const pose=poses[0];
-        this.confidence=this.computeConfidence(pose);
-        this.lostFrames=0;
-        this.smoothPose(pose);
-        this.lastPose=pose;
-        // Collect every wrist from every person for co-op catch play
-        this.allHands=this.collectAllHands(poses);
-        this.updateHandCache(this.allHands);
-        return pose;
+        // Keep only people with a reasonably confident torso — filters out
+        // spurious low-confidence "ghost" detections in the background.
+        const valid=poses.filter(p=>this.computeConfidence(p)>0.15);
+        this.smoothAllPersons(valid);
+        this.confidence=this.persons[0]?this.computeConfidence(poses[0]):0;
+        this.lostFrames=valid.length?0:this.lostFrames+1;
+        if(this.lostFrames>this.maxLostFrames&&!valid.length){this.persons=[];this.smoothedKeypoints=[];}
+        this.lastPose=poses[0]||this.lastPose;
+        return this.lastPose;
       }else{
-        this.allHands=[];
         this.lostFrames++;
-        if(this.lostFrames>this.maxLostFrames){
-          this.lastPose=null;this.smoothedKeypoints=[];this.allHands=[];
-        }
+        if(this.lostFrames>this.maxLostFrames){this.lastPose=null;this.persons=[];this.smoothedKeypoints=[];}
         return this.lastPose;
       }
-    }catch(e){
-      console.warn('Detection error:',e);
-      this.allHands=[];
-      return this.lastPose;
-    }
+    }catch(e){console.warn('Detection error:',e);return this.lastPose;}
     finally{this._detecting=false;}
   },
 
@@ -854,30 +828,55 @@ const POSE = {
     return count>0?sum/count:0;
   },
 
-  smoothPose(pose){
-    if(!this.smoothedKeypoints.length){this.smoothedKeypoints=pose.keypoints.map(kp=>({...kp}));this.keypointVelocities=pose.keypoints.map(()=>({vx:0,vy:0}));return;}
+  // Smooths every currently-detected person independently (index-matched
+  // between frames — good enough for "is a hand near the ball right now"
+  // without needing full player identity tracking).
+  smoothAllPersons(poses){
+    if(!this.persons)this.persons=[];
     const alpha=CONFIG.SMOOTHING_FACTOR;
-    for(let i=0;i<pose.keypoints.length;i++){
-      const kp=pose.keypoints[i];const sk=this.smoothedKeypoints[i];const vel=this.keypointVelocities[i];
-      if(kp.score>CONFIG.POSE_CONFIDENCE_THRESHOLD){
-        vel.vx=(kp.x-sk.x)*0.5;vel.vy=(kp.y-sk.y)*0.5;
-        sk.x=MATH.lerp(sk.x,kp.x,alpha);sk.y=MATH.lerp(sk.y,kp.y,alpha);sk.score=kp.score;
+    for(let p=0;p<poses.length;p++){
+      const kps=poses[p].keypoints;
+      if(!this.persons[p]){
+        this.persons[p]={smoothed:kps.map(kp=>({...kp})),vel:kps.map(()=>({vx:0,vy:0}))};
+        continue;
+      }
+      const person=this.persons[p];
+      for(let i=0;i<kps.length;i++){
+        const kp=kps[i],sk=person.smoothed[i],vel=person.vel[i];
+        if(kp.score>CONFIG.POSE_CONFIDENCE_THRESHOLD){
+          vel.vx=(kp.x-sk.x)*0.5;vel.vy=(kp.y-sk.y)*0.5;
+          sk.x=MATH.lerp(sk.x,kp.x,alpha);sk.y=MATH.lerp(sk.y,kp.y,alpha);sk.score=kp.score;
+        }
       }
     }
+    if(this.persons.length>poses.length)this.persons.length=poses.length; // drop people who left frame
+    this.smoothedKeypoints=this.persons[0]?this.persons[0].smoothed:[];
+  },
+
+  // Every catchable hand from every detected person — this is what makes
+  // multiplayer possible: collision and glove rendering both read from
+  // here instead of a single implicit "the player".
+  getAllHands(){
+    if(!this.persons||!this.persons.length)return[];
+    const hands=[];
+    for(let p=0;p<this.persons.length;p++){
+      for(const idx of[9,10]){
+        const key='p'+p+'_'+idx;
+        const raw=this.persons[p].smoothed[idx];
+        if(!raw||raw.score<0.18)continue;
+        if(!this.dispHands)this.dispHands={};
+        if(!this.dispHands[key])this.dispHands[key]={x:raw.x,y:raw.y,score:raw.score};
+        const d=this.dispHands[key];
+        d.x=MATH.lerp(d.x,raw.x,0.55);d.y=MATH.lerp(d.y,raw.y,0.55);d.score=raw.score;
+        const swap=SETTINGS&&SETTINGS.values.swapHands;
+        const isRight=swap?idx===9:idx===10;
+        hands.push({x:d.x,y:d.y,score:d.score,color:isRight?'#ff5a5a':'#3ec1ff',personIdx:p});
+      }
+    }
+    return hands;
   },
 
   getSmoothedKeypoints(){return this.smoothedKeypoints;},
-
-  resetForNewPlayers(){
-    this.lastPose=null;
-    this.smoothedKeypoints=[];
-    this.keypointVelocities=[];
-    this.allHands=[];
-    this.lastHands=[];
-    this.lostFrames=0;
-    this.lastDetectTime=0;
-    this.detectIntervalMs=null;
-  },
 
   predictKeypoint(name,frames){
     const idx=CONFIG.KEYPOINT_NAMES.indexOf(name);
@@ -933,101 +932,6 @@ const POSE = {
   canCatchWith(kp){
     return !!(kp&&kp.score>=0.18);
   },
-
-  // Reads the current wrist index for a screen side, honoring the on-device
-  // "Swap Hands" setting in case the camera/mirroring behaves differently
-  // than expected on a given device.
-  // We no longer trust MoveNet's own left_wrist/right_wrist labels for this —
-  // camera mirroring made that unreliable. Instead we look at where each wrist
-  // ACTUALLY is on screen right now and call whichever one has the smaller x
-  // "left": that guarantees "move your left hand" always moves the glove on
-  // the left side of the screen, regardless of any label or mirror confusion.
-  getWristsBySide(){
-    const a=this.dispWrist9||this.smoothedKeypoints[9],b=this.dispWrist10||this.smoothedKeypoints[10];
-    const aOk=a&&a.score>0.18,bOk=b&&b.score>0.18;
-    // Use the ACTUAL camera capture width, not an assumed 640 — camera
-    // resolution was reduced elsewhere for performance, so a hardcoded 320
-    // midpoint was wrong whenever the real capture width wasn't 640. This
-    // was the actual bug behind "everything shows up on the left."
-    const midX=(this.videoW||320)*0.5;
-    let result;
-    if(aOk&&bOk){
-      result=(a.x<=b.x)?{left:a,right:b}:{left:b,right:a};
-    }else if(aOk){
-      // Only one hand tracked (common on weaker devices/AI throttling) —
-      // decide its side from its real x-position relative to the actual
-      // frame width, so a single detected hand on the right side of the
-      // frame correctly becomes the right glove.
-      result=(a.x<midX)?{left:a,right:null}:{left:null,right:a};
-    }else if(bOk){
-      result=(b.x<midX)?{left:b,right:null}:{left:null,right:b};
-    }else{
-      result={left:null,right:null};
-    }
-    if(SETTINGS&&SETTINGS.values.swapHands){const t=result.left;result.left=result.right;result.right=t;}
-    return result;
-  },
-
-  // Pull every wrist from every multipose person (co-op / multiple players)
-  collectAllHands(poses){
-    const hands=[];
-    if(!poses)return hands;
-    for(let p=0;p<poses.length;p++){
-      const kps=poses[p].keypoints;
-      if(!kps)continue;
-      for(const idx of [9,10]){ // left_wrist, right_wrist
-        const kp=kps[idx];
-        if(kp&&kp.score>=0.10){
-          hands.push({x:kp.x,y:kp.y,score:kp.score,person:p,side:idx===9?'left':'right'});
-        }
-      }
-    }
-    return hands;
-  },
-
-  updateHandCache(hands){
-    const now=performance.now();
-    if(Array.isArray(hands)&&hands.length){
-      this.lastHands=hands.map(h=>({...h,timestamp:now}));
-      return;
-    }
-    this.lastHands=this.lastHands.filter(h=>now-h.timestamp<=this.HAND_FALLBACK_MS);
-  },
-
-  // All catchable hands: multipose list if available, else single-pose wrists
-  getAllCatchHands(){
-    if(this.allHands&&this.allHands.length)return this.allHands;
-    const now=performance.now();
-    const fallback=this.lastHands.filter(h=>now-h.timestamp<=this.HAND_FALLBACK_MS);
-    if(fallback.length)return fallback;
-    const{left,right}=this.getWristsBySide();
-    const out=[];
-    if(left)out.push({x:left.x,y:left.y,score:left.score||0.5,person:0,side:'left'});
-    if(right)out.push({x:right.x,y:right.y,score:right.score||0.5,person:0,side:'right'});
-    return out;
-  },
-
-  // Eases the two wrist points toward whatever the AI last detected, EVERY
-  // render frame (not just every Nth AI frame). This never predicts or
-  // overshoots — it only ever moves toward the real last-known position —
-  // so throttled AI (needed for adaptive performance) still looks like
-  // continuous 60fps tracking instead of a visible step every few frames.
-  updateDisplayWrists(){
-    const targets=[[9,'dispWrist9'],[10,'dispWrist10']];
-    for(const[idx,key]of targets){
-      const t=this.smoothedKeypoints[idx];
-      if(!t){this[key]=null;continue;}
-      if(!this[key])this[key]={x:t.x,y:t.y,score:t.score};
-      const d=this[key];
-      // Snappier than before (was 0.35) — safe to raise now that AI itself
-      // updates ~2x more often (see the polling interval above), so there's
-      // less distance to cover per ease step. No predictive extrapolation
-      // here on purpose: guessing ahead of the last real reading can
-      // overshoot if a hand suddenly stops or changes direction, which
-      // would hurt catch fairness more than the latency it saves.
-      d.x=MATH.lerp(d.x,t.x,0.55);d.y=MATH.lerp(d.y,t.y,0.55);d.score=t.score;
-    }
-  }
 };
 
 // ============================================================
@@ -1187,10 +1091,7 @@ const CALIBRATION = {
         const sorted=times.slice().sort((a,b)=>a-b);
         const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
         const jankyFraction=times.filter(t=>t>1/20).length/times.length;
-        // Relax the acid test to the most conservative level so newer
-        // medium and flagship phones keep modern mode unless real performance
-        // is very poor.
-        const rawVerdict=avgFps<16&&medianFps<18&&jankyFraction>0.6;
+        const rawVerdict=avgFps<22&&medianFps<24&&jankyFraction>0.45;
         // Hysteresis across rounds: a single reading — even a good one —
         // can't flip the mode by itself. Only commit a change once the SAME
         // verdict shows up on two calibrations in a row. This is what
@@ -1298,16 +1199,13 @@ const COLLISION = {
       if(ball.z>CLOSE_Z)return null;
       const zScale=MATH.lerp(0.3,1.2,1-ball.z/1000);
       const visualRadius=ball.radius*zScale;
-      const radius=RENDERER.getGloveHitRadius(true);
-      // Every tracked hand from every person can catch (co-op play)
-      const hands=POSE.getAllCatchHands();
-      for(const h of hands){
-        if(!h||h.score<0.18)continue;
-        const hx=h.x*scaleX,hy=h.y*scaleY;
+      const radius=RENDERER.getGloveHitRadius(true); // always active size
+      const hands=POSE.getAllHands();
+      for(const hand of hands){
+        if(!POSE.canCatchWith(hand))continue;
+        const hx=hand.x*scaleX,hy=hand.y*scaleY;
         const thr=visualRadius+radius,dx=ball.x-hx,dy=ball.y-hy;
-        if(dx*dx+dy*dy<thr*thr){
-          return{part:h.side==='right'?'RIGHT_HAND':'LEFT_HAND',x:hx,y:hy,person:h.person};
-        }
+        if(dx*dx+dy*dy<thr*thr)return{part:'HAND',x:hx,y:hy};
       }
       return null;
     }
@@ -1597,7 +1495,12 @@ const RENDERER = {
 
   triggerShake(intensity,duration){
     if(SETTINGS.values.reducedMotion)return;
-    this.shakeIntensity=intensity||CONFIG.SCREEN_SHAKE_INTENSITY;
+    // Scale relative to a 1080p reference (what these intensity values were
+    // tuned against) so shake stays proportionally the same magnitude on
+    // any screen size instead of a fixed pixel count that's barely
+    // perceptible on a large display.
+    const screenScale=Math.min(this.width,this.height)/1080;
+    this.shakeIntensity=(intensity||CONFIG.SCREEN_SHAKE_INTENSITY)*Math.max(0.5,screenScale);
     this.shakeTimer=duration||CONFIG.SCREEN_SHAKE_DURATION;
   },
 
@@ -1609,6 +1512,12 @@ const RENDERER = {
   render(dt){
     this.time+=dt;
     this._frame=(this._frame|0)+1;
+    // Safety net: if the real viewport ever drifts from what we last sized
+    // for (missed/late resize event), resync immediately rather than
+    // drawing stale-sized cached layers against a differently-sized canvas.
+    if(this.canvas&&(this.canvas.width!==window.innerWidth||this.canvas.height!==window.innerHeight)){
+      this.resize();
+    }
     if(this.retroMode){this.renderRetro(dt);return;}
     const ctx=this.ctx;const w=this.width;const h=this.height;
     ctx.save();
@@ -1616,9 +1525,7 @@ const RENDERER = {
     // Screen shake
     if(this.shakeTimer>0){
       const shake=this.shakeIntensity*(this.shakeTimer/CONFIG.SCREEN_SHAKE_DURATION);
-      const sizeFactor=Math.min(1.3,Math.max(1,900/Math.min(this.width,this.height)));
-      const effectiveShake=shake*sizeFactor;
-      ctx.translate((Math.random()-0.5)*effectiveShake,(Math.random()-0.5)*effectiveShake);
+      ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
       this.shakeTimer-=dt*1000;
     }
 
@@ -1634,7 +1541,7 @@ const RENDERER = {
     }
 
     // Static lights + structure (baked)
-    if(this.bgCanvas)ctx.drawImage(this.bgCanvas,0,0);
+    if(this.bgCanvas)ctx.drawImage(this.bgCanvas,0,0,this.bgCanvas.width,this.bgCanvas.height,0,0,w,h);
 
     // Clouds
     for(const c of this.clouds){
@@ -1666,7 +1573,7 @@ const RENDERER = {
 
     // Goal + net — pre-rendered to an offscreen canvas (static shape, never
     // animates), so this is one drawImage instead of ~15 stroke calls.
-    if(this.goalCanvas)ctx.drawImage(this.goalCanvas,0,0);
+    if(this.goalCanvas)ctx.drawImage(this.goalCanvas,0,0,this.goalCanvas.width,this.goalCanvas.height,0,0,w,h);
 
     // Kicker mascot — the "far center" character the player watches kick the ball out
     if(GAME.state==='playing'||GAME.state==='countdown')KICKER.draw(ctx);
@@ -1711,15 +1618,6 @@ const RENDERER = {
     const s=this.retroScale; // full-resolution game coordinates -> retro canvas coordinates
     const gY=this.retroGroundY;
 
-    rctx.save();
-    if(this.shakeTimer>0){
-      const shake=this.shakeIntensity*(this.shakeTimer/CONFIG.SCREEN_SHAKE_DURATION);
-      const sizeFactor=Math.min(1.3,Math.max(1,900/Math.min(this.width,this.height)));
-      const effectiveShake=shake*sizeFactor;
-      rctx.translate((Math.random()-0.5)*effectiveShake,(Math.random()-0.5)*effectiveShake);
-      this.shakeTimer-=dt*1000;
-    }
-
     // Flat sky + flat pitch (no gradients)
     rctx.fillStyle='#1e3a5f';rctx.fillRect(0,0,rw,gY);
     rctx.fillStyle='#2a7a2a';rctx.fillRect(0,gY,rw,rh-gY);
@@ -1744,21 +1642,11 @@ const RENDERER = {
       rctx.strokeStyle='#1a1a1a';rctx.lineWidth=1;rctx.stroke();
     }
 
-    // Gloves — flat colored squares at the tracked wrist positions
+    // Gloves — flat colored squares at every tracked hand from every person
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      const{left:lw,right:rw2}=POSE.getWristsBySide();
       const scaleX=this.width/(POSE.videoW||320),scaleY=this.height/(POSE.videoH||240);
-      // Draw every co-op hand (multipose); fall back to side wrists
-      const hands=POSE.getAllCatchHands();
-      const colors=['#3ec1ff','#ff5a5a','#7bed9f','#f9ca24','#a29bfe','#fd79a8'];
-      if(hands.length){
-        for(let i=0;i<hands.length;i++){
-          const h=hands[i];
-          this.drawRetroGlove(rctx,h.x*scaleX*s,h.y*scaleY*s,colors[i%colors.length],true);
-        }
-      }else{
-        if(lw)this.drawRetroGlove(rctx,lw.x*scaleX*s,lw.y*scaleY*s,'#3ec1ff',true);
-        if(rw2)this.drawRetroGlove(rctx,rw2.x*scaleX*s,rw2.y*scaleY*s,'#ff5a5a',true);
+      for(const hand of POSE.getAllHands()){
+        this.drawRetroGlove(rctx,hand.x*scaleX*s,hand.y*scaleY*s,hand.color,POSE.isHandRaised(hand));
       }
     }
 
@@ -1780,11 +1668,24 @@ const RENDERER = {
     }
     rctx.globalAlpha=1;
 
+    // Screen shake — decayed here since retro mode skips the modern
+    // render() path entirely (this was previously never wired up at all,
+    // which is why shake only ever worked on devices staying in modern
+    // mode - exactly the more capable, usually larger-screen devices).
+    let shakeX=0,shakeY=0;
+    if(this.shakeTimer>0){
+      const shakeAmt=this.shakeIntensity*(this.shakeTimer/CONFIG.SCREEN_SHAKE_DURATION);
+      shakeX=(Math.random()-0.5)*shakeAmt;
+      shakeY=(Math.random()-0.5)*shakeAmt;
+      this.shakeTimer-=dt*1000;
+    }
+
     // Stamp the low-res frame onto the real canvas, scaled up with hard
     // pixel edges — this is what actually reads as "8-bit" to the eye.
     const ctx=this.ctx;
     ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(this.retroCanvas,0,0,rw,rh,0,0,this.width,this.height);
+    ctx.fillStyle='#000';ctx.fillRect(0,0,this.width,this.height); // cover shake gaps at the edges
+    ctx.drawImage(this.retroCanvas,0,0,rw,rh,shakeX,shakeY,this.width,this.height);
     ctx.imageSmoothingEnabled=true;
   },
 
@@ -1807,16 +1708,15 @@ const RENDERER = {
   },
 
   drawRetroGlove(rctx,x,y,color,raised){
-    // Convert full-screen gloveScale into low-res canvas pixels so classic
-    // mode keeps the same relative size as modern on every resolution.
-    const s=this.retroScale||(160/Math.max(1,this.width));
-    const baseSize=Math.max(4,Math.round(this.gloveScale()*2*s));
-    const size=Math.max(4,Math.round(baseSize*0.8));
+    // Derived from the same gloveScale() used by modern mode and the
+    // hitbox, converted into retro-canvas-space — guarantees visual size
+    // always matches the real catch area, on any screen.
+    const size=RENDERER.gloveScale()*RENDERER.retroScale*(raised?1:0.85);
     rctx.globalAlpha=raised?1:0.9;
     rctx.fillStyle=color;
-    rctx.fillRect(Math.floor(x-size/2),Math.floor(y-size/2),size,size);
+    rctx.fillRect(x-size/2,y-size/2,size,size);
     rctx.strokeStyle='#ffffff';rctx.lineWidth=1;
-    rctx.strokeRect(Math.floor(x-size/2),Math.floor(y-size/2),size,size);
+    rctx.strokeRect(x-size/2,y-size/2,size,size);
     rctx.globalAlpha=1;
   },
 
@@ -2056,63 +1956,50 @@ const RENDERER = {
       ctx.beginPath();ctx.ellipse(bounds.cx*scaleX,this.groundY,bounds.w*scaleX*0.5,10,0,0,Math.PI*2);ctx.fill();
     }
 
-    // Glove icons on the hands (Catch! mode) so it's obvious what the camera is tracking
+    // Glove icons on every tracked hand from every detected person
     if(GAME.currentMode&&GAME.currentMode.handOnly){
-      // Draw every co-op hand so multiple players see their gloves
-      const hands=POSE.getAllCatchHands();
-      const colors=['#3ec1ff','#ff5a5a','#7bed9f','#f9ca24','#a29bfe','#fd79a8'];
-      if(hands.length){
-        for(let i=0;i<hands.length;i++){
-          const h=hands[i];
-          this.drawGlove(ctx,h.x*scaleX,h.y*scaleY,colors[i%colors.length],true);
-        }
-      }else{
-        const{left:leftWrist,right:rightWrist}=POSE.getWristsBySide();
-        if(leftWrist)this.drawGlove(ctx,leftWrist.x*scaleX,leftWrist.y*scaleY,'#3ec1ff',true);
-        if(rightWrist)this.drawGlove(ctx,rightWrist.x*scaleX,rightWrist.y*scaleY,'#ff5a5a',true);
+      for(const hand of POSE.getAllHands()){
+        this.drawGlove(ctx,hand.x*scaleX,hand.y*scaleY,hand.color,POSE.isHandRaised(hand));
       }
     }
   },
 
-  // Screen-relative glove + lag compensation. Classic/retro uses a smaller
-  // base so low-power 8-bit mode does not cover half the goal.
+  // Hit radius in full-screen pixels, matched to what drawGlove / drawRetroGlove
+  // actually paint. Tiny fudge (+2) for touch/pose jitter only — not a large
+  // invisible bonus. Scales correctly on phone and monitor.
+  // Single source of truth for glove size, shared by the hitbox and the
+  // visual draw below, so they always match and both scale as a fraction
+  // of screen size rather than a fixed pixel count. A fixed pixel radius
+  // covers a much bigger fraction of a small screen than a large one,
+  // which was making small screens objectively easier - proportional
+  // sizing keeps the same relative difficulty on any device.
   gloveScale(){
-    const short=Math.min(this.width||320,this.height||240);
-    // Modern ~1/20; classic ~1/30 (smaller on low-power retro devices)
-    let r=short/(this.retroMode?30:20);
-    const ms=(typeof POSE!=='undefined'&&POSE.detectMs!=null)?POSE.detectMs:30;
-    const maxBoost=this.retroMode?0.25:0.75;
-    const lagBoost=1+Math.max(0,Math.min(maxBoost,(ms-25)/100));
-    r*=lagBoost;
-    const gap=(typeof POSE!=='undefined'&&POSE.detectIntervalMs!=null)
-      ?POSE.detectIntervalMs:40;
-    if(gap>45)r*=1+Math.min(this.retroMode?0.1:0.35,(gap-45)/100);
-    if(!this.retroMode&&typeof GAME!=='undefined'&&GAME.fps>0&&GAME.fps<28)r*=1.15;
-    const lo=this.retroMode?14:22;
-    const hi=this.retroMode?38:80;
-    return Math.max(lo,Math.min(hi,r));
+    return Math.max(20,Math.min(RENDERER.width,RENDERER.height)*0.075);
   },
 
   getGloveHitRadius(raised){
-    // Match paint size; small +4 fudge for pose jitter only
-    return this.gloveScale()+4;
+    return this.gloveScale();
   },
 
   drawGlove(ctx,x,y,color,raised){
     ctx.save();ctx.translate(x,y);
-    // Reference shape radius ≈ 24px; scale so painted size = gloveScale()
-    const scale=this.gloveScale()/24;
+    // Scale matches gloveScale() (shared with the hitbox above) so the
+    // drawn glove always visually represents its real catch area,
+    // proportional to screen size rather than a fixed pixel multiplier.
+    // The shape below has a natural reference radius of ~24px.
+    const scale=RENDERER.gloveScale()/24;
     ctx.scale(scale,scale);
-    ctx.shadowColor=raised?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.35)';
-    ctx.shadowBlur=raised?Math.max(6,12*scale):Math.max(4,6*scale);
+    ctx.shadowColor=raised?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.35)';ctx.shadowBlur=raised?16:8;
     ctx.globalAlpha=raised?1:0.9;
+    // Palm
     ctx.fillStyle=color;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.fill();
+    // Fingers
     for(let i=-2;i<=2;i++){
       ctx.beginPath();ctx.ellipse(i*9,-16,6,14,0,0,Math.PI*2);ctx.fill();
     }
     ctx.shadowBlur=0;
-    ctx.strokeStyle='rgba(255,255,255,0.75)';ctx.lineWidth=Math.max(1,2/Math.max(0.5,scale));
+    ctx.strokeStyle='rgba(255,255,255,0.75)';ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(0,6,20,24,0,0,Math.PI*2);ctx.stroke();
     ctx.globalAlpha=1;
     ctx.restore();
@@ -2314,8 +2201,15 @@ const GAME = {
   },
 
   startCountdown(){
-    POSE.resetForNewPlayers();
     this.state='countdown';this.countdownValue=3;
+    // Reset round state now, before the HUD is shown - previously this only
+    // happened in startGame() after the countdown finished, so the HUD
+    // displayed the PREVIOUS round's score/lives/combo for the entire
+    // countdown. A new player should see a clean slate from the first frame.
+    this.score=0;this.lives=this.currentMode.lives;this.maxLives=this.currentMode.lives;this.combo=0;this.maxCombo=0;
+    this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;this.accuracy=100;
+    this.powerups={};this.activePowerups=[];this.updatePowerupDisplay();
+    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;
     document.getElementById('hudTop').style.display='flex';
     const instrEl=document.getElementById('instructionBar');
     instrEl.textContent=(this.currentMode&&this.currentMode.handOnly)
@@ -2336,23 +2230,11 @@ const GAME = {
 
   startGame(){
     this.state='playing';
-    // Full reset — treat every start as new players (no leftover UI/score)
-    if(this.timerInterval){clearInterval(this.timerInterval);this.timerInterval=null;}
-    this.score=0;this.lives=this.currentMode.lives;this.maxLives=this.currentMode.lives;
-    this.combo=0;this.maxCombo=0;this.idleTime=0;
-    this.timeLeft=this.currentMode.time;this.totalBalls=0;this.savedBalls=0;
     this.roundStartTime=performance.now();
-    this.accuracy=100;this.powerups={};this.activePowerups=[];
-    BALLS.difficultyMult=1;BALLS.clear();PARTICLES.clear();
-    this.scorePopups=[];this.finalCountdownShown=false;KICKER.kickTimer=0;
     this.lastCatchAt=performance.now();
     document.getElementById('gameOver').classList.add('hidden');
     document.getElementById('pauseMenu').classList.add('hidden');
     document.getElementById('attractOverlay').style.display='none';
-    document.getElementById('centerMessage').style.display='none';
-    document.getElementById('comboDisplay').style.display='none';
-    const pui=document.getElementById('powerupIndicator');if(pui)pui.innerHTML='';
-    this.updateHUD();
     if('vibrate'in navigator)navigator.vibrate(200);
     AUDIO.playWhistle();AUDIO.startMusic();
 
@@ -2525,7 +2407,6 @@ const GAME = {
     if(ball.collided)return;ball.collided=true;
     this.totalBalls++;this.combo=0;
     this.accuracy=Math.round((this.savedBalls/this.totalBalls)*100);
-    RENDERER.triggerShake(14,380);
     this.updateHUD();
   },
 
@@ -2899,12 +2780,9 @@ const LOOP = {
       const now=performance.now();
       const targetIntervalMs=(navigator.maxTouchPoints>0||window.innerWidth<900)?40:33; // ~25-30 real updates/sec, same on every device
       if(now-(POSE.lastDetectTime||0)>=targetIntervalMs){
-        const prev=POSE.lastDetectTime||now;
-        POSE.detectIntervalMs=POSE.detectIntervalMs==null?(now-prev):(POSE.detectIntervalMs*0.8+(now-prev)*0.2);
         POSE.lastDetectTime=now;
         POSE.detect();
       }
-      POSE.updateDisplayWrists();
     }
 
     // Calibration preview drawing
