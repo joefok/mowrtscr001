@@ -1187,10 +1187,11 @@ const CALIBRATION = {
         const sorted=times.slice().sort((a,b)=>a-b);
         const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
         const jankyFraction=times.filter(t=>t>1/20).length/times.length;
-        // Relax the acid test even more so medium-low devices can remain in
-        // modern mode unless performance is truly poor. This prioritizes better
-        // gameplay over the 8-bit fallback on borderline hardware.
-        const rawVerdict=avgFps<20&&medianFps<22&&jankyFraction>0.5;
+        // Relax the acid test even further so only genuinely low-power
+        // conditions use the classic 8-bit path. This preserves modern-mode
+        // gameplay on higher-end phones (including 2023 flagship devices)
+        // while still letting underpowered screens fall back when needed.
+        const rawVerdict=avgFps<18&&medianFps<20&&jankyFraction>0.55;
         // Hysteresis across rounds: a single reading — even a good one —
         // can't flip the mode by itself. Only commit a change once the SAME
         // verdict shows up on two calibrations in a row. This is what
@@ -1708,6 +1709,13 @@ const RENDERER = {
     const rctx=this.retroCtx,rw=this.retroCanvas.width,rh=this.retroCanvas.height;
     const s=this.retroScale; // full-resolution game coordinates -> retro canvas coordinates
     const gY=this.retroGroundY;
+
+    rctx.save();
+    if(this.shakeTimer>0){
+      const shake=this.shakeIntensity*(this.shakeTimer/CONFIG.SCREEN_SHAKE_DURATION);
+      rctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+      this.shakeTimer-=dt*1000;
+    }
 
     // Flat sky + flat pitch (no gradients)
     rctx.fillStyle='#1e3a5f';rctx.fillRect(0,0,rw,gY);
