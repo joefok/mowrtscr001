@@ -828,13 +828,18 @@ const POSE = {
         this.allHands=this.collectAllHands(poses);
         return pose;
       }else{
+        this.allHands=[];
         this.lostFrames++;
         if(this.lostFrames>this.maxLostFrames){
           this.lastPose=null;this.smoothedKeypoints=[];this.allHands=[];
         }
         return this.lastPose;
       }
-    }catch(e){console.warn('Detection error:',e);return this.lastPose;}
+    }catch(e){
+      console.warn('Detection error:',e);
+      this.allHands=[];
+      return this.lastPose;
+    }
     finally{this._detecting=false;}
   },
 
@@ -859,6 +864,16 @@ const POSE = {
   },
 
   getSmoothedKeypoints(){return this.smoothedKeypoints;},
+
+  resetForNewPlayers(){
+    this.lastPose=null;
+    this.smoothedKeypoints=[];
+    this.keypointVelocities=[];
+    this.allHands=[];
+    this.lostFrames=0;
+    this.lastDetectTime=0;
+    this.detectIntervalMs=null;
+  },
 
   predictKeypoint(name,frames){
     const idx=CONFIG.KEYPOINT_NAMES.indexOf(name);
@@ -1765,7 +1780,8 @@ const RENDERER = {
     // Convert full-screen gloveScale into low-res canvas pixels so classic
     // mode keeps the same relative size as modern on every resolution.
     const s=this.retroScale||(160/Math.max(1,this.width));
-    const size=Math.max(4,Math.round(this.gloveScale()*2*s)); // diameter in retro px
+    const baseSize=Math.max(4,Math.round(this.gloveScale()*2*s));
+    const size=Math.max(4,Math.round(baseSize*0.8));
     rctx.globalAlpha=raised?1:0.9;
     rctx.fillStyle=color;
     rctx.fillRect(Math.floor(x-size/2),Math.floor(y-size/2),size,size);
@@ -2032,19 +2048,18 @@ const RENDERER = {
   // base so low-power 8-bit mode does not cover half the goal.
   gloveScale(){
     const short=Math.min(this.width||320,this.height||240);
-    // Modern ~1/20; classic ~1/28 (noticeably smaller on weak devices)
-    let r=short/(this.retroMode?28:20);
+    // Modern ~1/20; classic ~1/30 (smaller on low-power retro devices)
+    let r=short/(this.retroMode?30:20);
     const ms=(typeof POSE!=='undefined'&&POSE.detectMs!=null)?POSE.detectMs:30;
-    // Milder lag boost in classic so gloves stay compact
-    const maxBoost=this.retroMode?0.35:0.75;
+    const maxBoost=this.retroMode?0.25:0.75;
     const lagBoost=1+Math.max(0,Math.min(maxBoost,(ms-25)/100));
     r*=lagBoost;
     const gap=(typeof POSE!=='undefined'&&POSE.detectIntervalMs!=null)
       ?POSE.detectIntervalMs:40;
-    if(gap>45)r*=1+Math.min(this.retroMode?0.15:0.35,(gap-45)/100);
+    if(gap>45)r*=1+Math.min(this.retroMode?0.1:0.35,(gap-45)/100);
     if(!this.retroMode&&typeof GAME!=='undefined'&&GAME.fps>0&&GAME.fps<28)r*=1.15;
     const lo=this.retroMode?14:22;
-    const hi=this.retroMode?42:80;
+    const hi=this.retroMode?38:80;
     return Math.max(lo,Math.min(hi,r));
   },
 
@@ -2269,6 +2284,7 @@ const GAME = {
   },
 
   startCountdown(){
+    POSE.resetForNewPlayers();
     this.state='countdown';this.countdownValue=3;
     document.getElementById('hudTop').style.display='flex';
     const instrEl=document.getElementById('instructionBar');
