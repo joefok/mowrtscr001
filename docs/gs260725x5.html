@@ -740,6 +740,8 @@ const POSE = {
   RAISE_THRESHOLD: 40, // relative to actual video height (~360)
   videoW: 320,
   videoH: 240,
+  lastHands: [],
+  HAND_FALLBACK_MS: 500,
 
   async init(){
     if(this.isReady||this.initializing)return;
@@ -826,6 +828,7 @@ const POSE = {
         this.lastPose=pose;
         // Collect every wrist from every person for co-op catch play
         this.allHands=this.collectAllHands(poses);
+        this.updateHandCache(this.allHands);
         return pose;
       }else{
         this.allHands=[];
@@ -870,6 +873,7 @@ const POSE = {
     this.smoothedKeypoints=[];
     this.keypointVelocities=[];
     this.allHands=[];
+    this.lastHands=[];
     this.lostFrames=0;
     this.lastDetectTime=0;
     this.detectIntervalMs=null;
@@ -940,7 +944,7 @@ const POSE = {
   // the left side of the screen, regardless of any label or mirror confusion.
   getWristsBySide(){
     const a=this.dispWrist9||this.smoothedKeypoints[9],b=this.dispWrist10||this.smoothedKeypoints[10];
-    const aOk=a&&a.score>0.25,bOk=b&&b.score>0.25;
+    const aOk=a&&a.score>0.18,bOk=b&&b.score>0.18;
     // Use the ACTUAL camera capture width, not an assumed 640 — camera
     // resolution was reduced elsewhere for performance, so a hardcoded 320
     // midpoint was wrong whenever the real capture width wasn't 640. This
@@ -973,7 +977,7 @@ const POSE = {
       if(!kps)continue;
       for(const idx of [9,10]){ // left_wrist, right_wrist
         const kp=kps[idx];
-        if(kp&&kp.score>=0.2){
+        if(kp&&kp.score>=0.10){
           hands.push({x:kp.x,y:kp.y,score:kp.score,person:p,side:idx===9?'left':'right'});
         }
       }
@@ -981,9 +985,21 @@ const POSE = {
     return hands;
   },
 
+  updateHandCache(hands){
+    const now=performance.now();
+    if(Array.isArray(hands)&&hands.length){
+      this.lastHands=hands.map(h=>({...h,timestamp:now}));
+      return;
+    }
+    this.lastHands=this.lastHands.filter(h=>now-h.timestamp<=this.HAND_FALLBACK_MS);
+  },
+
   // All catchable hands: multipose list if available, else single-pose wrists
   getAllCatchHands(){
     if(this.allHands&&this.allHands.length)return this.allHands;
+    const now=performance.now();
+    const fallback=this.lastHands.filter(h=>now-h.timestamp<=this.HAND_FALLBACK_MS);
+    if(fallback.length)return fallback;
     const{left,right}=this.getWristsBySide();
     const out=[];
     if(left)out.push({x:left.x,y:left.y,score:left.score||0.5,person:0,side:'left'});
