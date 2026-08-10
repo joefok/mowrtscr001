@@ -1091,7 +1091,7 @@ const CALIBRATION = {
         const sorted=times.slice().sort((a,b)=>a-b);
         const medianFps=1/Math.max(1e-6,sorted[Math.floor(sorted.length/2)]);
         const jankyFraction=times.filter(t=>t>1/20).length/times.length;
-        const rawVerdict=avgFps<22&&medianFps<24&&jankyFraction>0.45;
+        const rawVerdict=avgFps<15&&medianFps<17&&jankyFraction>0.55;
         // Hysteresis across rounds: a single reading — even a good one —
         // can't flip the mode by itself. Only commit a change once the SAME
         // verdict shows up on two calibrations in a row. This is what
@@ -1495,12 +1495,13 @@ const RENDERER = {
 
   triggerShake(intensity,duration){
     if(SETTINGS.values.reducedMotion)return;
-    // Scale relative to a 1080p reference (what these intensity values were
-    // tuned against) so shake stays proportionally the same magnitude on
-    // any screen size instead of a fixed pixel count that's barely
-    // perceptible on a large display.
+    // Scale relative to a 1080p reference so shake stays proportionally
+    // strong on any screen size. IMPORTANT: only ever scales UP for larger
+    // screens, never down - a small screen still gets the full tuned base
+    // intensity at minimum, since shake needs to stay perceptible there,
+    // not get reduced.
     const screenScale=Math.min(this.width,this.height)/1080;
-    this.shakeIntensity=(intensity||CONFIG.SCREEN_SHAKE_INTENSITY)*Math.max(0.5,screenScale);
+    this.shakeIntensity=(intensity||CONFIG.SCREEN_SHAKE_INTENSITY)*Math.max(1.0,screenScale);
     this.shakeTimer=duration||CONFIG.SCREEN_SHAKE_DURATION;
   },
 
@@ -2359,7 +2360,7 @@ const GAME = {
     if(ball.type==='ICE')PARTICLES.spawnSmoke(ball.x,ball.y,0,4);
     if(ball.type==='RAINBOW')PARTICLES.spawnConfetti(ball.x,ball.y,0,12);
 
-    RENDERER.triggerShake(4,200);
+    RENDERER.triggerShake(7,220);
 
     // Power-up chance
     if(Math.random()<0.08)this.spawnPowerUp();
@@ -2390,7 +2391,7 @@ const GAME = {
     }else{
       if(ball.type!=='BOMB'){
         this.lives--;
-        AUDIO.playGoal();RENDERER.triggerShake(8,300);AUDIO.playNetShake();
+        AUDIO.playGoal();RENDERER.triggerShake(11,320);AUDIO.playNetShake();
         PARTICLES.spawnSmoke(ball.x,ball.y,0,10);
       }
     }
