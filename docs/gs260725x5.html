@@ -754,12 +754,15 @@ const POSE = {
       await tf.ready();
       try{if(tf.env&&tf.env().set){tf.env().set('WEBGL_PACK',true);tf.env().set('WEBGL_FORCE_F16_TEXTURES',true);}if(tf.enableProdMode)tf.enableProdMode();}catch(_){}
       // MultiPose Lightning — detects several people at once (needed for
-      // multiplayer). Slightly heavier than SinglePose, but the existing
-      // adaptive PERF/retro-mode system already exists to absorb exactly
-      // this kind of extra load gracefully on weaker devices.
-      this.detector=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
+      // multiplayer). This is the default/modern-mode detector, and is also
+      // what runs during calibration's acid test. If the acid test decides
+      // retro mode, a much lighter SinglePose detector is loaded on demand
+      // (see ensureSingleDetector below) specifically for that mode, since
+      // retro is meant to be the "very low demand" path.
+      this.detectorMulti=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
         modelType: poseDetection.movenet.modelType['MULTIPOSE_LIGHTNING']
       });
+      this.detector=this.detectorMulti; // kept for any legacy reference
       this.isReady=true;
       console.log('MoveNet loaded: MULTIPOSE_LIGHTNING');
     }catch(e){
@@ -788,15 +791,45 @@ const POSE = {
     };});
   },
 
+  // Loads the lightweight SinglePose detector on first use (only needed if
+  // retro mode is actually triggered) and caches it for the rest of the
+  // session — this is the "very low demand, 1 player/2 hands" engine.
+  async ensureSingleDetector(){
+    if(this.detectorSingle||this._loadingSingle)return;
+    this._loadingSingle=true;
+    try{
+      this.detectorSingle=await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet,{
+        modelType: poseDetection.movenet.modelType['SINGLEPOSE_LIGHTNING']
+      });
+      console.log('MoveNet loaded: SINGLEPOSE_LIGHTNING (retro mode)');
+    }catch(e){
+      console.warn('SinglePose load failed, retro mode will keep using MultiPose:',e);
+    }finally{
+      this._loadingSingle=false;
+    }
+  },
+
   async detect(){
-    if(!this.detector||!this.video||this.video.readyState<2)return null;
+    if(!this.detectorMulti||!this.video||this.video.readyState<2)return null;
     if(this._detecting)return this.lastPose; // previous call still in flight — never stack concurrent inference
     this._detecting=true;
     try{
+      // Retro mode uses the much lighter SinglePose engine (one player, two
+      // hands, very low demand) - modern mode always keeps the full
+      // MultiPose engine, unchanged. If retro was just triggered and the
+      // lighter detector hasn't finished loading yet, fall back to MultiPose
+      // for those few frames rather than leaving tracking with a gap.
+      const useSingle=RENDERER.retroMode&&this.detectorSingle;
+      if(RENDERER.retroMode&&!this.detectorSingle&&!this._loadingSingle)this.ensureSingleDetector();
+      const activeDetector=useSingle?this.detectorSingle:this.detectorMulti;
+
       // We always request RAW (unflipped) poses and mirror the coordinates
       // ourselves below — the library's own flipHorizontal behaved
       // inconsistently, which is what caused the left/right confusion.
-      const poses=await this.detector.estimatePoses(this.video,{flipHorizontal:false,maxPoses:4});
+      const rawPoses=useSingle
+        ?await activeDetector.estimatePoses(this.video,{flipHorizontal:false})
+        :await activeDetector.estimatePoses(this.video,{flipHorizontal:false,maxPoses:4});
+      const poses=rawPoses?rawPoses.slice(0,useSingle?1:4):[]; // SinglePose is naturally capped at 1 anyway
       if(poses&&poses.length>0){
         if(this.mirror){
           const vw=this.videoW||this.video.videoWidth||320;
@@ -1101,6 +1134,7 @@ const CALIBRATION = {
         if(rawVerdict===this._pendingRetroVerdict){
           if(rawVerdict!==RENDERER.retroMode){
             RENDERER.retroMode=rawVerdict;
+            if(rawVerdict)POSE.ensureSingleDetector();
             console.log('[ACID TEST] confirmed twice — avg='+avgFps.toFixed(1)+' median='+medianFps.toFixed(1)+' janky='+(jankyFraction*100).toFixed(0)+'% ->',rawVerdict?'retro':'modern');
           }
         }else{
