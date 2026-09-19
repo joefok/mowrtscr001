@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Classroom Screen Monitor</title>
+
 <style>
 :root {
   color-scheme: dark;
@@ -13,15 +14,15 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 12px; }
-main { max-width: 1500px; margin: auto; }
-h1 { font-size: 1.4rem; }
+main { max-width: 1600px; margin: auto; }
+h1 { font-size: 1.45rem; }
 h2 { font-size: 1.05rem; }
 .panel {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 10px;
   padding: 14px;
   margin-bottom: 12px;
-  border: 1px solid #475569;
-  background: #1e293b;
-  border-radius: 10px;
 }
 .row {
   display: flex;
@@ -29,25 +30,34 @@ h2 { font-size: 1.05rem; }
   align-items: end;
   gap: 10px;
 }
-label { display: grid; gap: 5px; }
-button, input, select {
+label {
+  display: grid;
+  gap: 5px;
+  font-size: .9rem;
+}
+button, input, select, textarea {
   font: inherit;
   padding: 9px;
-  border-radius: 6px;
   border: 1px solid #64748b;
+  border-radius: 6px;
   background: #0f172a;
   color: inherit;
 }
-button { background: #1d4ed8; cursor: pointer; }
+button {
+  background: #1d4ed8;
+  cursor: pointer;
+}
 button.secondary { background: #374151; }
 button.danger { background: #991b1b; }
 button:disabled { opacity: .45; cursor: not-allowed; }
-input[type=number] { width: 80px; }
-.small { font-size: .84rem; line-height: 1.5; }
+input[type=number] { width: 85px; }
+textarea { width: 100%; min-height: 140px; }
+.small { font-size: .83rem; line-height: 1.5; }
 .warning { color: #fbbf24; }
 .hidden { display: none !important; }
-#message { white-space: pre-wrap; }
-#viewport { overflow: auto; max-height: 78vh; }
+#status { white-space: pre-wrap; }
+#roomLink { width: min(100%, 700px); }
+#viewport { overflow: auto; max-height: 76vh; }
 #grid {
   display: grid;
   grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr));
@@ -58,188 +68,178 @@ input[type=number] { width: 80px; }
 }
 .tile {
   position: relative;
-  aspect-ratio: 16/9;
+  aspect-ratio: 16 / 9;
   min-width: 0;
-  background: #555;
-  border: 2px solid #9ca3af;
-  border-radius: 6px;
   overflow: hidden;
+  border: 2px solid #9ca3af;
+  border-radius: 7px;
+  background: #555;
   cursor: pointer;
 }
-.tile video { width: 100%; height: 100%; object-fit: contain; }
-.tile.bad video { visibility: hidden; }
 .tile.good { border-color: #22c55e; }
-.tile .name, .tile .status {
+.tile.mine { border-color: #60a5fa; }
+.tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: black;
+}
+.tile.bad video { visibility: hidden; }
+.tile .name, .tile .health {
   position: absolute;
   left: 0;
   right: 0;
   padding: 3px 5px;
-  background: #0009;
   font-size: clamp(9px, 1vw, 12px);
+  background: #0009;
 }
 .tile .name { top: 0; }
-.tile .status { bottom: 0; }
-.tile.disabled { opacity: .5; border-style: dashed; }
+.tile .health { bottom: 0; }
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #475569;
+}
+.request span { flex: 1; }
+pre {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  font-size: 12px;
+}
 dialog {
-  width: min(95vw, 1200px);
+  width: min(95vw, 1100px);
   background: #111827;
   color: white;
   border: 1px solid #64748b;
+  border-radius: 10px;
 }
 dialog::backdrop { background: #000c; }
-dialog video { width: 100%; max-height: 75vh; }
-pre { white-space: pre-wrap; max-height: 200px; overflow: auto; }
+dialog video { width: 100%; max-height: 72vh; }
 @media(max-width:600px) {
   body { padding: 7px; }
+  .panel { padding: 10px; }
   button { min-height: 44px; }
   .row > label { flex: 1 1 120px; }
 }
 </style>
 </head>
+
 <body>
 <main>
 <h1>Classroom Screen Monitor</h1>
 
-<section class="panel">
-  <strong>No typing of pairing codes.</strong>
-  <ol class="small">
-    <li>Teacher creates a classroom and downloads an invitation.</li>
-    <li>Participant opens the invitation here; an answer downloads.</li>
-    <li>Teacher accepts the answer file.</li>
-  </ol>
-  <p class="small warning">
-    Exchange files privately. coturn does not automatically discover browsers.
-    Keep the creating teacher's browser open.
-  </p>
+<section class="panel small">
+  Teacher creates a room. Students open its link and click an empty seat.
+  Screen sharing always requires browser permission.
+  Keep the creating teacher's browser open.
 </section>
 
 <section class="panel">
   <div class="row">
-    <button id="turnButton" class="secondary">Configure TURN</button>
-    <span id="turnStatus">TURN not configured</span>
-    <button id="downloadPage" class="secondary">Download HTML</button>
+    <button id="settingsButton" class="secondary">Connection settings</button>
+    <button id="downloadButton" class="secondary">Download HTML</button>
+    <span id="serviceStatus">Not connected to signaling</span>
   </div>
   <p class="small">
-    TURN host is prompted and saved in a browser cookie.
-    No IP address is embedded. Port 3489.
-    Static test credentials are visible in the source.
+    Firebase provides room discovery and initial signaling.
+    Screen video and WebRTC DataChannels are forced through TURN.
+    No TURN host is embedded in this file.
   </p>
 </section>
 
 <section id="startPanel" class="panel">
   <div class="row">
     <label>Your name
-      <input id="name" maxlength="64" placeholder="Your name">
+      <input id="nameInput" maxlength="60" placeholder="Your name">
     </label>
     <label>Role
-      <select id="role">
+      <select id="roleInput">
+        <option value="student">Student</option>
         <option value="teacher">Teacher</option>
-        <option value="student">Student</option>
       </select>
     </label>
-    <label>Classroom name
-      <input id="roomName" maxlength="64" placeholder="Class A">
+    <label>Room name / ID
+      <input id="roomInput" maxlength="80" placeholder="Classroom name or room ID">
     </label>
-    <button id="create">Create classroom</button>
-    <button id="join">Open invitation file</button>
-  </div>
-</section>
-
-<section id="hostPairing" class="panel hidden">
-  <h2>Invite a participant</h2>
-  <div class="row">
-    <label>Invite as
-      <select id="inviteRole">
-        <option value="student">Student</option>
-        <option value="teacher">Additional teacher</option>
-      </select>
-    </label>
-    <button id="invite">Download invitation</button>
-    <button id="accept">Accept answer file</button>
+    <button id="createButton">Create room</button>
+    <button id="joinButton">Open room</button>
   </div>
   <p class="small">
-    Create a separate invitation for every browser. Accept opens a file picker:
-    select the answer received from that participant.
+    Teachers create rooms. Students open an existing room ID or use the
+    teacher's shared room link.
   </p>
 </section>
 
 <section class="panel">
-  <strong id="connectionStatus">Not in a classroom</strong>
-  <p id="message" role="status">Create a classroom or open an invitation.</p>
-  <button id="downloadPairing" class="secondary hidden">
-    Download generated pairing file again
-  </button>
+  <strong id="connectionState">Not in a room</strong>
+  <p id="status" role="status">Configure the services, then create or open a room.</p>
 </section>
 
 <section id="roomPanel" class="panel hidden">
   <h2 id="roomTitle"></h2>
 
-  <div id="teacherSettings">
+  <div id="teacherControls" class="hidden">
     <div class="row">
+      <label>Student acceptance
+        <select id="autoAccept">
+          <option value="false">Manually accept</option>
+          <option value="true">Automatically accept</option>
+        </select>
+      </label>
       <label>Rows
-        <input id="rows" type="number" min="1" max="12" value="5">
+        <input id="rowsInput" type="number" min="1" max="12" value="5">
       </label>
       <label>Columns
-        <input id="cols" type="number" min="1" max="12" value="8">
+        <input id="colsInput" type="number" min="1" max="12" value="8">
       </label>
-      <label>Preview
-        <select id="width">
+      <label>Preview size
+        <select id="widthInput">
           <option value="160">160 × 90</option>
           <option value="256" selected>256 × 144</option>
           <option value="320">320 × 180</option>
         </select>
       </label>
       <label>FPS
-        <select id="fps">
+        <select id="fpsInput">
           <option value="1">1</option>
           <option value="2">2</option>
         </select>
       </label>
-      <label>Disabled seats
-        <input id="disabled" placeholder="6, 12, 18">
-      </label>
-      <label>Student seat changes
-        <select id="locked">
-          <option value="false">Allowed</option>
-          <option value="true">Locked</option>
-        </select>
-      </label>
-      <button id="apply">Apply shared settings</button>
-      <button id="resetDraft" class="secondary">Discard draft</button>
+      <button id="applyButton">Apply settings</button>
+      <button id="closeRoomButton" class="danger">Close room</button>
     </div>
-    <p id="draftStatus" class="small"></p>
+
+    <p class="small">
+      Up to 64 grid positions. Occupied seats cannot be removed by shrinking
+      the grid. Tiny previews are for general activity, not readable text.
+    </p>
 
     <div class="row">
-      <label>Participant
-        <select id="person"></select>
-      </label>
-      <label>Destination seat
-        <select id="destination"></select>
-      </label>
-      <button id="move">Move participant</button>
-      <button id="remove" class="danger">Remove participant</button>
+      <input id="roomLink" readonly aria-label="Student room link">
+      <button id="copyLinkButton" class="secondary">Copy student link</button>
     </div>
-    <hr>
+
+    <h2>Join requests and connected students</h2>
+    <div id="requests"></div>
   </div>
 
   <div class="row">
-    <label>My seat
-      <select id="seat"></select>
-    </label>
-    <button id="choose">Choose seat</button>
-    <button id="share">Share screen</button>
-    <button id="stop" class="danger">Stop sharing</button>
+    <button id="stopButton" class="danger">Stop sharing / cancel request</button>
     <label>Local view
-      <select id="view">
-        <option value="fit">Fit classroom</option>
+      <select id="viewInput">
+        <option value="fit">Fit room width</option>
         <option value="scroll">Scroll larger tiles</option>
       </select>
     </label>
   </div>
-  <p class="small">
-    Tap a tile to enlarge. Maximum 64 positions.
-    Students see seat metadata but do not receive other students' video.
-    Grey means unavailable or uncertain, not proof of misconduct.
+
+  <p id="studentHelp" class="small">
+    Click an empty tile to request that seat and share your screen.
+    If auto accept is off, wait for the teacher.
   </p>
 </section>
 
@@ -248,493 +248,533 @@ pre { white-space: pre-wrap; max-height: 200px; overflow: auto; }
 </section>
 
 <details class="panel">
-  <summary>Diagnostics and limitations</summary>
+  <summary>Diagnostics and important limitations</summary>
   <pre id="log"></pre>
-  <p class="small">
-    HTTPS and a supported desktop browser are required for screen capture.
-    Mobile browsers can view; screen-capture support is platform-dependent.
-    No account authentication, automatic discovery, coordinator failover,
-    or SFU is included. Additional teachers increase coordinator workload.
-    Static screens may remain healthy when frames continue arriving.
-    Test on your actual devices before classroom deployment.
-  </p>
+  <ul class="small">
+    <li>One controlling teacher per room; multiple rooms can run simultaneously.</li>
+    <li>Anonymous Firebase authentication is not school-account identity verification.</li>
+    <li>Anyone with a room link may request access. Use manual acceptance when needed.</li>
+    <li>The creating teacher must remain online. No coordinator failover is included.</li>
+    <li>Student names and assigned seats are visible to room participants.</li>
+    <li>Static screens may continue producing frames and remain healthy.</li>
+    <li>Grey means unavailable or uncertain, not proof of misconduct.</li>
+    <li>Production should use authenticated school accounts, temporary TURN
+      credentials, abuse protection, and room-data cleanup.</li>
+  </ul>
 </details>
 
-<dialog id="zoom">
+<dialog id="settingsDialog">
+  <h2>Connection settings</h2>
+  <p class="small">
+    Paste the Firebase Web App configuration as valid JSON.
+    Include databaseURL for your Realtime Database.
+    Firebase configuration is not a server secret; database rules protect access.
+  </p>
+  <textarea id="firebaseConfigInput" spellcheck="false"
+    placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://...","projectId":"...","appId":"..."}'></textarea>
+
+  <label>TURN IPv4 address or hostname — no protocol or port
+    <input id="turnHostInput" placeholder="Enter your TURN host">
+  </label>
+
+  <p class="small">
+    TURN port: 3489. Test username: username. Test password: password.
+    Host is saved in a cookie. Firebase configuration is saved in localStorage.
+  </p>
+
+  <div class="row">
+    <button id="saveSettingsButton">Save settings</button>
+    <button id="cancelSettingsButton" class="secondary">Cancel</button>
+  </div>
+</dialog>
+
+<dialog id="zoomDialog">
   <h2 id="zoomTitle"></h2>
   <video id="zoomVideo" autoplay muted playsinline></video>
   <p id="zoomStatus"></p>
-  <button id="closeZoom">Close</button>
+  <button id="closeZoomButton">Close</button>
 </dialog>
-
-<input id="invitationFile" type="file"
-  accept=".json,application/json" hidden>
-<input id="answerFile" type="file"
-  accept=".json,application/json" hidden>
 </main>
 
-<script>
-"use strict";
-
+<script type="module">
 /*
 ===========================================================================
-FILE-PAIRING CLASSROOM MONITOR — REVIEW GUIDE
+CLASSROOM MONITOR — AUTOMATIC SIGNALING EDITION
 ===========================================================================
 
-BOOTSTRAP
-- Invitation and answer files replace pasted SDP.
-- Clicking Accept opens a file picker; it cannot discover a remote browser.
-- Initial ICE gathering is non-trickle.
-- Subsequent configuration and SDP use TURN-relayed DataChannels.
+REQUIREMENTS
+- HTTPS frontend.
+- Firebase Anonymous Authentication enabled.
+- Firebase Realtime Database with the documented rules.
+- Publicly reachable coturn with appropriate relay ports and credentials.
 
-TRUST
-- Private invitation files are bearer admission material.
-- Inviter assigns role. Role dropdown is not authentication.
-- Room/session identity is checked on every application message.
-- Edit actor identity comes from the admitted connection.
-- Production needs authenticated signaling and temporary TURN credentials.
+TRANSPORT
+- Firebase: room discovery, join requests, initial offer/answer, room metadata.
+- TURN-relayed WebRTC: screen video, heartbeats, connected-session config.
+- iceTransportPolicy:"relay" prevents direct media connections.
+- ICE gathering completes before SDP is written; non-trickle ICE.
 
-TOPOLOGY
-- Creating teacher is authoritative coordinator.
-- One dedicated upload transceiver per participant.
-- Explicit separate sendonly transceivers forward screens to teachers.
-- No student-to-student video.
-- Browser forwarding is not an SFU.
+AUTHORITY
+- Exactly one creating teacher controls a room.
+- Teacher alone assigns seats in authoritative room metadata.
+- Requests are keyed by Firebase authenticated UID and a request generation ID.
+- A student cannot cause an offer merely by editing a status string.
+- Teacher acceptance is performed by teacher code and local connection state.
+- Firebase anonymous IDs are not verified real-world identities.
+
+ROOM ISOLATION
+- Random room ID.
+- Every request has a generation ID.
+- Every DataChannel message carries room ID + generation ID.
+- Stale answers and callbacks must match their current connection object.
 
 STATE
-- Full revisioned snapshots.
-- Edits carry baseRevision and requestId.
-- Draft versions preserve typing after a submitted change.
-- Coordinator-only renegotiation avoids offer glare.
-- Shared state and local receiver health are different concepts.
+- Teacher persists discovery metadata to Firebase.
+- Connected students also receive config snapshots through DataChannels.
+- Grid seat ownership is authoritative teacher metadata.
+- Pending requests do not reserve a seat until accepted.
+- Acceptance synchronously reserves the local seat before asynchronous work.
 
-HEALTH / LIFECYCLE
-- Track, playback and decoded-frame checks.
-- Heartbeats bypass asynchronous SDP processing.
-- Receiver sources map through negotiated MIDs and publishing-session IDs.
-- Asynchronous health results are identity-checked.
-- Capture objects have identity and lifecycle guards.
-- Static desktop content does not necessarily stop encoded frames.
+LIFECYCLE
+- Screen capture begins only from a student tile click/user gesture.
+- Captured desktop is resized onto a low-FPS canvas.
+- Cancellation removes the student's request.
+- Teacher connection cleanup releases its seat.
+- Closing the teacher tab does not provide failover.
 
-LIMITATIONS
-- No automatic signaling, accounts, failover, server persistence or SFU.
-- Long sessions accumulate stopped SDP sections.
-- No 40-device test is claimed.
-- Display permission and original-screen selection cannot be forced silently.
+HEALTH
+- Teacher checks decoded frames on each video receiver.
+- Grey hides stale images.
+- Heartbeats show application connectivity, not fresh desktop capture.
+- Static desktops need not become grey.
+- Asynchronous stats results are guarded against connection replacement.
 
-FUTURE EDITS
-Document authorization effects, protocol changes, lifecycle cleanup,
-test results, and known limitations.
+KNOWN LIMITATIONS
+- One teacher per room, no SFU or multi-teacher forwarding.
+- No account verification beyond Firebase anonymous identities.
+- No automatic ICE restart; failed students stop and request again.
+- No guaranteed 40-device performance claim.
+- Static TURN credentials are public test values.
+- Old Firebase room records require administrative cleanup.
+
+AI / DEVELOPER MODIFICATION RULES
+Document protocol changes, permission effects, cleanup implications,
+tests actually performed, and remaining limitations.
 ===========================================================================
 */
 
+import { initializeApp } from
+  "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+
+import {
+  getAuth, signInAnonymously,
+  setPersistence, browserSessionPersistence
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+import {
+  getDatabase, ref, set, get, update, remove,
+  onValue, onDisconnect
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
 const CLEAN_HTML = "<!doctype html>\n" + document.documentElement.outerHTML;
 const $ = id => document.getElementById(id);
-const uid = () => crypto.randomUUID();
-const VERSION = "file-pairing-1";
-const PORT = 3489;
-const USERNAME = "username";
-const PASSWORD = "password";
-const COOKIE = "classroom_turn_file_v1";
+const uuid = () => crypto.randomUUID();
+
+const TURN_PORT = 3489;
+const TURN_USERNAME = "username";
+const TURN_PASSWORD = "password";
+
+const COOKIE = "classroom_turn_auto_v1";
+const CONFIG_KEY = "classroom_firebase_auto_v1";
+
 const COOKIE_PATH =
   location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1) || "/";
 
-let turnHost = "";
-let room = null;
-let host = false;
-let selfId = "";
-let upstream = null;
-let removed = false;
-let busy = false;
-let mediaBusy = false;
+let db = null;
+let auth = null;
+let firebaseUser = null;
+let connectPromise = null;
+
+let roomId = "";
+let isTeacher = false;
+let meta = null;
+let latestRequests = {};
+
 let capture = null;
-let pending = null;
-let dirtyDraft = false;
-let draftVersion = 0;
-let generated = null;
-let zoomPerson = null;
-let healthBusy = false;
+let studentLink = null;
+let captureBusy = false;
+let roomClosing = false;
 
-const links = new Map();
-const sources = new Map();
-const receivers = new Map();
+let studentRequestId = null;
+let studentSeat = null;
+let studentWatchStop = null;
+let roomWatchStop = null;
+let requestsWatchStop = null;
+let disconnectRegistration = null;
+
+let zoomSeat = null;
+let healthRunning = false;
+
+const teacherLinks = new Map();
 const tiles = new Map();
-let manifest = [];
 
-function message(text) { $("message").textContent = text; }
+// Serializes teacher metadata writes without losing later updates.
+let metadataWrites = Promise.resolve();
+
 function log(text) {
   $("log").textContent =
     `[${new Date().toLocaleTimeString()}] ${text}\n` +
-    $("log").textContent.slice(0, 14000);
+    $("log").textContent.slice(0, 18000);
 }
-function error(e) {
-  message(e.message || String(e));
-  log(e.message || String(e));
+
+function status(text) {
+  $("status").textContent = text;
 }
-function bind(id, fn) {
-  $(id).onclick = async () => {
-    if ($(id).dataset.running) return;
-    $(id).dataset.running = "1";
-    controls();
-    try { await fn(); } catch (e) { error(e); }
-    finally {
-      delete $(id).dataset.running;
-      controls();
+
+function showError(error) {
+  const text = error?.message || String(error);
+  status(text);
+  log(text);
+}
+
+function button(id, callback) {
+  $(id).addEventListener("click", async () => {
+    if ($(id).dataset.busy) return;
+    $(id).dataset.busy = "1";
+    updateControls();
+    try {
+      await callback();
+    } catch (error) {
+      showError(error);
+    } finally {
+      delete $(id).dataset.busy;
+      updateControls();
     }
-  };
+  });
 }
-function download(name, content, type = "application/json") {
-  const url = URL.createObjectURL(new Blob([content], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-function exportPairing(value, filename) {
-  generated = { value, filename };
-  $("downloadPairing").classList.remove("hidden");
-  download(filename, JSON.stringify(value));
-}
-function validHost(value) {
-  if (!value || value.length > 253) return false;
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(value)) {
-    return value.split(".").every(x => Number(x) <= 255);
+
+function validHost(host) {
+  if (!host || host.length > 253) return false;
+
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return host.split(".").every(part => Number(part) <= 255);
   }
-  return value.split(".").every(x =>
-    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(x));
-}
-function configureTurn() {
-  const value = prompt(
-    `Enter coturn IPv4 address or hostname.\nPort ${PORT} is used.\nNo protocol or port.`,
-    ""
+
+  return host.split(".").every(part =>
+    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(part)
   );
-  if (value === null) return false;
-  const hostValue = value.trim().toLowerCase();
-  if (!validHost(hostValue)) throw new Error("Invalid TURN host.");
-  turnHost = hostValue;
+}
+
+function getTurnHost() {
+  try {
+    const item = document.cookie.split(";")
+      .map(value => value.trim())
+      .find(value => value.startsWith(COOKIE + "="));
+
+    const host = item
+      ? decodeURIComponent(item.slice(COOKIE.length + 1))
+      : "";
+
+    return validHost(host) ? host : "";
+  } catch {
+    return "";
+  }
+}
+
+function saveTurnHost(host) {
   document.cookie =
-    `${COOKIE}=${encodeURIComponent(turnHost)}; Max-Age=31536000` +
+    `${COOKIE}=${encodeURIComponent(host)}; Max-Age=31536000` +
     `; Path=${COOKIE_PATH}; SameSite=Lax` +
     (location.protocol === "https:" ? "; Secure" : "");
-  $("turnStatus").textContent = "TURN configured; not connection-tested";
-  return true;
 }
+
+function showSettings() {
+  try {
+    $("firebaseConfigInput").value =
+      localStorage.getItem(CONFIG_KEY) || "";
+  } catch {}
+
+  // Do not prefill or reveal the saved TURN host in the input.
+  $("turnHostInput").value = "";
+  $("turnHostInput").placeholder = getTurnHost()
+    ? "Leave blank to keep the saved TURN host"
+    : "Enter your TURN host";
+
+  $("settingsDialog").showModal();
+}
+
+function readFirebaseConfig() {
+  let value;
+  try {
+    value = JSON.parse(localStorage.getItem(CONFIG_KEY) || "null");
+  } catch {}
+
+  if (!value?.apiKey || !value?.databaseURL || !value?.projectId) {
+    throw new Error(
+      "Configure Firebase first. Include apiKey, databaseURL and projectId."
+    );
+  }
+
+  return value;
+}
+
+async function connectServices() {
+  if (firebaseUser && db) return;
+  if (connectPromise) return connectPromise;
+
+  connectPromise = (async () => {
+    if (!window.isSecureContext) {
+      throw new Error("Use HTTPS or localhost.");
+    }
+
+    if (!getTurnHost()) {
+      throw new Error("Configure your TURN host first.");
+    }
+
+    const config = readFirebaseConfig();
+    const app = initializeApp(config);
+
+    auth = getAuth(app);
+    await setPersistence(auth, browserSessionPersistence);
+
+    const credential = await signInAnonymously(auth);
+    firebaseUser = credential.user;
+    db = getDatabase(app);
+
+    onValue(ref(db, ".info/connected"), snapshot => {
+      $("serviceStatus").textContent = snapshot.val()
+        ? "Signaling connected"
+        : "Signaling reconnecting";
+    });
+
+    log("Firebase signaling initialized.");
+  })();
+
+  try {
+    await connectPromise;
+  } catch (error) {
+    // Reload is recommended after initialization/configuration errors.
+    $("serviceStatus").textContent = "Signaling setup failed";
+    throw error;
+  }
+}
+
+function peerRef(uid = firebaseUser.uid) {
+  return ref(db, `rooms/${roomId}/peers/${uid}`);
+}
+
+function roomMetaRef() {
+  return ref(db, `rooms/${roomId}/meta`);
+}
+
 function rtcConfig() {
-  if (!turnHost && !configureTurn()) throw new Error("TURN configuration required.");
+  const host = getTurnHost();
+  if (!host) throw new Error("TURN host is not configured.");
+
   return {
     iceServers: [{
       urls: [
-        `turn:${turnHost}:${PORT}?transport=udp`,
-        `turn:${turnHost}:${PORT}?transport=tcp`
+        `turn:${host}:${TURN_PORT}?transport=udp`,
+        `turn:${host}:${TURN_PORT}?transport=tcp`
       ],
-      username: USERNAME,
-      credential: PASSWORD
+      username: TURN_USERNAME,
+      credential: TURN_PASSWORD
     }],
     iceTransportPolicy: "relay"
   };
 }
-function me() { return room?.people.find(p => p.id === selfId); }
-function teacher() { return me()?.role === "teacher"; }
-function ready() {
-  if (!room || removed || room.revision < 1) return false;
-  return host || !!(
-    upstream?.active &&
-    upstream.dc?.readyState === "open" &&
-    upstream.pc.connectionState === "connected" &&
-    Date.now() - upstream.lastSeen < 25000
-  );
-}
-function envelope(type, extra = {}) {
-  return {
-    protocol: VERSION,
-    roomId: room.id,
-    sessionId: room.sessionId,
-    type,
-    ...extra
-  };
-}
-function validEnvelope(value) {
-  return room && value &&
-    value.protocol === VERSION &&
-    value.roomId === room.id &&
-    value.sessionId === room.sessionId;
-}
-function controls() {
-  const online = ready();
-  $("startPanel").classList.toggle("hidden", !!room);
-  $("hostPairing").classList.toggle("hidden", !host);
-  $("roomPanel").classList.toggle("hidden", !room);
-  $("gridPanel").classList.toggle("hidden", !room);
-  $("teacherSettings").classList.toggle("hidden", !teacher());
+
+function updateControls() {
+  const inRoom = !!roomId;
+
+  $("startPanel").classList.toggle("hidden", inRoom);
+  $("roomPanel").classList.toggle("hidden", !inRoom);
+  $("gridPanel").classList.toggle("hidden", !inRoom);
+  $("teacherControls").classList.toggle("hidden", !isTeacher);
+
+  $("studentHelp").classList.toggle("hidden", isTeacher);
+  $("stopButton").classList.toggle("hidden", isTeacher);
 
   const disabled = {
-    create: !!room || busy || $("role").value !== "teacher",
-    join: !!room || busy,
-    invite: !host || busy,
-    accept: !host || busy,
-    apply: !online || !teacher() || !!pending,
-    move: !online || !teacher() || !!pending,
-    remove: !online || !teacher() || !!pending,
-    choose: !online || !!pending || (room?.layout.locked && !teacher()),
-    share: !online || mediaBusy || !!capture || !me()?.seat,
-    stop: !capture || mediaBusy
+    createButton: inRoom || $("roleInput").value !== "teacher",
+    joinButton: inRoom,
+    applyButton: !isTeacher || roomClosing,
+    closeRoomButton: !isTeacher || roomClosing,
+    stopButton: !capture && !studentRequestId
   };
-  document.querySelectorAll("button").forEach(button => {
-    button.disabled = !!button.dataset.running || !!disabled[button.id];
-  });
-  $("connectionStatus").textContent = !room
-    ? "Not in a classroom"
-    : removed
-      ? "Removed — reload to join again"
-      : online
-        ? host ? "Coordinator online" : "Classroom synchronized"
-        : "Connecting / configuration out of sync";
-  $("connectionStatus").style.color = online ? "#86efac" : "#fbbf24";
-  $("draftStatus").textContent = dirtyDraft
-    ? "Unsent local settings draft."
-    : "Showing committed classroom settings.";
+
+  for (const element of document.querySelectorAll("button")) {
+    element.disabled = !!element.dataset.busy || !!disabled[element.id];
+  }
+
+  $("connectionState").textContent = !inRoom
+    ? "Not in a room"
+    : meta?.closed
+      ? "Room closed"
+      : isTeacher
+        ? "Teacher room active"
+        : studentLink?.pc.connectionState === "connected"
+          ? "Screen connection established"
+          : studentRequestId
+            ? "Waiting / connecting"
+            : "Room open — click an empty seat";
+}
+
+function validateLayout(rows, cols, width, fps) {
+  if (
+    !Number.isInteger(rows) || !Number.isInteger(cols) ||
+    rows < 1 || cols < 1 || rows > 12 || cols > 12 ||
+    rows * cols > 64 ||
+    ![160, 256, 320].includes(width) ||
+    ![1, 2].includes(fps)
+  ) {
+    throw new Error("Use 1–64 positions and supported preview settings.");
+  }
+}
+
+function roomLink() {
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("room", roomId);
+  return url.href;
 }
 
 /*
- * Reliable application framing.
- * Bounds apply to queued data, partial messages and queued handlers.
+ * Teacher metadata is mirrored to Firebase for pre-connection discovery.
+ * Connected students receive the same revision through TURN DataChannels.
  */
-function send(link, value) {
-  if (!link?.active || link.dc?.readyState !== "open") return false;
-  const text = JSON.stringify(value);
-  if (text.length > 2000000) return false;
-  const id = uid();
-  const n = Math.max(1, Math.ceil(text.length / 8000));
-  const frames = [];
-  for (let i = 0; i < n; i++) {
-    frames.push(JSON.stringify({ id, i, n, s: text.slice(i * 8000, (i + 1) * 8000) }));
+function commitMetadata() {
+  if (!isTeacher || !meta) return Promise.resolve();
+
+  meta.revision++;
+  const snapshot = structuredClone(meta);
+
+  for (const link of teacherLinks.values()) {
+    sendData(link, "config", { meta: snapshot });
   }
-  const size = frames.reduce((sum, f) => sum + f.length, 0);
-  if (link.queuedSize + size > 4000000) {
-    log("Send queue overloaded; re-pair the affected participant.");
-    return false;
-  }
-  link.queue.push(...frames);
-  link.queuedSize += size;
-  pump(link);
-  return true;
+
+  renderGrid();
+
+  metadataWrites = metadataWrites
+    .catch(() => {})
+    .then(() => set(roomMetaRef(), snapshot));
+
+  metadataWrites.catch(showError);
+  return metadataWrites;
 }
-function pump(link) {
-  if (!link.active || link.dc?.readyState !== "open") return;
+
+async function createRoom() {
+  await connectServices();
+
+  const name = $("nameInput").value.trim() || "Teacher";
+  const label = $("roomInput").value.trim() || "Classroom";
+
+  roomId = uuid();
+  isTeacher = true;
+
   try {
-    while (link.queue.length && link.dc.bufferedAmount < 262144) {
-      const frame = link.queue[0];
-      link.dc.send(frame);
-      link.queue.shift();
-      link.queuedSize -= frame.length;
-    }
-  } catch (e) { log("Send failed: " + e.message); }
-}
-function cleanInbox(link) {
-  const now = Date.now();
-  for (const [id, value] of link.inbox) {
-    if (now - value.at > 30000) {
-      link.inboxSize -= value.size;
-      link.inbox.delete(id);
-    }
-  }
-  for (const [id, at] of link.completed) {
-    if (now - at > 60000) link.completed.delete(id);
-  }
-}
-function receive(link, raw) {
-  if (!link.active || typeof raw !== "string" || raw.length > 60000) return;
-  const f = JSON.parse(raw);
-  if (
-    typeof f.id !== "string" || f.id.length > 80 ||
-    typeof f.s !== "string" || f.s.length > 8000 ||
-    !Number.isInteger(f.n) || f.n < 1 || f.n > 250 ||
-    !Number.isInteger(f.i) || f.i < 0 || f.i >= f.n
-  ) throw new Error("Invalid message frame.");
+    await set(ref(db, `rooms/${roomId}/owner`), firebaseUser.uid);
 
-  cleanInbox(link);
-  if (link.completed.has(f.id)) return;
-  let p = link.inbox.get(f.id);
-  if (!p) {
-    if (link.inbox.size >= 8) throw new Error("Partial-message limit.");
-    p = { n: f.n, parts: new Map(), size: 0, at: Date.now() };
-    link.inbox.set(f.id, p);
-  }
-  if (p.n !== f.n) throw new Error("Conflicting message frames.");
-  if (p.parts.has(f.i)) {
-    if (p.parts.get(f.i) !== f.s) throw new Error("Conflicting duplicate.");
-    return;
-  }
-  if (link.inboxSize + f.s.length > 2000000) throw new Error("Receive limit.");
-  p.parts.set(f.i, f.s);
-  p.size += f.s.length;
-  link.inboxSize += f.s.length;
-  if (p.parts.size !== p.n) return;
-
-  const text = Array.from({ length: p.n }, (_, i) => p.parts.get(i)).join("");
-  link.inbox.delete(f.id);
-  link.inboxSize -= p.size;
-  link.completed.set(f.id, Date.now());
-  while (link.completed.size > 256) {
-    link.completed.delete(link.completed.keys().next().value);
-  }
-
-  const value = JSON.parse(text);
-  if (!validEnvelope(value)) throw new Error("Wrong classroom/session.");
-
-  // Heartbeats must not wait for asynchronous SDP handling.
-  link.lastSeen = Date.now();
-  if (value.type === "heartbeat") return;
-  if (link.handlers >= 128) throw new Error("Application queue limit.");
-
-  link.handlers++;
-  link.chain = link.chain
-    .then(() => handle(link, value))
-    .catch(e => log("Rejected message: " + e.message))
-    .finally(() => link.handlers--);
-}
-function newLink(id, personId, role, hostSide) {
-  const pc = new RTCPeerConnection(rtcConfig());
-  const link = {
-    id, personId, role, hostSide, pc,
-    name: role,
-    active: true, admitted: false,
-    dc: null, upload: null,
-    lastSeen: Date.now(),
-    queue: [], queuedSize: 0,
-    inbox: new Map(), inboxSize: 0, completed: new Map(),
-    chain: Promise.resolve(), handlers: 0,
-    forwards: new Map(),
-    dirty: false, preparing: false, waiting: false, failed: false,
-    timer: null, editTimes: []
-  };
-
-  pc.onconnectionstatechange = () => {
-    if (!link.active) return;
-    log(`${hostSide ? "Participant" : "Coordinator"}: ${pc.connectionState}`);
-    if (hostSide) updateOnline(link);
-    render();
-  };
-  pc.onicecandidateerror = () => {
-    log("An ICE attempt failed. Check TURN if the connection does not establish.");
-  };
-  pc.onnegotiationneeded = () => {
-    if (hostSide && link.dc?.readyState === "open") {
-      link.dirty = true;
-      void negotiate(link);
-    }
-  };
-  pc.ondatachannel = event => {
-    if (link.dc) event.channel.close();
-    else attachChannel(link, event.channel);
-  };
-  pc.ontrack = event => {
-    if (!link.active || event.track.kind !== "video") return;
-    const source = {
-      track: event.track,
-      stream: event.streams[0] || new MediaStream([event.track]),
-      receiver: event.receiver,
-      transceiver: event.transceiver,
-      pc,
-      local: false,
-      version: uid()
+    meta = {
+      label,
+      teacherName: name,
+      rows: 5,
+      cols: 8,
+      width: 256,
+      fps: 1,
+      autoAccept: false,
+      closed: false,
+      revision: 1,
+      seats: {}
     };
-    if (hostSide) {
-      if (event.transceiver !== link.upload) return;
-      sources.set(personId, source);
-      event.track.addEventListener("ended", () => {
-        if (!link.active || sources.get(personId)?.track !== event.track) return;
-        sources.delete(personId);
-        const person = room?.people.find(p => p.id === personId);
-        if (person) {
-          person.sharing = false;
-          person.streamId = null;
-          commit();
-        }
-      }, { once: true });
-      reconcileAll();
-      render();
-    } else {
-      const mid = event.transceiver.mid;
-      if (mid === null) return;
-      receivers.set(mid, source);
-      event.track.addEventListener("ended", () => {
-        if (receivers.get(mid)?.track === event.track) {
-          receivers.delete(mid);
-          bindManifest();
-        }
-      }, { once: true });
-      bindManifest();
-    }
-  };
-  return link;
-}
-function attachChannel(link, dc) {
-  link.dc = dc;
-  dc.bufferedAmountLowThreshold = 65536;
-  dc.onbufferedamountlow = () => pump(link);
-  dc.onmessage = event => {
-    try { receive(link, event.data); } catch (e) { log(e.message); }
-  };
-  dc.onopen = () => {
-    if (!link.active) return;
-    link.admitted = true;
-    link.lastSeen = Date.now();
-    if (link.hostSide) {
-      if (!room.people.some(p => p.id === link.personId)) {
-        room.people.push({
-          id: link.personId, name: link.name, role: link.role,
-          seat: null, online: true, sharing: false, streamId: null
-        });
-      }
-      commit();
-    } else {
-      send(link, envelope("sync"));
-      message("Connection established. Waiting for classroom state.");
-    }
-    render();
-  };
-  dc.onclose = () => {
-    if (link.hostSide) updateOnline(link);
-    render();
-  };
-}
-function closeLink(link) {
-  if (!link) return;
-  link.active = false;
-  clearTimeout(link.timer);
-  link.queue = [];
-  link.inbox.clear();
-  link.completed.clear();
-  try { link.dc?.close(); } catch {}
-  try { link.pc.close(); } catch {}
-  link.forwards.clear();
-}
-function updateOnline(link) {
-  if (!host || !room || !link.active || !link.admitted) return;
-  const person = room.people.find(p => p.id === link.personId);
-  const online =
-    link.dc?.readyState === "open" &&
-    link.pc.connectionState === "connected" &&
-    Date.now() - link.lastSeen < 25000;
-  if (person && person.online !== online) {
-    person.online = online;
-    commit();
+
+    await set(roomMetaRef(), meta);
+
+    requestsWatchStop = onValue(
+      ref(db, `rooms/${roomId}/peers`),
+      snapshot => {
+        latestRequests = snapshot.val() || {};
+        processRequests();
+      },
+      showError
+    );
+
+    $("roomLink").value = roomLink();
+    renderGrid();
+    renderRequests();
+    updateControls();
+
+    status("Room created. Share the student link. Auto accept is currently off.");
+  } catch (error) {
+    roomId = "";
+    isTeacher = false;
+    meta = null;
+    throw error;
   }
 }
-async function gathered(pc) {
+
+async function openRoom() {
+  await connectServices();
+
+  let value = $("roomInput").value.trim();
+
+  if (value.includes("://")) {
+    value = new URL(value).searchParams.get("room") || "";
+  }
+
+  if (!/^[a-zA-Z0-9-]{8,100}$/.test(value)) {
+    throw new Error("Enter a valid room ID or open the teacher's room link.");
+  }
+
+  const snapshot = await get(ref(db, `rooms/${value}/meta`));
+  if (!snapshot.exists()) throw new Error("Room not found.");
+
+  const initial = snapshot.val();
+  if (initial.closed) throw new Error("This room is closed.");
+
+  roomId = value;
+  isTeacher = false;
+  meta = initial;
+
+  roomWatchStop = onValue(roomMetaRef(), snapshot => {
+    const next = snapshot.val();
+
+    if (!next || next.closed) {
+      if (next) meta = next;
+      status("Teacher closed the room.");
+      void stopStudent();
+      renderGrid();
+      return;
+    }
+
+    if (!meta || next.revision >= meta.revision) {
+      meta = next;
+      renderGrid();
+    }
+  }, showError);
+
+  renderGrid();
+  updateControls();
+
+  status("Click an empty seat. Your browser will ask which screen to share.");
+}
+
+/** Gather all relay candidates before writing SDP to Firebase. */
+async function completeDescription(pc) {
   if (pc.iceGatheringState !== "complete") {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error("TURN gathering timed out. Check server settings."));
+        reject(new Error("TURN gathering timed out. Check your TURN server."));
       }, 30000);
+
       function cleanup() {
         clearTimeout(timer);
         pc.removeEventListener("icegatheringstatechange", check);
         pc.removeEventListener("connectionstatechange", check);
       }
+
       function check() {
         if (pc.connectionState === "closed") {
           cleanup();
@@ -744,993 +784,1073 @@ async function gathered(pc) {
           resolve();
         }
       }
+
       pc.addEventListener("icegatheringstatechange", check);
       pc.addEventListener("connectionstatechange", check);
       check();
     });
   }
-  const d = pc.localDescription;
-  if (!d?.sdp?.includes(" typ relay")) {
-    throw new Error("No TURN relay candidate. Verify host, port and credentials.");
-  }
-  return { type: d.type, sdp: d.sdp };
-}
-async function negotiate(link) {
-  if (
-    !link.active || !link.hostSide || link.failed ||
-    link.dc?.readyState !== "open" ||
-    !link.dirty || link.preparing || link.waiting ||
-    link.pc.signalingState !== "stable"
-  ) return;
 
-  link.dirty = false;
-  link.preparing = true;
-  try {
-    await link.pc.setLocalDescription(await link.pc.createOffer());
-    const description = await gathered(link.pc);
-    if (!link.active) return;
-    link.waiting = true;
-    if (!send(link, envelope("offer", { description }))) {
-      throw new Error("Could not send video negotiation.");
-    }
-    link.timer = setTimeout(() => {
-      if (link.waiting && link.active) {
-        log(`Negotiation delayed for ${link.name}; re-pair if necessary.`);
-      }
-    }, 45000);
-  } catch (e) {
-    link.failed = true;
-    log("Negotiation failed; remove and re-invite participant: " + e.message);
-  } finally {
-    link.preparing = false;
-    if (link.dirty && !link.waiting && !link.failed) {
-      setTimeout(() => void negotiate(link), 0);
-    }
+  const value = pc.localDescription;
+
+  if (!value?.sdp?.includes(" typ relay")) {
+    throw new Error("No TURN relay candidate. Verify TURN host, port and credentials.");
   }
+
+  return { type: value.type, sdp: value.sdp };
 }
 
-function layoutKey(name) { return "file-class-layout:" + name.toLowerCase(); }
-function validateLayout(value, people = []) {
-  if (!value) throw new Error("Missing layout.");
-  const rows = Number(value.rows), cols = Number(value.cols);
-  const width = Number(value.width), fps = Number(value.fps);
-  if (
-    !Number.isInteger(rows) || !Number.isInteger(cols) ||
-    rows < 1 || cols < 1 || rows > 12 || cols > 12 || rows * cols > 64 ||
-    ![160, 256, 320].includes(width) || ![1, 2].includes(fps) ||
-    !Array.isArray(value.disabled)
-  ) throw new Error("Use 1–64 positions and supported preview settings.");
-  const disabled = [...new Set(value.disabled.map(Number))];
-  if (disabled.some(n => !Number.isInteger(n) || n < 1 || n > rows * cols)) {
-    throw new Error("Disabled seat is outside the grid.");
-  }
-  for (const p of people) {
-    if (p.seat && (p.seat > rows * cols || disabled.includes(p.seat))) {
-      throw new Error(`Move ${p.name} before removing seat ${p.seat}.`);
-    }
-  }
-  return { rows, cols, width, fps, disabled, locked: value.locked === true };
-}
-function defaultLayout(name) {
-  try {
-    const value = JSON.parse(localStorage.getItem(layoutKey(name)));
-    if (value) return validateLayout(value);
-  } catch {}
-  return { rows: 5, cols: 8, width: 256, fps: 1, disabled: [], locked: false };
-}
-function createRoom() {
-  if (room || busy) throw new Error("Reload before creating another classroom.");
-  if ($("role").value !== "teacher") throw new Error("Select Teacher.");
-  if (!turnHost && !configureTurn()) return;
-  host = true;
-  selfId = uid();
-  const label = $("roomName").value.trim() || "Classroom";
-  room = {
-    id: uid(), sessionId: uid(), coordinatorId: selfId,
-    label, revision: 1, layout: defaultLayout(label),
-    people: [{
-      id: selfId, name: $("name").value.trim() || "Coordinator",
-      role: "teacher", seat: null, online: true, sharing: false, streamId: null
-    }]
+function newPeer(uid, requestId, teacherSide) {
+  const pc = new RTCPeerConnection(rtcConfig());
+
+  const link = {
+    uid,
+    requestId,
+    teacherSide,
+    pc,
+    dc: null,
+    transceiver: null,
+    receiver: null,
+    stream: null,
+    name: "",
+    seat: null,
+    active: true,
+    answerApplied: false,
+    applyingAnswer: false,
+    lastHeartbeat: Date.now(),
+    frames: null,
+    lastFrameAt: 0,
+    sourceVersion: uuid(),
+    disconnectTimer: null
   };
-  render();
-  message("Classroom created. Click Download invitation.");
-}
-async function makeInvitation() {
-  if (!host || busy) return;
-  if (links.size >= 80) throw new Error("Connection limit reached.");
-  busy = true;
-  controls();
-  let link;
-  try {
-    link = newLink(uid(), uid(), $("inviteRole").value, true);
-    links.set(link.id, link);
-    link.upload = link.pc.addTransceiver("video", { direction: "recvonly" });
-    attachChannel(link, link.pc.createDataChannel("classroom", { ordered: true }));
-    await link.pc.setLocalDescription(await link.pc.createOffer());
-    const description = await gathered(link.pc);
-    exportPairing({
-      protocol: VERSION, kind: "invitation",
-      roomId: room.id, sessionId: room.sessionId, label: room.label,
-      linkId: link.id, personId: link.personId, role: link.role, description
-    }, `classroom-invitation-${link.id.slice(0, 8)}.json`);
-    message("Invitation downloaded. Send it privately to the participant.");
-  } catch (e) {
-    if (link) {
-      closeLink(link);
-      links.delete(link.id);
-    }
-    throw e;
-  } finally {
-    busy = false;
-    controls();
-  }
-}
-async function readPairing(file) {
-  if (!file || file.size > 3000000) throw new Error("Invalid pairing file.");
-  const value = JSON.parse(await file.text());
-  if (
-    value.protocol !== VERSION ||
-    !["roomId", "sessionId", "linkId", "personId"].every(
-      key => typeof value[key] === "string" &&
-        value[key].length > 0 && value[key].length < 100
-    ) ||
-    typeof value.description?.sdp !== "string"
-  ) throw new Error("Incompatible or invalid pairing file.");
-  return value;
-}
-async function joinFile(file) {
-  if (room || busy) throw new Error("Reload before joining another classroom.");
-  const invitation = await readPairing(file);
-  if (
-    invitation.kind !== "invitation" ||
-    invitation.description.type !== "offer" ||
-    !["teacher", "student"].includes(invitation.role)
-  ) throw new Error("Select an invitation file, not an answer.");
 
-  busy = true;
-  controls();
-  try {
-    host = false;
-    selfId = invitation.personId;
-    room = {
-      id: invitation.roomId, sessionId: invitation.sessionId,
-      label: String(invitation.label || "Classroom").slice(0, 64),
-      coordinatorId: "", revision: 0, layout: defaultLayout(""),
-      people: [{
-        id: selfId, name: $("name").value.trim() || invitation.role,
-        role: invitation.role, seat: null, online: false,
-        sharing: false, streamId: null
-      }]
-    };
-    upstream = newLink(invitation.linkId, selfId, invitation.role, false);
-    await upstream.pc.setRemoteDescription(invitation.description);
-    upstream.upload = upstream.pc.getTransceivers().find(
-      t => t.receiver.track.kind === "video"
-    );
-    if (!upstream.upload) throw new Error("Missing upload transceiver.");
-    upstream.upload.direction = "sendonly";
-    await upstream.pc.setLocalDescription(await upstream.pc.createAnswer());
-    const description = await gathered(upstream.pc);
-    exportPairing({
-      protocol: VERSION, kind: "answer",
-      roomId: room.id, sessionId: room.sessionId,
-      linkId: upstream.id, personId: selfId,
-      name: me().name, description
-    }, `classroom-answer-${upstream.id.slice(0, 8)}.json`);
-    message("Answer downloaded. Send it to the teacher, who must accept that file.");
-    render();
-  } catch (e) {
-    closeLink(upstream);
-    upstream = null;
-    room = null;
-    sources.clear();
-    receivers.clear();
-    throw e;
-  } finally {
-    busy = false;
-    controls();
-  }
-}
-async function acceptFile(file) {
-  if (!host) throw new Error("Create a classroom before accepting an answer.");
-  const answer = await readPairing(file);
-  if (
-    answer.kind !== "answer" || answer.description.type !== "answer" ||
-    answer.roomId !== room.id || answer.sessionId !== room.sessionId
-  ) throw new Error("Select an answer for this classroom session.");
-  const link = links.get(answer.linkId);
-  if (
-    !link?.active || link.admitted ||
-    link.personId !== answer.personId ||
-    link.pc.signalingState !== "have-local-offer"
-  ) throw new Error("Unknown or already accepted answer.");
-  link.name = String(answer.name || link.role).slice(0, 64);
-  await link.pc.setRemoteDescription(answer.description);
-  message("Answer accepted. Connecting through TURN.");
+  pc.onicecandidateerror = () => {
+    log("An ICE server attempt failed. Check TURN if connection does not establish.");
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (!link.active) return;
+
+    clearTimeout(link.disconnectTimer);
+    log(`${teacherSide ? link.name || "Student" : "Teacher"}: ${pc.connectionState}`);
+
+    if (teacherSide && ["failed", "disconnected"].includes(pc.connectionState)) {
+      link.disconnectTimer = setTimeout(() => {
+        if (
+          link.active &&
+          ["failed", "disconnected"].includes(pc.connectionState)
+        ) {
+          void releaseStudent(uid, "Connection lost. Please join again.");
+        }
+      }, 20000);
+    }
+
+    if (!teacherSide && pc.connectionState === "failed") {
+      status("Connection failed. Stop sharing and click your seat again.");
+    }
+
+    renderGrid();
+    updateControls();
+  };
+
+  pc.ontrack = event => {
+    if (!teacherSide || event.track.kind !== "video" || !link.active) return;
+
+    link.receiver = event.receiver;
+    link.stream = new MediaStream([event.track]);
+    link.sourceVersion = uuid();
+    link.frames = null;
+    link.lastFrameAt = 0;
+
+    event.track.addEventListener("ended", () => renderGrid(), { once: true });
+    renderGrid();
+  };
+
+  pc.ondatachannel = event => attachDataChannel(link, event.channel);
+
+  return link;
 }
 
-function commit() {
-  if (!host || !room) return;
-  room.revision++;
-  try {
-    localStorage.setItem(layoutKey(room.label), JSON.stringify(room.layout));
-  } catch {}
-  for (const link of links.values()) {
-    if (link.admitted) send(link, envelope("snapshot", { state: room }));
-  }
-  render();
-  reconcileAll();
-}
-function applyEdit(actorId, edit) {
-  const actor = room.people.find(p => p.id === actorId);
-  if (!actor || !edit) throw new Error("Invalid edit actor.");
-  if (edit.kind === "layout") {
-    if (actor.role !== "teacher") throw new Error("Teacher permission required.");
-    room.layout = validateLayout(edit.layout, room.people);
-  } else if (edit.kind === "seat") {
-    if (actor.role !== "teacher" && room.layout.locked) {
-      throw new Error("Student seat changes are locked.");
-    }
-    const id = actor.role === "teacher" ? edit.personId : actorId;
-    const person = room.people.find(p => p.id === id);
-    const seat = Number(edit.seat);
-    if (
-      !person || !Number.isInteger(seat) || seat < 1 ||
-      seat > room.layout.rows * room.layout.cols ||
-      room.layout.disabled.includes(seat)
-    ) throw new Error("Invalid seat.");
-    if (room.people.some(p => p.id !== id && p.seat === seat)) {
-      throw new Error("Seat already occupied.");
-    }
-    person.seat = seat;
-  } else if (edit.kind === "remove") {
-    if (actor.role !== "teacher") throw new Error("Teacher permission required.");
-    if (edit.personId === room.coordinatorId) throw new Error("Cannot remove coordinator.");
-    if (!room.people.some(p => p.id === edit.personId)) throw new Error("Unknown participant.");
-    for (const [id, link] of links) {
-      if (link.personId === edit.personId) {
-        send(link, envelope("removed"));
-        link.active = false;
-        links.delete(id);
-        setTimeout(() => closeLink(link), 250);
-      }
-    }
-    sources.delete(edit.personId);
-    room.people = room.people.filter(p => p.id !== edit.personId);
-  } else throw new Error("Unsupported edit.");
-  commit();
-}
-function clearPending(id) {
-  if (!pending || pending.id !== id) return null;
-  const value = pending;
-  clearTimeout(value.timer);
-  pending = null;
-  return value;
-}
-function requestEdit(edit) {
-  if (!ready()) throw new Error("Classroom is not synchronized.");
-  if (pending) throw new Error("Wait for the current edit.");
-  if (host) {
-    applyEdit(selfId, edit);
-    if (edit.kind === "layout") dirtyDraft = false;
-    render();
-    message("Shared change committed.");
+function attachDataChannel(link, dc) {
+  if (link.dc && link.dc !== dc) {
+    dc.close();
     return;
   }
-  const id = uid();
-  const timer = setTimeout(() => {
-    if (!clearPending(id)) return;
-    message("Edit response timed out. Review current state before retrying.");
-    send(upstream, envelope("sync"));
-    controls();
-  }, 15000);
-  pending = { id, edit, timer, draftVersion };
-  if (!send(upstream, envelope("edit", {
-    requestId: id, revision: room.revision, edit
-  }))) {
-    clearPending(id);
-    throw new Error("Could not send edit.");
+
+  link.dc = dc;
+
+  dc.onopen = () => {
+    link.lastHeartbeat = Date.now();
+
+    if (link.teacherSide) {
+      sendData(link, "config", { meta });
+      sendData(link, "accepted", { seat: link.seat });
+    } else {
+      status("Teacher accepted you. Screen sharing is connected.");
+    }
+  };
+
+  dc.onmessage = event => {
+    try {
+      if (typeof event.data !== "string" || event.data.length > 50000) return;
+      const value = JSON.parse(event.data);
+
+      if (
+        !link.active ||
+        value.roomId !== roomId ||
+        value.requestId !== link.requestId
+      ) return;
+
+      link.lastHeartbeat = Date.now();
+
+      if (!link.teacherSide && value.type === "config") {
+        const next = value.meta;
+
+        if (
+          next &&
+          Number.isInteger(next.revision) &&
+          (!meta || next.revision >= meta.revision)
+        ) {
+          meta = next;
+          renderGrid();
+        }
+      }
+
+      if (!link.teacherSide && value.type === "removed") {
+        status(value.reason || "Removed by teacher.");
+        void stopStudent();
+      }
+
+    } catch (error) {
+      log("Invalid DataChannel message ignored.");
+    }
+  };
+}
+
+function sendData(link, type, extra = {}) {
+  if (!link?.active || link.dc?.readyState !== "open") return false;
+
+  try {
+    if (link.dc.bufferedAmount > 262144) return false;
+
+    link.dc.send(JSON.stringify({
+      roomId,
+      requestId: link.requestId,
+      type,
+      ...extra
+    }));
+
+    return true;
+  } catch {
+    return false;
   }
-  controls();
 }
-function rateLimit(link) {
-  const now = Date.now();
-  link.editTimes = link.editTimes.filter(t => now - t < 10000);
-  if (link.editTimes.length >= 30) throw new Error("Too many changes; wait.");
-  link.editTimes.push(now);
+
+function destroyPeer(link) {
+  if (!link) return;
+  link.active = false;
+  clearTimeout(link.disconnectTimer);
+
+  try { link.dc?.close(); } catch {}
+  try { link.pc.close(); } catch {}
+
+  link.stream = null;
 }
-function validateState(state) {
+
+async function capSender(sender) {
+  try {
+    const parameters = sender.getParameters();
+    if (!parameters.encodings?.length) return;
+    parameters.encodings[0].maxBitrate = 80000;
+    parameters.encodings[0].maxFramerate = 2;
+    await sender.setParameters(parameters);
+  } catch {
+    // Requested target, not guaranteed total traffic.
+  }
+}
+
+/*
+ * Teacher request processing.
+ * A local link is the authoritative indication of teacher acceptance.
+ * Student-written status fields alone never create a media connection.
+ */
+function processRequests() {
+  if (!isTeacher || roomClosing) return;
+
+  for (const [uid, link] of teacherLinks) {
+    const request = latestRequests[uid];
+
+    if (
+      !request ||
+      request.requestId !== link.requestId ||
+      request.state === "cancelled"
+    ) {
+      void releaseStudent(uid, "", false);
+    }
+  }
+
+  for (const [uid, request] of Object.entries(latestRequests)) {
+    const link = teacherLinks.get(uid);
+
+    if (
+      link &&
+      request.requestId === link.requestId &&
+      request.answer?.type === "answer" &&
+      !link.answerApplied &&
+      !link.applyingAnswer &&
+      link.pc.signalingState === "have-local-offer"
+    ) {
+      link.applyingAnswer = true;
+
+      link.pc.setRemoteDescription(request.answer)
+        .then(() => {
+          if (link.active) link.answerApplied = true;
+        })
+        .catch(showError)
+        .finally(() => {
+          link.applyingAnswer = false;
+        });
+    }
+
+    if (
+      !link &&
+      meta.autoAccept &&
+      request.state === "requested"
+    ) {
+      void acceptStudent(uid).catch(showError);
+    }
+  }
+
+  renderRequests();
+}
+
+function validRequest(request) {
+  return request &&
+    typeof request.requestId === "string" &&
+    request.requestId.length < 100 &&
+    typeof request.name === "string" &&
+    request.name.length <= 60 &&
+    Number.isInteger(request.seat) &&
+    request.seat >= 1 &&
+    request.seat <= meta.rows * meta.cols &&
+    request.state === "requested";
+}
+
+async function acceptStudent(uid) {
+  if (!isTeacher || roomClosing || teacherLinks.has(uid)) return;
+
+  const request = latestRequests[uid];
+
+  if (!validRequest(request)) {
+    throw new Error("Invalid or expired student request.");
+  }
+
+  meta.seats ||= {};
+
+  const occupied = meta.seats[String(request.seat)];
+  if (occupied) {
+    await update(peerRef(uid), {
+      state: "rejected",
+      reason: "That seat was just taken. Choose another seat."
+    });
+    return;
+  }
+
+  // Reserve immediately, before asynchronous signaling, to avoid collisions.
+  const link = newPeer(uid, request.requestId, true);
+  link.name = request.name;
+  link.seat = request.seat;
+
+  teacherLinks.set(uid, link);
+
+  meta.seats[String(request.seat)] = {
+    uid,
+    requestId: request.requestId,
+    name: request.name
+  };
+
+  try {
+    await commitMetadata();
+
+    if (!link.active) return;
+
+    link.transceiver = link.pc.addTransceiver("video", {
+      direction: "recvonly"
+    });
+
+    attachDataChannel(
+      link,
+      link.pc.createDataChannel("classroom", { ordered: true })
+    );
+
+    await link.pc.setLocalDescription(await link.pc.createOffer());
+    const offer = await completeDescription(link.pc);
+
+    if (
+      !link.active ||
+      latestRequests[uid]?.requestId !== link.requestId
+    ) return;
+
+    await update(peerRef(uid), {
+      state: "accepted",
+      offer
+    });
+
+    log(`Accepted ${request.name} in seat ${request.seat}.`);
+
+  } catch (error) {
+    await releaseStudent(uid, "Connection setup failed. Please request again.");
+    throw error;
+  }
+
+  renderRequests();
+}
+
+async function rejectStudent(uid) {
+  const request = latestRequests[uid];
+  if (!request) return;
+
+  await update(peerRef(uid), {
+    state: "rejected",
+    reason: "Teacher declined this request."
+  });
+}
+
+async function releaseStudent(uid, reason = "Removed by teacher.", notify = true) {
+  const link = teacherLinks.get(uid);
+  if (!link) return;
+
+  teacherLinks.delete(uid);
+
+  if (notify) sendData(link, "removed", { reason });
+  destroyPeer(link);
+
+  const seatKey = String(link.seat);
+  if (meta?.seats?.[seatKey]?.uid === uid) {
+    delete meta.seats[seatKey];
+  }
+
+  await commitMetadata();
+
   if (
-    state?.id !== room.id || state.sessionId !== room.sessionId ||
-    !Number.isInteger(state.revision) || state.revision < 1 ||
-    typeof state.label !== "string" || state.label.length > 64 ||
-    !Array.isArray(state.people) || state.people.length > 81
-  ) throw new Error("Invalid classroom snapshot.");
-  const ids = new Set(), seats = new Set();
-  for (const p of state.people) {
-    if (
-      typeof p.id !== "string" || ids.has(p.id) ||
-      typeof p.name !== "string" || p.name.length > 64 ||
-      !["teacher", "student"].includes(p.role) ||
-      typeof p.online !== "boolean" || typeof p.sharing !== "boolean" ||
-      (p.seat !== null && (!Number.isInteger(p.seat) || p.seat < 1)) ||
-      (p.streamId !== null && typeof p.streamId !== "string")
-    ) throw new Error("Invalid participant snapshot.");
-    ids.add(p.id);
-    if (p.seat !== null) {
-      if (seats.has(p.seat)) throw new Error("Duplicate seat.");
-      seats.add(p.seat);
+    notify &&
+    latestRequests[uid]?.requestId === link.requestId
+  ) {
+    try {
+      await update(peerRef(uid), {
+        state: "rejected",
+        reason
+      });
+    } catch (error) {
+      log(error.message);
     }
   }
-  validateLayout(state.layout, state.people);
+
+  renderGrid();
+  renderRequests();
 }
-async function handle(link, value) {
-  if (!link.active || !validEnvelope(value)) return;
-  if (link.hostSide) {
-    if (!link.admitted) throw new Error("Not admitted.");
-    if (value.type === "sync") {
-      send(link, envelope("snapshot", { state: room }));
-      sendManifest(link);
-    } else if (value.type === "edit") {
-      if (typeof value.requestId !== "string" || value.requestId.length > 100) {
-        throw new Error("Invalid request ID.");
-      }
-      try {
-        rateLimit(link);
-        if (value.revision !== room.revision) {
-          throw new Error("Settings changed elsewhere. Review and retry.");
-        }
-        applyEdit(link.personId, value.edit);
-        send(link, envelope("ack", { requestId: value.requestId }));
-      } catch (e) {
-        send(link, envelope("editError", { requestId: value.requestId, text: e.message }));
-        send(link, envelope("snapshot", { state: room }));
-      }
-    } else if (value.type === "publishing") {
-      rateLimit(link);
-      const p = room.people.find(person => person.id === link.personId);
-      const active = value.active === true;
-      if (!p || (active && (
-        !p.seat || typeof value.streamId !== "string" ||
-        value.streamId.length > 100
-      ))) throw new Error("Invalid publishing status.");
-      const streamId = active ? value.streamId : null;
-      if (p.sharing !== active || p.streamId !== streamId) {
-        p.sharing = active;
-        p.streamId = streamId;
-        commit();
-      }
-    } else if (value.type === "answer") {
-      if (!link.waiting || value.description?.type !== "answer") {
-        throw new Error("Unexpected negotiation answer.");
-      }
-      await link.pc.setRemoteDescription(value.description);
-      clearTimeout(link.timer);
-      link.waiting = false;
-      for (const item of link.forwards.values()) void cap(item.sender);
-      sendManifest(link);
-      void negotiate(link);
+
+function renderRequests() {
+  if (!isTeacher) return;
+
+  $("requests").replaceChildren();
+
+  for (const [uid, request] of Object.entries(latestRequests)) {
+    const link = teacherLinks.get(uid);
+
+    if (!link && request.state !== "requested") continue;
+
+    const row = document.createElement("div");
+    row.className = "request";
+
+    const label = document.createElement("span");
+    label.textContent =
+      `${String(request.name || "Student").slice(0, 60)} — seat ${request.seat}` +
+      (link ? ` — ${link.pc.connectionState}` : " — waiting");
+
+    row.append(label);
+
+    if (!link) {
+      const accept = document.createElement("button");
+      accept.textContent = "Accept";
+      accept.onclick = () => {
+        accept.disabled = true;
+        acceptStudent(uid).catch(showError);
+      };
+
+      const reject = document.createElement("button");
+      reject.textContent = "Reject";
+      reject.className = "secondary";
+      reject.onclick = () => rejectStudent(uid).catch(showError);
+
+      row.append(accept, reject);
+    } else {
+      const removeButton = document.createElement("button");
+      removeButton.textContent = "Remove";
+      removeButton.className = "danger";
+      removeButton.onclick = () => releaseStudent(uid).catch(showError);
+      row.append(removeButton);
     }
-  } else {
-    if (value.type === "snapshot") {
-      validateState(value.state);
-      if (value.state.revision >= room.revision) {
-        room = value.state;
-        if (!me()) {
-          removed = true;
-          if (capture) await stopCapture(capture, false);
-        }
-        bindManifest();
-      }
-    } else if (value.type === "offer") {
-      if (value.description?.type !== "offer") throw new Error("Invalid offer.");
-      await link.pc.setRemoteDescription(value.description);
-      await link.pc.setLocalDescription(await link.pc.createAnswer());
-      send(link, envelope("answer", { description: await gathered(link.pc) }));
-      bindManifest();
-    } else if (value.type === "manifest") {
-      if (!Array.isArray(value.entries) || value.entries.length > 80 ||
-          value.entries.some(e =>
-            typeof e.personId !== "string" ||
-            typeof e.streamId !== "string" ||
-            typeof e.mid !== "string")) {
-        throw new Error("Invalid manifest.");
-      }
-      manifest = value.entries;
-      bindManifest();
-    } else if (value.type === "ack") {
-      const done = clearPending(value.requestId);
-      if (done?.edit.kind === "layout" && done.draftVersion === draftVersion) {
-        dirtyDraft = false;
-      }
-      if (done) message(dirtyDraft
-        ? "Change committed. Your local draft remains unsent."
-        : "Shared change committed.");
-      render();
-    } else if (value.type === "editError") {
-      clearPending(value.requestId);
-      message("Edit rejected: " + String(value.text));
-      controls();
-    } else if (value.type === "removed") {
-      removed = true;
-      if (pending) clearPending(pending.id);
-      if (capture) await stopCapture(capture, false);
-      manifest = [];
-      receivers.clear();
-      sources.clear();
-      closeLink(link);
-      message("Removed from classroom. Reload to join again.");
-      render();
-    }
+
+    $("requests").append(row);
+  }
+
+  if (!$("requests").children.length) {
+    $("requests").textContent = "No waiting or connected students.";
   }
 }
 
-function bindManifest() {
-  if (host || !room || !upstream) return;
-  const pc = upstream.pc;
-  const stable = pc.signalingState === "stable";
-  const current = new Set(pc.getTransceivers());
-  for (const [mid, source] of receivers) {
-    const t = source.transceiver;
-    if (
-      source.track.readyState === "ended" ||
-      pc.connectionState === "closed" ||
-      (stable && (!current.has(t) || t.stopped ||
-        t.mid === null || t.currentDirection === "inactive" ||
-        t.currentDirection === "sendonly"))
-    ) receivers.delete(mid);
-  }
-  const keep = new Set([selfId]);
-  for (const entry of manifest) {
-    const person = room.people.find(p => p.id === entry.personId);
-    const source = receivers.get(entry.mid);
-    if (!person?.sharing || person.streamId !== entry.streamId ||
-        source?.track.readyState !== "live") continue;
-    keep.add(person.id);
-    const version = `${entry.streamId}:${entry.mid}:${source.version}`;
-    if (sources.get(person.id)?.version !== version) {
-      sources.set(person.id, { ...source, version });
-    }
-  }
-  for (const id of sources.keys()) {
-    if (!keep.has(id)) sources.delete(id);
-  }
-  render();
-}
-function sendManifest(link) {
-  const entries = [];
-  for (const [personId, item] of link.forwards) {
-    if (item.transceiver.mid !== null && !item.transceiver.stopped) {
-      entries.push({ personId, streamId: item.streamId, mid: item.transceiver.mid });
-    }
-  }
-  send(link, envelope("manifest", { entries }));
-}
-async function cap(sender) {
-  try {
-    const p = sender.getParameters();
-    if (!p.encodings?.length) return;
-    p.encodings[0].maxBitrate = 80000;
-    p.encodings[0].maxFramerate = 2;
-    await sender.setParameters(p);
-  } catch {}
-}
-function reconcile(link) {
-  if (!host || !link.active || !link.admitted ||
-      link.dc?.readyState !== "open") return;
-  const wanted = new Map();
-  if (link.role === "teacher") {
-    for (const person of room.people) {
-      const source = sources.get(person.id);
-      if (person.id !== link.personId && person.online && person.sharing &&
-          person.streamId && source?.track.readyState === "live") {
-        wanted.set(person.id, { person, source });
-      }
-    }
-  }
-  let changed = false;
-  for (const [id, item] of [...link.forwards]) {
-    const next = wanted.get(id);
-    if (!next || next.source.track !== item.track ||
-        next.person.streamId !== item.streamId) {
-      try { item.transceiver.stop(); } catch {}
-      link.forwards.delete(id);
-      changed = true;
-    }
-  }
-  for (const [id, value] of wanted) {
-    if (link.forwards.has(id)) continue;
-    const stream = new MediaStream([value.source.track]);
-    const t = link.pc.addTransceiver(value.source.track, {
-      direction: "sendonly", streams: [stream]
-    });
-    link.forwards.set(id, {
-      transceiver: t, sender: t.sender, track: value.source.track,
-      stream, streamId: value.person.streamId
-    });
-    void cap(t.sender);
-    changed = true;
-  }
-  sendManifest(link);
-  if (changed) {
-    link.dirty = true;
-    void negotiate(link);
-  }
-}
-function reconcileAll() {
-  if (!host) return;
-  for (const link of links.values()) {
-    try { reconcile(link); } catch (e) { log(e.message); }
-  }
-}
-function publishing(active, streamId = null) {
-  if (!room || removed) return;
-  if (host) {
-    const p = me();
-    if (p && (p.sharing !== active || p.streamId !== streamId)) {
-      p.sharing = active;
-      p.streamId = active ? streamId : null;
-      commit();
-    }
-  } else {
-    send(upstream, envelope("publishing", { active, streamId }));
-  }
-}
+/*
+ * Student clicks a grid tile.
+ * getDisplayMedia must be invoked directly from the user gesture.
+ */
+async function requestSeat(seat) {
+  if (
+    isTeacher ||
+    !roomId ||
+    !meta ||
+    meta.closed ||
+    captureBusy ||
+    capture ||
+    studentRequestId
+  ) return;
 
-async function startCapture() {
-  if (!ready() || !me()?.seat) throw new Error("Connect and choose a seat first.");
-  if (mediaBusy || capture) return;
+  if (meta.seats?.[String(seat)]) {
+    status("That seat is occupied. Choose an empty tile.");
+    return;
+  }
+
   if (!navigator.mediaDevices?.getDisplayMedia) {
-    throw new Error("Screen capture requires HTTPS and a supported desktop browser.");
+    throw new Error("Screen capture requires a supported desktop browser and HTTPS.");
   }
-  mediaBusy = true;
-  controls();
-  let c;
+
+  captureBusy = true;
+  updateControls();
+
+  let current;
+
   try {
+    // No network await before this permission request.
     const desktop = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 2, max: 5 } }, audio: false
+      video: { frameRate: { ideal: 2, max: 5 } },
+      audio: false
     });
-    c = {
-      id: uid(), desktop,
+
+    current = {
+      id: uuid(),
+      desktop,
       video: document.createElement("video"),
       canvas: document.createElement("canvas"),
-      output: null, track: null,
-      ended: false, cancelled: false, timer: null
+      stream: null,
+      track: null,
+      timer: null,
+      ended: false
     };
-    capture = c;
-    c.video.muted = true;
-    c.video.playsInline = true;
-    c.video.srcObject = desktop;
-    desktop.getVideoTracks()[0].addEventListener("ended", () => {
-      c.ended = true;
-      if (capture === c && !mediaBusy) stopCapture(c).catch(error);
-    }, { once: true });
-    await c.video.play();
-    if (!ready() || c.ended) throw new Error("Capture ended or connection lost.");
 
-    c.canvas.width = room.layout.width;
-    c.canvas.height = Math.round(room.layout.width * 9 / 16);
-    const ctx = c.canvas.getContext("2d", { alpha: false });
-    if (!ctx || !c.canvas.captureStream) throw new Error("Canvas capture unsupported.");
+    capture = current;
+    current.video.muted = true;
+    current.video.playsInline = true;
+    current.video.srcObject = desktop;
+
+    desktop.getVideoTracks()[0].addEventListener("ended", () => {
+      current.ended = true;
+      if (!captureBusy && capture === current) {
+        void stopStudent();
+      }
+    }, { once: true });
+
+    await current.video.play();
+
+    if (current.ended || meta.closed) {
+      throw new Error("Screen sharing ended before the request was sent.");
+    }
+
+    const context = current.canvas.getContext("2d", { alpha: false });
+    if (!context || !current.canvas.captureStream) {
+      throw new Error("Canvas video capture is unavailable.");
+    }
 
     function draw() {
-      if (capture !== c || c.cancelled || c.ended) return;
+      if (capture !== current || current.ended) return;
+
       try {
-        const w = room.layout.width, h = Math.round(w * 9 / 16);
-        if (c.canvas.width !== w || c.canvas.height !== h) {
-          c.canvas.width = w;
-          c.canvas.height = h;
+        const width = Number(meta.width) || 256;
+        const height = Math.round(width * 9 / 16);
+
+        if (
+          current.canvas.width !== width ||
+          current.canvas.height !== height
+        ) {
+          current.canvas.width = width;
+          current.canvas.height = height;
         }
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, w, h);
-        if (c.video.videoWidth && c.video.videoHeight) {
-          const s = Math.min(w / c.video.videoWidth, h / c.video.videoHeight);
-          const dw = c.video.videoWidth * s, dh = c.video.videoHeight * s;
-          ctx.drawImage(c.video, (w - dw) / 2, (h - dh) / 2, dw, dh);
+
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, width, height);
+
+        if (current.video.videoWidth && current.video.videoHeight) {
+          const scale = Math.min(
+            width / current.video.videoWidth,
+            height / current.video.videoHeight
+          );
+
+          const w = current.video.videoWidth * scale;
+          const h = current.video.videoHeight * scale;
+
+          context.drawImage(
+            current.video,
+            (width - w) / 2,
+            (height - h) / 2,
+            w,
+            h
+          );
         }
-        c.timer = setTimeout(draw, 1000 / room.layout.fps);
-      } catch (e) {
-        c.ended = true;
-        if (!mediaBusy) stopCapture(c).catch(error);
+
+        current.timer = setTimeout(draw, 1000 / (meta.fps || 1));
+
+      } catch (error) {
+        current.ended = true;
+        showError(error);
+        if (!captureBusy) void stopStudent();
       }
     }
+
     draw();
-    c.output = c.canvas.captureStream(2);
-    c.track = c.output.getVideoTracks()[0];
-    if (!c.track) throw new Error("No canvas video track.");
-    if (!host) {
-      await upstream.upload.sender.replaceTrack(c.track);
-      await cap(upstream.upload.sender);
-    }
-    if (!ready() || c.ended) throw new Error("Capture stopped during startup.");
-    sources.set(selfId, {
-      track: c.track, stream: c.output, local: true,
-      pc: null, receiver: null, version: c.id
+
+    current.stream = current.canvas.captureStream(2);
+    current.track = current.stream.getVideoTracks()[0];
+
+    studentRequestId = current.id;
+    studentSeat = seat;
+
+    // Remove stale signaling from an earlier request by writing a full record.
+    disconnectRegistration = onDisconnect(peerRef());
+    await disconnectRegistration.remove();
+
+    await set(peerRef(), {
+      requestId: studentRequestId,
+      name: $("nameInput").value.trim() || "Student",
+      seat,
+      state: "requested",
+      createdAt: Date.now()
     });
-    publishing(true, c.id);
-    message("Screen sharing started.");
-    render();
-  } catch (e) {
-    if (c) {
-      c.cancelled = true;
-      clearTimeout(c.timer);
-      c.desktop.getTracks().forEach(t => t.stop());
-      c.output?.getTracks().forEach(t => t.stop());
-      c.video.srcObject = null;
-      if (capture === c) capture = null;
-      if (sources.get(selfId)?.version === c.id) sources.delete(selfId);
-      if (!host && upstream?.upload) {
-        try { await upstream.upload.sender.replaceTrack(null); } catch {}
+
+    const generation = studentRequestId;
+
+    studentWatchStop = onValue(peerRef(), snapshot => {
+      const request = snapshot.val();
+
+      if (studentRequestId !== generation) return;
+
+      if (!request || request.requestId !== generation) {
+        status("Request removed. Click an empty seat to join again.");
+        void stopStudent();
+        return;
       }
-    }
-    throw e;
+
+      if (request.state === "rejected") {
+        status(request.reason || "Request rejected.");
+        void stopStudent();
+        return;
+      }
+
+      if (
+        request.state === "accepted" &&
+        request.offer?.type === "offer" &&
+        !studentLink
+      ) {
+        void answerTeacher(request, generation).catch(async error => {
+          showError(error);
+          await stopStudent();
+        });
+      }
+    }, showError);
+
+    status(meta.autoAccept
+      ? "Request sent. Connecting when the teacher accepts automatically."
+      : "Request sent. Waiting for teacher acceptance.");
+
+    renderGrid();
+
+  } catch (error) {
+    await stopStudent();
+    throw error;
+
   } finally {
-    mediaBusy = false;
-    controls();
-    if (c?.ended && capture === c) stopCapture(c).catch(error);
-  }
-}
-async function stopCapture(c = capture, announce = true) {
-  if (!c || capture !== c || c.cancelled) return;
-  if (mediaBusy) { c.ended = true; return; }
-  mediaBusy = true;
-  c.cancelled = true;
-  capture = null;
-  clearTimeout(c.timer);
-  if (sources.get(selfId)?.version === c.id) sources.delete(selfId);
-  if (announce) publishing(false);
-  render();
-  try {
-    c.desktop.getTracks().forEach(t => t.stop());
-    c.output?.getTracks().forEach(t => t.stop());
-    c.video.srcObject = null;
-    if (!host && upstream?.upload) {
-      try { await upstream.upload.sender.replaceTrack(null); } catch {}
+    captureBusy = false;
+    updateControls();
+
+    if (current?.ended && capture === current) {
+      void stopStudent();
     }
-  } finally {
-    mediaBusy = false;
-    render();
   }
 }
 
-function options(select, values) {
-  const old = select.value;
-  select.replaceChildren();
-  for (const [value, text] of values) {
-    const option = document.createElement("option");
-    option.value = String(value);
-    option.textContent = text;
-    select.append(option);
+async function answerTeacher(request, generation) {
+  if (
+    studentLink ||
+    studentRequestId !== generation ||
+    !capture ||
+    capture.ended
+  ) return;
+
+  const link = newPeer(firebaseUser.uid, generation, false);
+  studentLink = link;
+
+  await link.pc.setRemoteDescription(request.offer);
+
+  const transceiver = link.pc.getTransceivers().find(
+    item => item.receiver.track.kind === "video"
+  );
+
+  if (!transceiver) throw new Error("Teacher offer has no video receiver.");
+
+  transceiver.direction = "sendonly";
+  link.transceiver = transceiver;
+
+  if (!capture || capture.id !== generation) {
+    throw new Error("Sharing request was cancelled.");
   }
-  if ([...select.options].some(o => o.value === old)) select.value = old;
+
+  await transceiver.sender.replaceTrack(capture.track);
+  await link.pc.setLocalDescription(await link.pc.createAnswer());
+
+  const answer = await completeDescription(link.pc);
+
+  if (
+    !link.active ||
+    studentLink !== link ||
+    studentRequestId !== generation
+  ) return;
+
+  await update(peerRef(), { answer });
+  await capSender(transceiver.sender);
+
+  status("Teacher accepted. Establishing the screen connection.");
 }
-function health(tile, good, text) {
-  tile.el.classList.toggle("good", good);
-  tile.el.classList.toggle("bad", !good);
-  tile.status.textContent = text;
-  if (zoomPerson && zoomPerson === tile.personId) {
-    $("zoomStatus").textContent = text;
-    $("zoomVideo").style.visibility = good ? "visible" : "hidden";
+
+async function stopStudent() {
+  const current = capture;
+  capture = null;
+
+  studentWatchStop?.();
+  studentWatchStop = null;
+
+  const hadRequest = !!studentRequestId;
+  studentRequestId = null;
+  studentSeat = null;
+
+  destroyPeer(studentLink);
+  studentLink = null;
+
+  if (current) {
+    current.ended = true;
+    clearTimeout(current.timer);
+    current.desktop.getTracks().forEach(track => track.stop());
+    current.stream?.getTracks().forEach(track => track.stop());
+    current.video.srcObject = null;
   }
+
+  if (hadRequest && db && roomId && firebaseUser) {
+    try { await remove(peerRef()); } catch (error) { log(error.message); }
+  }
+
+  try { await disconnectRegistration?.cancel(); } catch {}
+  disconnectRegistration = null;
+
+  renderGrid();
+  updateControls();
 }
-function newTile(seat) {
-  const el = document.createElement("div");
-  el.className = "tile bad";
+
+async function applySettings() {
+  const rows = Number($("rowsInput").value);
+  const cols = Number($("colsInput").value);
+  const width = Number($("widthInput").value);
+  const fps = Number($("fpsInput").value);
+
+  validateLayout(rows, cols, width, fps);
+
+  for (const key of Object.keys(meta.seats || {})) {
+    if (Number(key) > rows * cols) {
+      throw new Error("Remove students in the seats being deleted before shrinking.");
+    }
+  }
+
+  Object.assign(meta, {
+    rows,
+    cols,
+    width,
+    fps,
+    autoAccept: $("autoAccept").value === "true"
+  });
+
+  await commitMetadata();
+  processRequests();
+
+  status("Room settings updated.");
+}
+
+async function closeRoom() {
+  if (!confirm("Close the room and disconnect all students?")) return;
+
+  roomClosing = true;
+  meta.closed = true;
+
+  await commitMetadata();
+
+  for (const [uid] of [...teacherLinks]) {
+    await releaseStudent(uid, "Teacher closed the room.");
+  }
+
+  requestsWatchStop?.();
+  requestsWatchStop = null;
+
+  status("Room closed. Reload the page to create another room.");
+  updateControls();
+}
+
+/** Create stable video tiles; do not rebuild them on each update. */
+function createTile(seat) {
+  const element = document.createElement("div");
+  element.className = "tile bad";
+
   const video = document.createElement("video");
   video.autoplay = true;
   video.muted = true;
   video.playsInline = true;
+
   const name = document.createElement("div");
   name.className = "name";
-  const status = document.createElement("div");
-  status.className = "status";
-  el.append(video, name, status);
+
+  const health = document.createElement("div");
+  health.className = "health";
+
+  element.append(video, name, health);
+
   const tile = {
-    el, video, name, status, seat,
-    personId: null, version: null, binding: 0,
-    counter: null, last: 0, presented: 0, callback: null
+    seat,
+    element,
+    video,
+    name,
+    health,
+    stream: null,
+    uid: null,
+    binding: 0
   };
-  el.onclick = () => {
-    if (!tile.personId || !video.srcObject) return;
-    zoomPerson = tile.personId;
-    $("zoomTitle").textContent = name.textContent;
-    $("zoomVideo").srcObject = video.srcObject;
-    $("zoomVideo").style.visibility = el.classList.contains("good") ? "visible" : "hidden";
-    $("zoomStatus").textContent = status.textContent;
-    $("zoomVideo").play().catch(() => {});
-    if (!$("zoom").open) $("zoom").showModal();
+
+  element.onclick = () => {
+    if (isTeacher) {
+      if (!tile.video.srcObject) return;
+      zoomSeat = seat;
+      $("zoomTitle").textContent = tile.name.textContent;
+      $("zoomVideo").srcObject = tile.video.srcObject;
+      $("zoomVideo").style.visibility =
+        tile.element.classList.contains("good") ? "visible" : "hidden";
+      $("zoomStatus").textContent = tile.health.textContent;
+      $("zoomVideo").play().catch(() => {});
+      if (!$("zoomDialog").open) $("zoomDialog").showModal();
+    } else {
+      requestSeat(seat).catch(showError);
+    }
   };
+
   return tile;
 }
-function bindSource(tile, person, source) {
-  const id = person?.id || null, version = source?.version || null;
-  if (tile.personId === id && tile.version === version) return;
+
+function tileHealth(tile, good, text) {
+  tile.element.classList.toggle("good", good);
+  tile.element.classList.toggle("bad", !good);
+  tile.health.textContent = text;
+
+  if (zoomSeat === tile.seat) {
+    $("zoomStatus").textContent = text;
+    $("zoomVideo").style.visibility = good ? "visible" : "hidden";
+  }
+}
+
+function setTileStream(tile, stream, uid) {
+  if (tile.stream === stream && tile.uid === uid) return;
+
   tile.binding++;
-  if (tile.callback !== null && tile.video.cancelVideoFrameCallback) {
-    tile.video.cancelVideoFrameCallback(tile.callback);
+  tile.stream = stream;
+  tile.uid = uid;
+  tile.video.srcObject = stream;
+
+  if (stream) tile.video.play().catch(() => {});
+  tileHealth(tile, false, "Waiting for video");
+
+  if (zoomSeat === tile.seat) {
+    $("zoomVideo").srcObject = stream;
+    $("zoomVideo").style.visibility = "hidden";
   }
-  tile.personId = id;
-  tile.version = version;
-  tile.counter = null;
-  tile.last = 0;
-  tile.presented = 0;
-  tile.callback = null;
-  tile.video.srcObject = source?.stream || null;
-  if (source) {
-    tile.video.play().catch(() => {});
-    if (source.local && tile.video.requestVideoFrameCallback) {
-      const binding = tile.binding;
-      const next = () => {
-        if (tile.binding !== binding) return;
-        tile.presented++;
-        tile.callback = tile.video.requestVideoFrameCallback(next);
-      };
-      tile.callback = tile.video.requestVideoFrameCallback(next);
-    }
-  }
-  health(tile, false, "Waiting for video");
 }
-function render() {
-  controls();
-  if (!room) return;
-  const l = room.layout;
+
+function renderGrid() {
+  updateControls();
+  if (!meta || !roomId) return;
+
   $("roomTitle").textContent =
-    `${room.label} — revision ${room.revision} — ` +
-    `${room.people.filter(p => p.online).length} connected`;
+    `${meta.label} — ${Object.keys(meta.seats || {}).length} assigned students`;
 
-  if (!dirtyDraft) {
-    $("rows").value = l.rows;
-    $("cols").value = l.cols;
-    $("width").value = l.width;
-    $("fps").value = l.fps;
-    $("disabled").value = l.disabled.join(", ");
-    $("locked").value = String(l.locked);
-  }
-  const seats = [];
-  for (let n = 1; n <= l.rows * l.cols; n++) {
-    if (l.disabled.includes(n)) continue;
-    const p = room.people.find(person => person.seat === n);
-    seats.push([n, `Seat ${n}${p ? " — " + p.name : ""}`]);
-  }
-  options($("seat"), seats);
-  options($("destination"), seats);
-  options($("person"), room.people.map(p => [p.id, `${p.name} (${p.role})`]));
-  $("grid").style.setProperty("--cols", l.cols);
-  $("grid").classList.toggle("scroll", $("view").value === "scroll");
+  $("grid").style.setProperty("--cols", meta.cols);
+  $("grid").classList.toggle("scroll", $("viewInput").value === "scroll");
 
-  for (const [n, tile] of tiles) {
-    if (n > l.rows * l.cols) {
-      bindSource(tile, null, null);
-      tile.el.remove();
-      tiles.delete(n);
+  const count = meta.rows * meta.cols;
+
+  for (const [seat, tile] of tiles) {
+    if (seat > count) {
+      tile.video.srcObject = null;
+      tile.element.remove();
+      tiles.delete(seat);
     }
   }
-  for (let n = 1; n <= l.rows * l.cols; n++) {
-    let tile = tiles.get(n);
+
+  for (let seat = 1; seat <= count; seat++) {
+    let tile = tiles.get(seat);
+
     if (!tile) {
-      tile = newTile(n);
-      tiles.set(n, tile);
-      $("grid").append(tile.el);
+      tile = createTile(seat);
+      tiles.set(seat, tile);
+      $("grid").append(tile.element);
     }
-    const person = room.people.find(p => p.seat === n);
-    const source = person && sources.get(person.id);
-    tile.name.textContent = `Seat ${n}${person ? " — " + person.name : ""}`;
-    tile.el.classList.toggle("disabled", l.disabled.includes(n));
-    bindSource(tile, person, source);
-    if (l.disabled.includes(n)) health(tile, false, "Disabled / aisle");
-    else if (!person) health(tile, false, "Empty");
-    else if (!ready()) health(tile, false, "Out of sync");
-    else if (!person.online) health(tile, false, "Publisher disconnected");
-    else if (!person.sharing) health(tile, false, "Not sharing");
-    else if (!source) health(tile, false,
-      teacher() || person.id === selfId ? "Waiting for video" : "Teacher-only video");
-    else if (source.pc && source.pc.connectionState !== "connected") {
-      health(tile, false, "Connection interrupted");
-    }
-  }
-  if (zoomPerson) {
-    const p = room.people.find(person => person.id === zoomPerson);
-    const source = p?.sharing ? sources.get(zoomPerson) : null;
-    if ($("zoomVideo").srcObject !== (source?.stream || null)) {
-      $("zoomVideo").srcObject = source?.stream || null;
-      $("zoomVideo").style.visibility = "hidden";
-    }
-    if (!p?.sharing || !ready()) {
-      $("zoomVideo").style.visibility = "hidden";
-      $("zoomStatus").textContent = "Unavailable / not sharing";
+
+    const assignment = meta.seats?.[String(seat)];
+    const ownPreview = !isTeacher && studentSeat === seat && capture;
+    const link = assignment && teacherLinks.get(assignment.uid);
+
+    const stream = isTeacher
+      ? link?.stream || null
+      : ownPreview?.stream || null;
+
+    setTileStream(tile, stream, assignment?.uid || null);
+
+    tile.name.textContent =
+      `Seat ${seat}${assignment ? " — " + assignment.name : ""}`;
+
+    tile.element.classList.toggle("mine", !!ownPreview);
+
+    if (meta.closed) {
+      tileHealth(tile, false, "Room closed");
+    } else if (ownPreview) {
+      tileHealth(
+        tile,
+        true,
+        studentLink?.pc.connectionState === "connected"
+          ? "Your local preview"
+          : "Your preview — waiting / connecting"
+      );
+    } else if (!assignment) {
+      tileHealth(tile, false, isTeacher ? "Empty" : "Click to join");
+    } else if (!isTeacher) {
+      tileHealth(tile, false, "Occupied");
+    } else if (!link || link.pc.connectionState !== "connected") {
+      tileHealth(tile, false, "Connecting / disconnected");
+    } else if (!stream) {
+      tileHealth(tile, false, "Waiting for video");
     }
   }
 }
+
+/*
+ * Teacher health: fresh decoded frames + transport + playback.
+ * A static screen can continue encoding frames.
+ */
 async function checkHealth() {
-  if (healthBusy || !room) return;
-  healthBusy = true;
+  if (!isTeacher || healthRunning || !meta) return;
+  healthRunning = true;
+
   try {
-    for (const tile of tiles.values()) {
-      const person = room.people.find(p => p.id === tile.personId);
-      const source = person && sources.get(person.id);
-      if (!person?.sharing || !person.online || !source) continue;
-      if (!ready()) { health(tile, false, "Out of sync"); continue; }
-      if (source.track.readyState !== "live" ||
-          (source.pc && source.pc.connectionState !== "connected")) {
-        health(tile, false, "Video unavailable");
+    for (const [uid, link] of teacherLinks) {
+      const tile = tiles.get(link.seat);
+      if (!tile || !link.active || !link.receiver || !link.stream) continue;
+
+      const version = link.sourceVersion;
+      const binding = tile.binding;
+
+      if (link.pc.connectionState !== "connected") {
+        tileHealth(tile, false, "Disconnected / connecting");
         continue;
       }
-      const version = source.version, binding = tile.binding;
-      let count = null;
+
+      let frames = null;
+
       try {
-        if (source.local) {
-          count = tile.video.requestVideoFrameCallback
-            ? tile.presented
-            : tile.video.getVideoPlaybackQuality
-              ? tile.video.getVideoPlaybackQuality().totalVideoFrames
-              : tile.video.currentTime;
-        } else {
-          const stats = await source.receiver.getStats();
-          stats.forEach(s => {
-            if (s.type === "inbound-rtp" &&
-                (s.kind === "video" || s.mediaType === "video") &&
-                typeof s.framesDecoded === "number") {
-              count = (count ?? 0) + s.framesDecoded;
-            }
-          });
-        }
+        const reports = await link.receiver.getStats();
+        reports.forEach(report => {
+          if (
+            report.type === "inbound-rtp" &&
+            (report.kind === "video" || report.mediaType === "video") &&
+            typeof report.framesDecoded === "number"
+          ) {
+            frames = (frames ?? 0) + report.framesDecoded;
+          }
+        });
       } catch {}
-      const current = room.people.find(p => p.id === person.id);
-      if (tile.binding !== binding || sources.get(person.id)?.version !== version ||
-          !current?.sharing || !current.online) continue;
-      if (!ready() || source.track.readyState !== "live" ||
-          (source.pc && source.pc.connectionState !== "connected")) {
-        health(tile, false, "Video unavailable / out of sync");
-        continue;
-      }
+
+      if (
+        teacherLinks.get(uid) !== link ||
+        !link.active ||
+        link.sourceVersion !== version ||
+        tile.binding !== binding
+      ) continue;
+
+      const track = link.stream.getVideoTracks()[0];
       const now = performance.now();
-      if (count !== null && count > 0 && count !== tile.counter) tile.last = now;
-      tile.counter = count;
-      if (count === null) health(tile, false, "Health unverified");
-      else if (!tile.last) health(tile, false, "Waiting for frames");
-      else if (now - tile.last > 30000) health(tile, false, "Possibly stalled");
-      else if (source.track.muted) health(tile, false, "Video temporarily unavailable");
-      else if (tile.video.paused || tile.video.readyState < 2) {
-        health(tile, false, "Playback paused / buffering");
-      } else health(tile, true, source.local ? "Local preview playing" : "Receiving video");
+
+      if (frames !== null && frames > 0 && frames !== link.frames) {
+        link.lastFrameAt = now;
+      }
+
+      link.frames = frames;
+
+      if (
+        meta.closed ||
+        link.pc.connectionState !== "connected" ||
+        track?.readyState !== "live"
+      ) {
+        tileHealth(tile, false, "Video unavailable");
+      } else if (frames === null) {
+        tileHealth(tile, false, "Health unverified");
+      } else if (!link.lastFrameAt) {
+        tileHealth(tile, false, "Waiting for frames");
+      } else if (now - link.lastFrameAt > 30000) {
+        tileHealth(tile, false, "Possibly stalled");
+      } else if (track.muted) {
+        tileHealth(tile, false, "Video temporarily unavailable");
+      } else if (tile.video.paused || tile.video.readyState < 2) {
+        tileHealth(tile, false, "Playback paused / buffering");
+      } else {
+        tileHealth(tile, true, "Receiving video");
+      }
     }
-  } finally { healthBusy = false; }
+  } finally {
+    healthRunning = false;
+  }
 }
 
 setInterval(() => {
-  if (!room) return;
-  const all = host ? [...links.values()] : [upstream].filter(Boolean);
-  for (const link of all) {
-    if (!link.active) continue;
-    cleanInbox(link);
-    send(link, envelope("heartbeat"));
-    pump(link);
-    if (host) updateOnline(link);
+  const links = isTeacher
+    ? [...teacherLinks.values()]
+    : studentLink ? [studentLink] : [];
+
+  for (const link of links) {
+    sendData(link, "heartbeat");
   }
-  if (!host) bindManifest();
-  else render();
+
+  if (
+    !isTeacher &&
+    studentLink?.dc?.readyState === "open" &&
+    Date.now() - studentLink.lastHeartbeat > 25000
+  ) {
+    status("Teacher heartbeat missing. Connection may be interrupted.");
+  }
 }, 5000);
 
-setInterval(() => checkHealth().catch(error), 2000);
+setInterval(() => {
+  checkHealth().catch(showError);
+}, 2000);
 
-// UI actions. Opening a picker synchronously avoids browser gesture restrictions.
-bind("turnButton", () => {
-  if (configureTurn()) message("TURN saved. Existing connections are unchanged.");
-});
-bind("create", createRoom);
-bind("invite", makeInvitation);
+// UI actions.
+button("settingsButton", showSettings);
 
-$("join").onclick = () => {
-  if (room || busy) return;
-  $("invitationFile").value = "";
-  $("invitationFile").click();
-};
-$("accept").onclick = () => {
-  if (!host || busy) {
-    message("Create a classroom first.");
-    return;
+button("saveSettingsButton", () => {
+  const config = JSON.parse($("firebaseConfigInput").value);
+
+  if (!config.apiKey || !config.databaseURL || !config.projectId) {
+    throw new Error("Firebase JSON must include apiKey, databaseURL and projectId.");
   }
-  $("answerFile").value = "";
-  $("answerFile").click();
-};
 
-$("invitationFile").onchange = async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-  try { await joinFile(file); } catch (e) { error(e); }
-};
-$("answerFile").onchange = async event => {
-  const file = event.target.files[0];
-  if (!file || busy) return;
-  busy = true;
-  controls();
-  try { await acceptFile(file); } catch (e) { error(e); }
-  finally { busy = false; controls(); }
-};
+  const enteredHost = $("turnHostInput").value.trim().toLowerCase();
+  const host = enteredHost || getTurnHost();
 
-bind("downloadPairing", () => {
-  if (generated) download(generated.filename, JSON.stringify(generated.value));
+  if (!validHost(host)) throw new Error("Enter a valid TURN host.");
+
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  saveTurnHost(host);
+
+  $("settingsDialog").close();
+
+  status(db || connectPromise
+    ? "Settings saved. Reload before using changed connection settings."
+    : "Settings saved. Create or open a room.");
 });
-bind("downloadPage", () => {
-  download("classroom-monitor.html", CLEAN_HTML, "text/html;charset=utf-8");
+
+$("cancelSettingsButton").onclick = () => $("settingsDialog").close();
+
+button("createButton", createRoom);
+button("joinButton", openRoom);
+button("applyButton", applySettings);
+button("closeRoomButton", closeRoom);
+
+button("stopButton", async () => {
+  await stopStudent();
+  status("Sharing stopped. Click an empty seat to request again.");
 });
-bind("share", startCapture);
-bind("stop", () => stopCapture());
-bind("choose", () => requestEdit({
-  kind: "seat", personId: selfId, seat: Number($("seat").value)
-}));
-bind("move", () => requestEdit({
-  kind: "seat", personId: $("person").value,
-  seat: Number($("destination").value)
-}));
-bind("remove", () => {
-  if (confirm("Remove this participant?")) {
-    requestEdit({ kind: "remove", personId: $("person").value });
+
+button("copyLinkButton", async () => {
+  try {
+    await navigator.clipboard.writeText(roomLink());
+    status("Student room link copied.");
+  } catch {
+    $("roomLink").select();
+    status("Copy the selected room link manually.");
   }
 });
-bind("apply", () => {
-  const text = $("disabled").value.trim();
-  requestEdit({
-    kind: "layout",
-    layout: {
-      rows: Number($("rows").value),
-      cols: Number($("cols").value),
-      width: Number($("width").value),
-      fps: Number($("fps").value),
-      locked: $("locked").value === "true",
-      disabled: text ? text.split(",").map(x => Number(x.trim())) : []
-    }
-  });
+
+button("downloadButton", () => {
+  const blob = new Blob([CLEAN_HTML], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "classroom-monitor.html";
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 });
-bind("resetDraft", () => {
-  draftVersion++;
-  dirtyDraft = false;
-  render();
-});
-for (const id of ["rows", "cols", "width", "fps", "disabled", "locked"]) {
-  $(id).oninput = () => {
-    draftVersion++;
-    dirtyDraft = true;
-    controls();
-  };
-}
-$("role").onchange = controls;
-$("view").onchange = () => {
-  $("grid").classList.toggle("scroll", $("view").value === "scroll");
+
+$("roleInput").onchange = updateControls;
+
+$("viewInput").onchange = () => {
+  $("grid").classList.toggle("scroll", $("viewInput").value === "scroll");
 };
-$("closeZoom").onclick = () => $("zoom").close();
-$("zoom").onclose = () => {
-  zoomPerson = null;
+
+$("closeZoomButton").onclick = () => $("zoomDialog").close();
+
+$("zoomDialog").addEventListener("close", () => {
+  zoomSeat = null;
   $("zoomVideo").srcObject = null;
-};
-window.addEventListener("beforeunload", () => {
-  capture?.desktop.getTracks().forEach(t => t.stop());
-  capture?.output?.getTracks().forEach(t => t.stop());
-  for (const link of links.values()) closeLink(link);
-  closeLink(upstream);
 });
 
-try {
-  const entry = document.cookie.split(";").map(x => x.trim())
-    .find(x => x.startsWith(COOKIE + "="));
-  const saved = entry ? decodeURIComponent(entry.slice(COOKIE.length + 1)) : "";
-  if (validHost(saved)) {
-    turnHost = saved;
-    $("turnStatus").textContent = "TURN loaded from cookie";
-  }
-} catch {}
+window.addEventListener("beforeunload", () => {
+  capture?.desktop.getTracks().forEach(track => track.stop());
+  capture?.stream?.getTracks().forEach(track => track.stop());
 
-controls();
+  for (const link of teacherLinks.values()) destroyPeer(link);
+  destroyPeer(studentLink);
+});
+
+// Read room ID from the teacher's shared link.
+const incomingRoom = new URL(location.href).searchParams.get("room");
+
+if (incomingRoom) {
+  $("roleInput").value = "student";
+  $("roomInput").value = incomingRoom;
+  status("Enter your name and click Open room.");
+}
+
+updateControls();
 
 if (!window.isSecureContext) {
-  message("Use HTTPS/GitHub Pages or localhost for screen capture.");
+  status("Host this page on HTTPS or localhost.");
 }
-setTimeout(() => {
-  if (!turnHost) {
-    try { configureTurn(); } catch (e) { error(e); }
-  }
-}, 250);
+
+let configured = false;
+try {
+  configured = !!getTurnHost() && !!localStorage.getItem(CONFIG_KEY);
+} catch {}
+
+if (!configured) {
+  setTimeout(showSettings, 300);
+}
 </script>
 </body>
 </html>
