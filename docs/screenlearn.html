@@ -13,8 +13,8 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 12px; }
-main { max-width: 1500px; margin: auto; }
-h1 { font-size: 1.45rem; }
+main { max-width: 1550px; margin: auto; }
+h1 { font-size: 1.4rem; }
 h2 { font-size: 1.05rem; }
 .panel {
   padding: 14px;
@@ -30,66 +30,64 @@ h2 { font-size: 1.05rem; }
   gap: 10px;
 }
 label { display: grid; gap: 5px; font-size: .9rem; }
-input, select, button, textarea {
-  font: inherit;
+input, button, select {
   padding: 9px;
-  border: 1px solid #64748b;
-  border-radius: 6px;
+  font: inherit;
   background: #0f172a;
   color: inherit;
+  border: 1px solid #64748b;
+  border-radius: 6px;
 }
-button { background: #1d4ed8; cursor: pointer; }
+button { cursor: pointer; background: #1d4ed8; }
 button.secondary { background: #374151; }
 button.danger { background: #991b1b; }
 button:disabled { opacity: .45; cursor: not-allowed; }
-input[type=number] { width: 85px; }
-textarea { width: 100%; min-height: 140px; }
+input[type=number] { width: 80px; }
 .small { font-size: .83rem; line-height: 1.5; }
 .warning { color: #fbbf24; }
 .hidden { display: none !important; }
 #message { white-space: pre-wrap; }
-#shareLink { width: min(100%, 750px); }
-#viewport { overflow: auto; max-height: 75vh; }
+#roomLink { width: min(100%, 800px); }
+#viewport { overflow: auto; max-height: 76vh; }
 #grid {
   display: grid;
   grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr));
   gap: 7px;
 }
 #grid.scroll {
-  grid-template-columns: repeat(var(--cols, 8), minmax(175px, 1fr));
+  grid-template-columns: repeat(var(--cols, 8), minmax(170px, 1fr));
 }
 .tile {
+  min-width: 0;
   position: relative;
   aspect-ratio: 16/9;
-  min-width: 0;
-  overflow: hidden;
   background: #555;
   border: 2px solid #9ca3af;
   border-radius: 7px;
+  overflow: hidden;
   cursor: pointer;
 }
 .tile.good { border-color: #22c55e; }
 .tile.mine { border-color: #60a5fa; }
 .tile video {
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   object-fit: contain;
   background: black;
 }
 .tile.bad video { visibility: hidden; }
-.tile .title, .tile .health {
+.tile .name, .tile .health {
   position: absolute;
   left: 0; right: 0;
   padding: 3px 5px;
   background: #000a;
   font-size: clamp(9px, 1vw, 12px);
 }
-.tile .title { top: 0; }
+.tile .name { top: 0; }
 .tile .health { bottom: 0; }
 .person {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid #475569;
@@ -97,18 +95,18 @@ textarea { width: 100%; min-height: 140px; }
 .person span { flex: 1; }
 dialog {
   width: min(95vw, 1100px);
-  border: 1px solid #64748b;
-  border-radius: 10px;
   background: #111827;
   color: white;
+  border: 1px solid #64748b;
+  border-radius: 10px;
 }
 dialog::backdrop { background: #000c; }
 dialog video { width: 100%; max-height: 72vh; }
 pre {
+  font-size: 12px;
   white-space: pre-wrap;
   max-height: 220px;
   overflow: auto;
-  font-size: 12px;
 }
 @media(max-width:600px) {
   body { padding: 7px; }
@@ -118,24 +116,25 @@ pre {
 }
 </style>
 </head>
-
 <body>
 <main>
 <h1>Classroom Screen Lobby</h1>
 
 <section class="panel small">
-  <strong>Teacher:</strong> Create room, enable Auto accept, share the room link.
+  <strong>Teacher:</strong> Create room → share link → auto accept or manually accept.
   <br>
-  <strong>Student:</strong> Open link, enter name, select a seat, and wait.
-  No pairing answers or files.
+  <strong>Student:</strong> Enter room → click an empty seat → wait → Share screen.
+  <br>
+  No pairing answers or files. Keep the creating teacher's browser open.
 </section>
 
 <section class="panel">
   <div class="row">
-    <button id="settingsBtn" class="secondary">Connection settings</button>
+    <button id="turnBtn" class="secondary">Configure TURN</button>
     <button id="downloadBtn" class="secondary">Download HTML</button>
-    <span id="serviceState">Services not connected</span>
+    <span id="serviceState">Connecting to Firebase…</span>
   </div>
+  <p id="turnState" class="small">TURN not configured.</p>
 </section>
 
 <section id="startPanel" class="panel">
@@ -149,8 +148,8 @@ pre {
         <option value="student">Student</option>
       </select>
     </label>
-    <label>Classroom name or room ID
-      <input id="roomInput" maxlength="100">
+    <label>Classroom name / room ID
+      <input id="roomInput" maxlength="100" placeholder="Class A">
     </label>
     <button id="createBtn">Create room</button>
     <button id="openBtn">Enter room</button>
@@ -159,7 +158,7 @@ pre {
 
 <section class="panel">
   <strong id="roomState">Not in a room</strong>
-  <p id="message" role="status">Configure services, then create a room.</p>
+  <p id="message" role="status">Configure TURN, then create or enter a room.</p>
 </section>
 
 <section id="roomPanel" class="panel hidden">
@@ -174,12 +173,12 @@ pre {
         </select>
       </label>
       <label>Rows
-        <input id="rows" type="number" value="5" min="1" max="12">
+        <input id="rows" type="number" min="1" max="12" value="5">
       </label>
       <label>Columns
-        <input id="cols" type="number" value="8" min="1" max="12">
+        <input id="cols" type="number" min="1" max="12" value="8">
       </label>
-      <label>Preview resolution
+      <label>Preview
         <select id="width">
           <option value="160">160 × 90</option>
           <option value="256" selected>256 × 144</option>
@@ -197,18 +196,17 @@ pre {
     </div>
 
     <p class="small">
-      Auto accept changes take effect immediately.
-      Grid settings support up to 64 positions.
+      Auto accept applies immediately. Maximum 64 positions.
+      Assigned positions cannot be removed by shrinking the grid.
     </p>
 
     <div class="row">
-      <input id="shareLink" readonly aria-label="Student room link">
+      <input id="roomLink" readonly aria-label="Student room link">
       <button id="copyBtn" class="secondary">Copy student link</button>
     </div>
 
     <p class="small warning">
-      Send the link privately. It includes public Firebase configuration and
-      the TURN address, not a secret school-account login.
+      Send the link privately. It contains the room ID and TURN hostname.
     </p>
 
     <h2>Lobby and connected students</h2>
@@ -216,21 +214,22 @@ pre {
   </div>
 
   <div id="studentPanel" class="hidden">
-    <p id="lobbyText">Click an empty tile to join that seat.</p>
+    <p id="lobbyText">Click an empty seat to join.</p>
     <div class="row">
       <button id="shareBtn">Share screen</button>
-      <button id="leaveSeatBtn" class="danger">Cancel / leave seat</button>
+      <button id="stopShareBtn" class="secondary">Stop screen</button>
+      <button id="leaveBtn" class="danger">Cancel / leave seat</button>
     </div>
     <p class="small">
-      Your browser always requires your approval to share a screen.
-      Teacher acceptance cannot bypass this permission.
+      Teacher acceptance is automatic when enabled. Your browser still requires
+      you to approve screen sharing.
     </p>
   </div>
 
   <div class="row">
     <label>Local viewing mode
       <select id="view">
-        <option value="fit">Fit classroom width</option>
+        <option value="fit">Fit classroom</option>
         <option value="scroll">Scroll larger tiles</option>
       </select>
     </label>
@@ -242,43 +241,20 @@ pre {
 </section>
 
 <details class="panel">
-  <summary>Diagnostics and implementation notes</summary>
+  <summary>Diagnostics and limitations</summary>
   <pre id="log"></pre>
   <ul class="small">
-    <li>One controlling teacher per room. Multiple separate rooms are supported.</li>
-    <li>Firebase handles lobby discovery and automatic SDP signaling.</li>
-    <li>Video and WebRTC DataChannels are forced through coturn.</li>
-    <li>Keep the creating teacher's browser open. No automatic failover.</li>
-    <li>Screen sharing requires HTTPS and supported desktop-browser capture.</li>
-    <li>Grey means missing, disconnected, or possibly stalled video.</li>
-    <li>Static screens may remain healthy when encoded frames continue arriving.</li>
+    <li>One controlling teacher per room. Multiple independent rooms are supported.</li>
+    <li>Firebase handles lobby and signaling. coturn relays WebRTC video and data.</li>
+    <li>No automatic teacher failover. Keep the teacher browser open.</li>
     <li>Anonymous authentication does not verify real-world student identity.</li>
-    <li>Production needs school authentication, temporary TURN credentials,
-      abuse protection, and cleanup of old Firebase room records.</li>
+    <li>Screen capture requires HTTPS and a supported desktop browser.</li>
+    <li>Grey means unavailable, not sharing, or possibly stalled.</li>
+    <li>A static desktop can remain healthy if frames continue arriving.</li>
+    <li>Production needs verified accounts, temporary TURN credentials,
+      abuse protection, and cleanup of old database records.</li>
   </ul>
 </details>
-
-<dialog id="settings">
-  <h2>Connection settings</h2>
-  <p class="small">
-    Teacher setup: paste Firebase Web App configuration as valid JSON,
-    including databaseURL.
-  </p>
-  <textarea id="firebaseConfig" spellcheck="false"
-    placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://...","projectId":"...","appId":"..."}'></textarea>
-  <label>TURN IPv4 address or hostname
-    <input id="turnHost" placeholder="No protocol or port">
-  </label>
-  <p class="small">
-    TURN port 3489. Username: username. Password: password.
-    The host is saved in a persistent cookie.
-    No TURN address is hardcoded in this page.
-  </p>
-  <div class="row">
-    <button id="saveSettingsBtn">Save</button>
-    <button id="cancelSettingsBtn" class="secondary">Cancel</button>
-  </div>
-</dialog>
 
 <dialog id="zoom">
   <h2 id="zoomTitle"></h2>
@@ -293,53 +269,65 @@ pre {
 
 /*
 ============================================================================
-CLASSROOM LOBBY — AUTOMATIC ACCEPTANCE EDITION
+FIREBASE CLASSROOM SCREEN LOBBY
 
-USER FLOW
-Teacher:
-  configure services -> create room -> Auto accept or Manual accept.
-Student:
-  shared link -> enter room -> click seat -> lobby acceptance -> Share screen.
+DEPENDENCIES
+- HTTPS.
+- Firebase Anonymous Authentication enabled.
+- Realtime Database rules supplied with this page.
+- Reachable coturn on port 3489.
 
-WHY SHARE SCREEN IS A SEPARATE BUTTON
-Browser capture requires a user gesture and explicit permission.
-Asynchronous teacher acceptance cannot silently trigger desktop capture.
+AUTOMATIC PAIRING
+Student chooses a seat.
+Teacher auto-accepts or clicks Accept.
+Browsers exchange SDP through Firebase automatically.
+Student never types an answer or exchanges files.
+
+CAPTURE PERMISSION
+Share screen is a separate user-gesture button because browser permission
+cannot be granted automatically by the teacher.
 
 TRANSPORT
-Firebase Realtime Database:
-  room discovery, join request, initial SDP offer/answer, room metadata.
-TURN-relayed WebRTC:
-  video, heartbeat, sharing status, connected-client configuration snapshots.
+- Firebase: lobby, initial signaling, discovery metadata.
+- TURN-only WebRTC: screen video, heartbeat and connected-client config.
+- Non-trickle ICE: gather candidates before publishing SDP.
+- No TURN IP is embedded in source.
+- Student link carries TURN host, visible to the recipient.
 
-SECURITY BOUNDARIES
-- Teacher UID owns the room according to database rules.
-- The application ignores student-written acceptance flags as authority.
-- Teacher acceptance exists as a local teacher connection object.
-- Room IDs and request generation IDs isolate sessions and reconnects.
-- Anonymous authentication is not verified school-account identity.
-- Shared links include PUBLIC Firebase config and the TURN host.
-- Static TURN username/password are public test credentials.
+SECURITY
+- Firebase room owner UID controls authoritative metadata.
+- Teacher acceptance is represented by a teacher-local peer object.
+- Student-written state flags alone never cause trusted admission.
+- Every request has a generation ID.
+- Every DataChannel message carries room ID and generation ID.
+- Anonymous Firebase UID is not verified school identity.
+- Static TURN credentials below are public test credentials.
 
-STATE AND RACES
-- Teacher reserves a seat synchronously before asynchronous acceptance work.
-- Metadata writes are serialized.
-- Student request writes use request-generation checks.
-- Stale SDP and callbacks must match the current link.
-- Capture starts only after a connection is accepted.
-- Teardown and startup use capture identity and busy guards.
-- Health checks revalidate the connection after asynchronous getStats.
+STATE/LIFECYCLE
+- Teacher reserves a seat synchronously before async offer generation.
+- Metadata database writes are serialized.
+- Conditional request writes avoid modifying a replacement generation.
+- Capture and connection callbacks check their current object identity.
+- Failed setup frees a seat.
+- No automatic ICE restart: leave/rejoin if persistent failure occurs.
+
+HEALTH
+- Remote decoded-frame progress + track + playback + transport.
+- Async getStats results are checked against current peer/tile identity.
+- Static content may keep producing frames.
+- Heartbeat does not prove fresh desktop capture.
+- Local preview is explicitly labelled as local.
 
 LIMITATIONS
-- One controlling teacher per room, no teacher failover or SFU.
-- No automatic ICE restart; leave seat and retry on persistent failure.
-- Teacher tab must remain open.
-- Old room records require administrative cleanup.
-- No 40-device test is claimed.
-- Canvas/encoder/browser throttling may affect effective FPS.
+- One controlling teacher per room.
+- No SFU, failover, account verification, or server cleanup jobs.
+- No 40-device load test is claimed.
 
-AI AGENT CHANGE RULES
-Explain changes, preserve authorization/room isolation, document protocol
-changes, clean up timers/listeners/tracks, and report tests actually performed.
+AI AGENT INSTRUCTIONS
+Preserve room authorization and request-generation checks.
+Document protocol changes and resource cleanup.
+Do not claim coturn provides authentication, discovery, or persistent state.
+Report tests actually performed.
 ============================================================================
 */
 
@@ -354,59 +342,66 @@ import {
   getDatabase, ref, set, get, onValue, onDisconnect, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
-const SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;
+const firebaseConfig = {
+  apiKey: "AIzaSyAif_jjK-aKtEs281TVy91sDHk5YJjNhc8",
+  authDomain: "fbase-7150b.firebaseapp.com",
+  databaseURL: "https://fbase-7150b-default-rtdb.firebaseio.com",
+  projectId: "fbase-7150b",
+  storageBucket: "fbase-7150b.firebasestorage.app",
+  messagingSenderId: "435637585834",
+  appId: "1:435637585834:web:99acf51fcd1aeb525e0dd3",
+  measurementId: "G-H9QM53QYFC"
+};
+
+// Analytics is intentionally not initialized; it is unnecessary for pairing.
+const CLEAN_HTML = "<!doctype html>\n" + document.documentElement.outerHTML;
 const $ = id => document.getElementById(id);
 const uuid = () => crypto.randomUUID();
 
-const CONFIG_KEY = "classroom-lobby-firebase-v1";
-const COOKIE = "classroom-lobby-turn-v1";
+const TURN_PORT = 3489;
+const TURN_USERNAME = "username";
+const TURN_PASSWORD = "password";
+const COOKIE = "fbase_classroom_turn_v1";
 const COOKIE_PATH =
   location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1) || "/";
 
-const TURN_PORT = 3489;
-const TURN_USER = "username";
-const TURN_PASSWORD = "password";
-
+let turnHost = "";
 let db = null;
 let user = null;
-let servicePromise = null;
-let serviceConfig = null;
-let activeTurn = "";
-
+let firebaseReady = false;
 let roomId = "";
 let teacher = false;
+let closed = false;
 let meta = null;
 let requests = {};
-let closed = false;
 
+let requestId = null;
+let seatNumber = null;
+let studentLink = null;
+let studentUnsubscribe = null;
 let roomUnsubscribe = null;
 let peersUnsubscribe = null;
-let studentUnsubscribe = null;
 let disconnectHook = null;
 
-let generation = null;
-let selectedSeat = null;
-let studentLink = null;
-let studentPhase = "idle";
 let requestBusy = false;
-
-let capture = null;
 let captureBusy = false;
-let stopPromise = null;
+let leaving = false;
+let capture = null;
+let captureStop = null;
 
-let metadataQueue = Promise.resolve();
+let writeQueue = Promise.resolve();
 let healthBusy = false;
 let zoomSeat = null;
 
 const links = new Map();
 const tiles = new Map();
 
+function message(text) { $("message").textContent = text; }
 function log(text) {
   $("log").textContent =
     `[${new Date().toLocaleTimeString()}] ${text}\n` +
-    $("log").textContent.slice(0, 16000);
+    $("log").textContent.slice(0, 18000);
 }
-function message(text) { $("message").textContent = text; }
 function fail(error) {
   const text = error?.message || String(error);
   message(text);
@@ -427,77 +422,55 @@ function action(id, fn) {
 function validHost(value) {
   if (!value || value.length > 253) return false;
   if (/^\d+\.\d+\.\d+\.\d+$/.test(value)) {
-    return value.split(".").every(x => Number(x) >= 0 && Number(x) <= 255);
+    return value.split(".").every(n => Number(n) >= 0 && Number(n) <= 255);
   }
-  return value.split(".").every(x =>
-    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(x));
+  return value.split(".").every(part =>
+    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(part));
 }
-function readTurn() {
+function readTurnCookie() {
   try {
-    const item = document.cookie.split(";").map(x => x.trim())
-      .find(x => x.startsWith(COOKIE + "="));
-    const value = item ? decodeURIComponent(item.slice(COOKIE.length + 1)) : "";
+    const entry = document.cookie.split(";").map(s => s.trim())
+      .find(s => s.startsWith(COOKIE + "="));
+    const value = entry
+      ? decodeURIComponent(entry.slice(COOKIE.length + 1)) : "";
     return validHost(value) ? value : "";
   } catch { return ""; }
 }
-function saveTurn(value) {
+function saveTurn(host) {
   document.cookie =
-    `${COOKIE}=${encodeURIComponent(value)}; Max-Age=31536000` +
+    `${COOKIE}=${encodeURIComponent(host)}; Max-Age=31536000` +
     `; Path=${COOKIE_PATH}; SameSite=Lax` +
     (location.protocol === "https:" ? "; Secure" : "");
 }
-function validateConfig(config) {
-  if (!config?.apiKey || !config?.databaseURL || !config?.projectId) {
-    throw new Error("Firebase config requires apiKey, databaseURL and projectId.");
+function configureTurn() {
+  if (roomId) {
+    throw new Error("Reload before changing TURN settings for a new session.");
   }
-  if (!String(config.databaseURL).startsWith("https://")) {
-    throw new Error("Use an HTTPS Firebase databaseURL.");
-  }
-  return config;
+  const input = prompt(
+    "Enter coturn IPv4 address or hostname only.\n" +
+    "Port 3489 is used. Do not include a protocol, path, or port.",
+    ""
+  );
+  if (input === null) return false;
+  const host = input.trim().toLowerCase();
+  if (!validHost(host)) throw new Error("Invalid TURN host.");
+  turnHost = host;
+  saveTurn(host);
+  $("turnState").textContent = "TURN configured — connection not yet tested.";
+  return true;
 }
-function readConfig() {
-  return validateConfig(JSON.parse(localStorage.getItem(CONFIG_KEY) || "null"));
-}
-function openSettings() {
-  $("firebaseConfig").value = localStorage.getItem(CONFIG_KEY) || "";
-  $("turnHost").value = "";
-  $("turnHost").placeholder = readTurn()
-    ? "Leave blank to keep saved TURN host" : "Enter TURN host";
-  $("settings").showModal();
-}
-async function services() {
-  if (servicePromise) return servicePromise;
-  servicePromise = (async () => {
-    if (!window.isSecureContext) throw new Error("Use HTTPS or localhost.");
-    serviceConfig = readConfig();
-    activeTurn = readTurn();
-    if (!activeTurn) throw new Error("Configure TURN first.");
-
-    const app = initializeApp(serviceConfig);
-    const auth = getAuth(app);
-    await setPersistence(auth, browserSessionPersistence);
-    user = (await signInAnonymously(auth)).user;
-    db = getDatabase(app);
-
-    onValue(ref(db, ".info/connected"), snap => {
-      $("serviceState").textContent = snap.val()
-        ? "Lobby signaling connected" : "Lobby signaling reconnecting";
-    });
-  })();
-  try { await servicePromise; }
-  catch (error) {
-    $("serviceState").textContent = "Setup failed — correct settings and reload";
-    throw error;
-  }
+function requireReady() {
+  if (!firebaseReady) throw new Error("Wait for Firebase connection or check the setup error.");
+  if (!turnHost && !configureTurn()) throw new Error("TURN host is required.");
 }
 function rtcConfig() {
   return {
     iceServers: [{
       urls: [
-        `turn:${activeTurn}:${TURN_PORT}?transport=udp`,
-        `turn:${activeTurn}:${TURN_PORT}?transport=tcp`
+        `turn:${turnHost}:${TURN_PORT}?transport=udp`,
+        `turn:${turnHost}:${TURN_PORT}?transport=tcp`
       ],
-      username: TURN_USER,
+      username: TURN_USERNAME,
       credential: TURN_PASSWORD
     }],
     iceTransportPolicy: "relay"
@@ -508,80 +481,81 @@ function peerRef(uid = user.uid) {
 }
 function metaRef() { return ref(db, `rooms/${roomId}/meta`); }
 
-/*
- * Conditional writes prevent old answers/cancellations from modifying a
- * newer request using the same authenticated UID.
- */
 async function patchPeer(uid, id, patch) {
-  return runTransaction(peerRef(uid), value => {
-    if (!value || value.requestId !== id) return;
-    return { ...value, ...patch };
+  return runTransaction(peerRef(uid), current => {
+    if (!current || current.requestId !== id) return;
+    return { ...current, ...patch };
   }, { applyLocally: false });
 }
 async function deletePeer(uid, id) {
-  return runTransaction(peerRef(uid), value => {
-    if (!value || value.requestId !== id) return;
+  return runTransaction(peerRef(uid), current => {
+    if (!current || current.requestId !== id) return;
     return null;
   }, { applyLocally: false });
 }
 function controls() {
   const inRoom = !!roomId;
+  const connected =
+    studentLink?.active &&
+    studentLink.pc.connectionState === "connected";
+
   $("startPanel").classList.toggle("hidden", inRoom);
   $("roomPanel").classList.toggle("hidden", !inRoom);
   $("gridPanel").classList.toggle("hidden", !inRoom);
   $("teacherPanel").classList.toggle("hidden", !teacher);
   $("studentPanel").classList.toggle("hidden", teacher);
 
-  const connected =
-    studentLink?.active &&
-    studentLink.pc.connectionState === "connected";
-
   const disabled = {
-    createBtn: inRoom || $("role").value !== "teacher",
-    openBtn: inRoom,
+    createBtn: !firebaseReady || inRoom || $("role").value !== "teacher",
+    openBtn: !firebaseReady || inRoom,
     applyBtn: !teacher || closed,
     closeRoomBtn: !teacher || closed,
-    shareBtn: !connected || !!capture || captureBusy || closed,
-    leaveSeatBtn: !generation || requestBusy
+    shareBtn: !connected || !!capture || captureBusy || leaving || closed,
+    stopShareBtn: !capture || captureBusy,
+    leaveBtn: !requestId || requestBusy || leaving,
+    turnBtn: inRoom
   };
-  document.querySelectorAll("button").forEach(button => {
-    button.disabled = !!button.dataset.busy || !!disabled[button.id];
-  });
+  for (const b of document.querySelectorAll("button")) {
+    b.disabled = !!b.dataset.busy || !!disabled[b.id];
+  }
+  $("autoAccept").disabled = closed || !teacher;
 
   $("roomState").textContent = !inRoom ? "Not in a room"
     : closed ? "Room closed"
     : teacher ? "Teacher room active"
-    : capture ? "Sharing your screen"
+    : capture ? "Sharing screen"
     : connected ? "Accepted — click Share screen"
-    : generation ? "Waiting in lobby / connecting"
-    : "Click an empty seat to join";
+    : requestId ? "Waiting in lobby / connecting"
+    : "Click an empty seat";
 
-  $("lobbyText").textContent = !generation
-    ? "Click an empty tile to join that seat."
-    : studentPhase === "requested"
-      ? `Seat ${selectedSeat}: waiting in lobby. No answer or code is needed.`
-      : connected
-        ? `Seat ${selectedSeat}: accepted. Click Share screen and approve the browser prompt.`
-        : `Seat ${selectedSeat}: establishing the connection automatically.`;
+  $("lobbyText").textContent = !requestId
+    ? "Click an empty tile to join."
+    : connected
+      ? `Seat ${seatNumber}: accepted. Click Share screen and approve the browser prompt.`
+      : `Seat ${seatNumber}: waiting / connecting automatically. No answer is required.`;
 }
-function layoutCheck(rows, cols, width, fps) {
-  if (!Number.isInteger(rows) || !Number.isInteger(cols) ||
-      rows < 1 || cols < 1 || rows > 12 || cols > 12 || rows * cols > 64 ||
-      ![160,256,320].includes(width) || ![1,2].includes(fps)) {
-    throw new Error("Use 1–64 positions and supported preview settings.");
-  }
+function validLayout(value) {
+  return value &&
+    Number.isInteger(value.rows) && Number.isInteger(value.cols) &&
+    value.rows >= 1 && value.cols >= 1 &&
+    value.rows <= 12 && value.cols <= 12 &&
+    value.rows * value.cols <= 64 &&
+    [160,256,320].includes(value.width) &&
+    [1,2].includes(value.fps);
 }
-function createShareLink() {
+function validMeta(value) {
+  return validLayout(value) &&
+    typeof value.label === "string" && value.label.length <= 100 &&
+    Number.isInteger(value.revision) &&
+    typeof value.closed === "boolean";
+}
+function sharedLink() {
   const url = new URL(location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("room", roomId);
-
-  // Public bootstrap configuration; not a credential-hiding mechanism.
-  url.hash = "setup=" + encodeURIComponent(JSON.stringify({
-    firebase: serviceConfig,
-    turn: activeTurn
-  }));
+  // Host is not secret from link recipients.
+  url.hash = new URLSearchParams({ turn: turnHost }).toString();
   return url.href;
 }
 function send(link, type, extra = {}) {
@@ -601,23 +575,28 @@ function commit() {
   if (!teacher || !meta) return Promise.resolve();
   meta.revision++;
   const snapshot = structuredClone(meta);
-
   for (const link of links.values()) send(link, "config", { meta: snapshot });
   render();
 
-  metadataQueue = metadataQueue.catch(() => {})
-    .then(() => set(metaRef(), snapshot));
-  metadataQueue.catch(fail);
-  return metadataQueue;
+  writeQueue = writeQueue.catch(() => {}).then(() => set(metaRef(), snapshot));
+  writeQueue.catch(fail);
+  return writeQueue;
 }
+function resetLayoutInputs() {
+  $("rows").value = meta.rows;
+  $("cols").value = meta.cols;
+  $("width").value = meta.width;
+  $("fps").value = meta.fps;
+  $("autoAccept").value = String(meta.autoAccept);
+}
+
 async function createRoom() {
-  await services();
+  requireReady();
   teacher = true;
   roomId = uuid();
   closed = false;
   meta = {
     label: $("roomInput").value.trim() || "Classroom",
-    teacherName: $("name").value.trim() || "Teacher",
     rows: 5, cols: 8, width: 256, fps: 1,
     autoAccept: true, closed: false, revision: 1, seats: {}
   };
@@ -634,10 +613,10 @@ async function createRoom() {
       }, fail
     );
 
-    $("shareLink").value = createShareLink();
-    $("autoAccept").value = "true";
+    $("roomLink").value = sharedLink();
+    resetLayoutInputs();
     render();
-    message("Room created. Auto accept is ON. Copy and share the student link.");
+    message("Room created. Auto accept is ON. Copy the student link.");
   } catch (error) {
     roomId = "";
     teacher = false;
@@ -646,8 +625,7 @@ async function createRoom() {
   }
 }
 async function openRoom() {
-  await services();
-
+  requireReady();
   let value = $("roomInput").value.trim();
   if (value.includes("://")) value = new URL(value).searchParams.get("room") || "";
   if (!/^[a-zA-Z0-9-]{8,100}$/.test(value)) throw new Error("Invalid room ID.");
@@ -655,44 +633,46 @@ async function openRoom() {
   const owner = await get(ref(db, `rooms/${value}/owner`));
   if (owner.val() === user.uid) {
     throw new Error(
-      "Use a different browser profile/device for the student. " +
-      "This browser is authenticated as the room owner."
+      "This browser is authenticated as the teacher. " +
+      "Test the student on another device, browser, or private browser window."
     );
   }
 
   const snapshot = await get(ref(db, `rooms/${value}/meta`));
-  if (!snapshot.exists() || snapshot.val().closed) throw new Error("Room unavailable.");
+  if (!snapshot.exists() || !validMeta(snapshot.val()) || snapshot.val().closed) {
+    throw new Error("Room does not exist or is closed.");
+  }
 
   roomId = value;
   teacher = false;
   meta = snapshot.val();
+  closed = false;
 
   roomUnsubscribe = onValue(metaRef(), snap => {
     const next = snap.val();
     if (!next || next.closed) {
       closed = true;
-      if (next) meta = next;
-      message("Teacher closed the room.");
+      if (validMeta(next)) meta = next;
+      message("Room closed.");
       void leaveSeat().catch(fail);
-    } else if (next.revision >= (meta?.revision || 0)) {
+    } else if (validMeta(next) && next.revision >= (meta?.revision || 0)) {
       meta = next;
     }
     render();
   }, fail);
 
   render();
-  message("Click an empty seat. Acceptance and connection setup are automatic.");
+  message("Click an empty seat to join the lobby.");
 }
 
-/** All ICE candidates are gathered before SDP is published to signaling. */
+/** Complete non-trickle ICE gathering before publishing SDP. */
 async function gathered(pc) {
   if (pc.iceGatheringState !== "complete") {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error("TURN gathering timed out. Check TURN server settings."));
+        reject(new Error("TURN gathering timed out. Check your TURN server."));
       }, 30000);
-
       function cleanup() {
         clearTimeout(timer);
         pc.removeEventListener("icegatheringstatechange", check);
@@ -712,9 +692,10 @@ async function gathered(pc) {
       check();
     });
   }
+
   const d = pc.localDescription;
   if (!d?.sdp?.includes(" typ relay")) {
-    throw new Error("No TURN relay candidate. Verify TURN host, port and credentials.");
+    throw new Error("No TURN relay candidate. Verify host, port and credentials.");
   }
   return { type: d.type, sdp: d.sdp };
 }
@@ -723,15 +704,14 @@ function newLink(uid, id, hostSide) {
   const link = {
     uid, id, hostSide, pc, active: true,
     dc: null, upload: null, receiver: null, stream: null,
-    seat: null, name: "", applying: false, answered: false,
+    name: "", seat: null, applying: false, answered: false,
     sharing: false, lastBeat: Date.now(),
     frames: null, lastFrame: 0, version: uuid(),
     disconnectTimer: null, setupTimer: null
   };
 
-  pc.onicecandidateerror = () => {
-    log("An ICE attempt failed; check TURN if connection does not establish.");
-  };
+  pc.onicecandidateerror = () =>
+    log("An ICE attempt failed. If connection fails, verify TURN configuration.");
 
   pc.onconnectionstatechange = () => {
     if (!link.active) return;
@@ -739,23 +719,20 @@ function newLink(uid, id, hostSide) {
 
     if (pc.connectionState === "connected") clearTimeout(link.setupTimer);
 
-    if (hostSide && ["failed","disconnected"].includes(pc.connectionState)) {
+    if (hostSide && ["failed", "disconnected"].includes(pc.connectionState)) {
       link.disconnectTimer = setTimeout(() => {
-        if (link.active && ["failed","disconnected"].includes(pc.connectionState)) {
-          void release(uid, "Connection lost. Please join again.").catch(fail);
+        if (link.active && ["failed", "disconnected"].includes(pc.connectionState)) {
+          void release(uid, "Connection lost. Join again.").catch(fail);
         }
       }, 20000);
     }
 
     if (!hostSide && pc.connectionState === "connected") {
-      studentPhase = "connected";
-      message("Accepted. Click Share screen—no pairing answer is needed.");
+      message("Accepted. Click Share screen. Pairing was completed automatically.");
     }
-
     if (!hostSide && pc.connectionState === "failed") {
       message("Connection failed. Leave the seat and try again.");
     }
-
     render();
     renderPeople();
   };
@@ -767,7 +744,7 @@ function newLink(uid, id, hostSide) {
     link.version = uuid();
     link.frames = null;
     link.lastFrame = 0;
-    event.track.addEventListener("ended", () => render(), { once: true });
+    event.track.addEventListener("ended", render, { once: true });
     render();
   };
 
@@ -775,7 +752,10 @@ function newLink(uid, id, hostSide) {
   return link;
 }
 function attachChannel(link, dc) {
-  if (link.dc && link.dc !== dc) { dc.close(); return; }
+  if (link.dc && link.dc !== dc) {
+    dc.close();
+    return;
+  }
   link.dc = dc;
 
   dc.onopen = () => {
@@ -797,18 +777,16 @@ function attachChannel(link, dc) {
         const active = value.active === true;
         if (link.sharing !== active) {
           link.sharing = active;
-          link.lastFrame = 0;
           link.frames = null;
+          link.lastFrame = 0;
           render();
         }
       }
 
-      if (!link.hostSide && value.type === "config") {
-        const next = value.meta;
-        if (next && Number.isInteger(next.revision) &&
-            next.revision >= (meta?.revision || 0)) {
-          meta = next;
-          if (next.closed) {
+      if (!link.hostSide && value.type === "config" && validMeta(value.meta)) {
+        if (value.meta.revision >= (meta?.revision || 0)) {
+          meta = value.meta;
+          if (meta.closed) {
             closed = true;
             void leaveSeat().catch(fail);
           }
@@ -820,7 +798,9 @@ function attachChannel(link, dc) {
         message(value.reason || "Removed by teacher.");
         void leaveSeat().catch(fail);
       }
-    } catch { log("Invalid DataChannel message ignored."); }
+    } catch {
+      log("Invalid DataChannel message ignored.");
+    }
   };
 }
 function destroy(link) {
@@ -839,7 +819,9 @@ async function cap(sender) {
     p.encodings[0].maxBitrate = 80000;
     p.encodings[0].maxFramerate = 2;
     await sender.setParameters(p);
-  } catch {}
+  } catch {
+    // These are targets, not guaranteed total network bandwidth.
+  }
 }
 function validRequest(r) {
   return r &&
@@ -862,6 +844,7 @@ function processRequests() {
     const link = links.get(uid);
 
     if (link && r.requestId === link.id && r.answer?.type === "answer" &&
+        typeof r.answer.sdp === "string" && r.answer.sdp.length < 1000000 &&
         !link.answered && !link.applying &&
         link.pc.signalingState === "have-local-offer") {
       link.applying = true;
@@ -875,17 +858,20 @@ function processRequests() {
       void accept(uid).catch(fail);
     }
   }
+
   renderPeople();
 }
 async function accept(uid) {
   if (!teacher || closed || links.has(uid)) return;
   const r = requests[uid];
-  if (!validRequest(r)) throw new Error("Request expired or invalid.");
+  if (!validRequest(r)) return;
 
   meta.seats ||= {};
+
   if (meta.seats[String(r.seat)]) {
     await patchPeer(uid, r.requestId, {
-      state: "rejected", reason: "Seat taken. Choose another seat."
+      state: "rejected",
+      reason: "Seat was taken. Choose another seat."
     });
     return;
   }
@@ -895,8 +881,10 @@ async function accept(uid) {
   link.seat = r.seat;
   links.set(uid, link);
 
-  // Synchronous reservation prevents two asynchronous accepts taking one seat.
-  meta.seats[String(r.seat)] = { uid, requestId: r.requestId, name: r.name };
+  // Reserve before any await: avoids double acceptance for one seat.
+  meta.seats[String(r.seat)] = {
+    uid, requestId: r.requestId, name: r.name
+  };
 
   try {
     await commit();
@@ -910,7 +898,8 @@ async function accept(uid) {
     if (!link.active) return;
 
     const result = await patchPeer(uid, link.id, {
-      state: "accepted", offer
+      state: "accepted",
+      offer
     });
 
     if (!result.committed) {
@@ -920,12 +909,12 @@ async function accept(uid) {
 
     link.setupTimer = setTimeout(() => {
       if (link.active && link.pc.connectionState !== "connected") {
-        void release(uid, "Connection timed out. Join again.").catch(fail);
+        void release(uid, "Setup timed out. Please join again.").catch(fail);
       }
     }, 60000);
 
   } catch (error) {
-    await release(uid, "Connection setup failed. Try again.");
+    await release(uid, "Connection setup failed. Please join again.");
     throw error;
   }
 
@@ -934,7 +923,8 @@ async function accept(uid) {
 async function reject(uid) {
   const r = requests[uid];
   if (r) await patchPeer(uid, r.requestId, {
-    state: "rejected", reason: "Teacher declined the request."
+    state: "rejected",
+    reason: "Teacher declined this request."
   });
 }
 async function release(uid, reason = "Removed by teacher.", notify = true) {
@@ -948,11 +938,9 @@ async function release(uid, reason = "Removed by teacher.", notify = true) {
   if (meta?.seats?.[String(link.seat)]?.requestId === link.id) {
     delete meta.seats[String(link.seat)];
   }
-  await commit();
 
-  if (notify) {
-    await patchPeer(uid, link.id, { state: "rejected", reason });
-  }
+  await commit();
+  if (notify) await patchPeer(uid, link.id, { state: "rejected", reason });
 
   render();
   renderPeople();
@@ -967,7 +955,6 @@ function renderPeople() {
 
     const row = document.createElement("div");
     row.className = "person";
-
     const text = document.createElement("span");
     text.textContent =
       `${String(r.name || "Student").slice(0,60)} — seat ${r.seat} — ` +
@@ -981,17 +968,18 @@ function renderPeople() {
         yes.disabled = true;
         accept(uid).catch(fail);
       };
+
       const no = document.createElement("button");
       no.textContent = "Reject";
       no.className = "secondary";
       no.onclick = () => reject(uid).catch(fail);
       row.append(yes, no);
     } else {
-      const remove = document.createElement("button");
-      remove.textContent = "Remove";
-      remove.className = "danger";
-      remove.onclick = () => release(uid).catch(fail);
-      row.append(remove);
+      const removeButton = document.createElement("button");
+      removeButton.textContent = "Remove";
+      removeButton.className = "danger";
+      removeButton.onclick = () => release(uid).catch(fail);
+      row.append(removeButton);
     }
 
     $("people").append(row);
@@ -1000,22 +988,18 @@ function renderPeople() {
   if (!$("people").children.length) $("people").textContent = "Lobby is empty.";
 }
 
-/*
- * Student chooses a seat and enters the lobby.
- * NO SDP answer entry, pasted code, or file exchange is involved.
- */
+/** Student enters lobby. All SDP answers are generated automatically. */
 async function chooseSeat(seat) {
-  if (teacher || closed || !roomId || generation || requestBusy) return;
+  if (teacher || closed || !roomId || requestId || requestBusy || leaving) return;
   if (meta.seats?.[String(seat)]) {
     message("That seat is occupied.");
     return;
   }
 
   requestBusy = true;
-  generation = uuid();
-  selectedSeat = seat;
-  studentPhase = "requested";
-  const id = generation;
+  requestId = uuid();
+  seatNumber = seat;
+  const id = requestId;
 
   try {
     disconnectHook = onDisconnect(peerRef());
@@ -1030,8 +1014,8 @@ async function chooseSeat(seat) {
     });
 
     studentUnsubscribe = onValue(peerRef(), snap => {
+      if (requestId !== id) return;
       const r = snap.val();
-      if (generation !== id) return;
 
       if (!r || r.requestId !== id) {
         message("Request removed. Choose a seat again.");
@@ -1039,7 +1023,8 @@ async function chooseSeat(seat) {
       } else if (r.state === "rejected") {
         message(r.reason || "Request rejected.");
         void leaveSeat().catch(fail);
-      } else if (r.state === "accepted" && r.offer?.type === "offer" && !studentLink) {
+      } else if (r.state === "accepted" && r.offer?.type === "offer" &&
+                 typeof r.offer.sdp === "string" && !studentLink) {
         void answerAutomatically(r, id).catch(async error => {
           fail(error);
           await leaveSeat();
@@ -1048,8 +1033,8 @@ async function chooseSeat(seat) {
     }, fail);
 
     message(meta.autoAccept
-      ? "Waiting in lobby. Auto accept will connect you—no answer is required."
-      : "Waiting in lobby for the teacher to click Accept.");
+      ? "Waiting in lobby. Auto accept will connect you automatically."
+      : "Waiting for the teacher to accept. No answer or code is required.");
 
   } catch (error) {
     await leaveSeat();
@@ -1059,34 +1044,36 @@ async function chooseSeat(seat) {
     render();
   }
 }
-async function answerAutomatically(request, id) {
-  if (generation !== id || studentLink || closed) return;
+async function answerAutomatically(r, id) {
+  if (requestId !== id || studentLink || closed) return;
 
   const link = newLink(user.uid, id, false);
   studentLink = link;
-  studentPhase = "connecting";
-  controls();
 
-  await link.pc.setRemoteDescription(request.offer);
-  const upload = link.pc.getTransceivers().find(t => t.receiver.track.kind === "video");
+  await link.pc.setRemoteDescription(r.offer);
+  const upload = link.pc.getTransceivers().find(
+    t => t.receiver.track.kind === "video"
+  );
   if (!upload) throw new Error("Missing video transceiver.");
 
   upload.direction = "sendonly";
   link.upload = upload;
 
-  // A sender without a track negotiates now; screen is attached after permission.
   await link.pc.setLocalDescription(await link.pc.createAnswer());
   const answer = await gathered(link.pc);
 
-  if (!link.active || generation !== id || studentLink !== link) return;
+  if (!link.active || requestId !== id || studentLink !== link) return;
+
   await patchPeer(user.uid, id, { answer });
-  message("Accepted. The browser exchanged the answer automatically.");
+  message("Accepted. The browser exchanged the connection answer automatically.");
 }
 async function leaveSeat() {
-  const id = generation;
-  generation = null;
-  selectedSeat = null;
-  studentPhase = "idle";
+  if (leaving) return;
+  leaving = true;
+
+  const id = requestId;
+  requestId = null;
+  seatNumber = null;
 
   studentUnsubscribe?.();
   studentUnsubscribe = null;
@@ -1095,33 +1082,39 @@ async function leaveSeat() {
   studentLink = null;
   destroy(oldLink);
 
-  await stopCapture();
+  try {
+    await stopCapture();
 
-  if (id && db && user && roomId) {
-    try { await deletePeer(user.uid, id); } catch (error) { log(error.message); }
+    // Cancel old disconnect registration before allowing a new request.
+    try { await disconnectHook?.cancel(); } catch {}
+    disconnectHook = null;
+
+    if (id && db && user && roomId) {
+      try { await deletePeer(user.uid, id); }
+      catch (error) { log(error.message); }
+    }
+  } finally {
+    leaving = false;
+    render();
   }
-  try { await disconnectHook?.cancel(); } catch {}
-  disconnectHook = null;
-
-  render();
 }
 
 /*
- * getDisplayMedia is invoked directly by the Share screen click.
- * Acceptance itself cannot bypass the browser permission picker.
+ * Browser permission is requested directly from the Share screen click.
+ * It cannot be auto-granted by a teacher or Firebase.
  */
 async function startCapture() {
   const link = studentLink;
   if (!link?.active || link.pc.connectionState !== "connected") {
     throw new Error("Wait for acceptance and connection first.");
   }
-  if (captureBusy || capture) return;
+  if (captureBusy || capture || leaving) return;
   if (!navigator.mediaDevices?.getDisplayMedia) {
-    throw new Error("Use HTTPS and a supported desktop browser.");
+    throw new Error("Screen capture requires HTTPS and a supported desktop browser.");
   }
 
   captureBusy = true;
-  let c;
+  let current;
 
   try {
     const desktop = await navigator.mediaDevices.getDisplayMedia({
@@ -1129,104 +1122,124 @@ async function startCapture() {
       audio: false
     });
 
-    c = {
-      id: uuid(), desktop, video: document.createElement("video"),
+    current = {
+      id: uuid(),
+      desktop,
+      video: document.createElement("video"),
       canvas: document.createElement("canvas"),
-      output: null, track: null, timer: null, ended: false
+      output: null,
+      track: null,
+      timer: null,
+      ended: false
     };
-    capture = c;
-    c.video.muted = true;
-    c.video.playsInline = true;
-    c.video.srcObject = desktop;
+    capture = current;
+
+    current.video.muted = true;
+    current.video.playsInline = true;
+    current.video.srcObject = desktop;
 
     desktop.getVideoTracks()[0].addEventListener("ended", () => {
-      c.ended = true;
-      if (capture === c && !captureBusy) void stopCapture().catch(fail);
+      current.ended = true;
+      if (capture === current && !captureBusy) void stopCapture().catch(fail);
     }, { once: true });
 
-    await c.video.play();
+    await current.video.play();
 
-    if (c.ended || studentLink !== link || !link.active || closed) {
+    if (current.ended || studentLink !== link || !link.active || closed) {
       throw new Error("Sharing cancelled or connection changed.");
     }
 
-    const ctx = c.canvas.getContext("2d", { alpha: false });
-    if (!ctx || !c.canvas.captureStream) throw new Error("Canvas capture unsupported.");
+    const ctx = current.canvas.getContext("2d", { alpha: false });
+    if (!ctx || !current.canvas.captureStream) {
+      throw new Error("Canvas video capture is unsupported.");
+    }
 
     function draw() {
-      if (capture !== c || c.ended) return;
+      if (capture !== current || current.ended) return;
+
       try {
-        const width = meta.width, height = Math.round(width * 9 / 16);
-        if (c.canvas.width !== width || c.canvas.height !== height) {
-          c.canvas.width = width;
-          c.canvas.height = height;
+        const width = meta.width;
+        const height = Math.round(width * 9 / 16);
+
+        if (current.canvas.width !== width || current.canvas.height !== height) {
+          current.canvas.width = width;
+          current.canvas.height = height;
         }
+
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, width, height);
-        if (c.video.videoWidth && c.video.videoHeight) {
-          const scale = Math.min(width / c.video.videoWidth, height / c.video.videoHeight);
-          const w = c.video.videoWidth * scale, h = c.video.videoHeight * scale;
-          ctx.drawImage(c.video, (width-w)/2, (height-h)/2, w, h);
+
+        if (current.video.videoWidth && current.video.videoHeight) {
+          const scale = Math.min(
+            width / current.video.videoWidth,
+            height / current.video.videoHeight
+          );
+          const w = current.video.videoWidth * scale;
+          const h = current.video.videoHeight * scale;
+
+          ctx.drawImage(current.video, (width-w)/2, (height-h)/2, w, h);
         }
-        c.timer = setTimeout(draw, 1000 / meta.fps);
+
+        current.timer = setTimeout(draw, 1000 / meta.fps);
       } catch (error) {
-        c.ended = true;
+        current.ended = true;
         log(error.message);
         if (!captureBusy) void stopCapture().catch(fail);
       }
     }
+
     draw();
+    current.output = current.canvas.captureStream(2);
+    current.track = current.output.getVideoTracks()[0];
+    if (!current.track) throw new Error("No canvas video track.");
 
-    c.output = c.canvas.captureStream(2);
-    c.track = c.output.getVideoTracks()[0];
-
-    await link.upload.sender.replaceTrack(c.track);
+    await link.upload.sender.replaceTrack(current.track);
     await cap(link.upload.sender);
 
-    if (c.ended || studentLink !== link || !link.active || closed) {
+    if (current.ended || studentLink !== link || !link.active || closed) {
       throw new Error("Sharing ended during startup.");
     }
 
     send(link, "sharing", { active: true });
-    message("Sharing your screen.");
+    message("Screen sharing started.");
     render();
 
   } catch (error) {
-    if (c) {
-      c.ended = true;
-      clearTimeout(c.timer);
-      c.desktop.getTracks().forEach(t => t.stop());
-      c.output?.getTracks().forEach(t => t.stop());
-      c.video.srcObject = null;
-      if (capture === c) capture = null;
+    if (current) {
+      current.ended = true;
+      clearTimeout(current.timer);
+      current.desktop.getTracks().forEach(t => t.stop());
+      current.output?.getTracks().forEach(t => t.stop());
+      current.video.srcObject = null;
+      if (capture === current) capture = null;
       try { await link.upload?.sender.replaceTrack(null); } catch {}
     }
     throw error;
   } finally {
     captureBusy = false;
     controls();
-    if (c?.ended && capture === c) void stopCapture().catch(fail);
+    if (current?.ended && capture === current) void stopCapture().catch(fail);
   }
 }
 async function stopCapture() {
-  if (stopPromise) return stopPromise;
-  const c = capture;
-  if (!c) return;
+  if (captureStop) return captureStop;
+  const current = capture;
+  if (!current) return;
 
   if (captureBusy) {
-    c.ended = true;
+    current.ended = true;
     return;
   }
 
   capture = null;
-  c.ended = true;
+  current.ended = true;
   captureBusy = true;
 
-  stopPromise = (async () => {
-    clearTimeout(c.timer);
-    c.desktop.getTracks().forEach(t => t.stop());
-    c.output?.getTracks().forEach(t => t.stop());
-    c.video.srcObject = null;
+  captureStop = (async () => {
+    clearTimeout(current.timer);
+    current.desktop.getTracks().forEach(t => t.stop());
+    current.output?.getTracks().forEach(t => t.stop());
+    current.video.srcObject = null;
 
     const link = studentLink;
     if (link?.active) {
@@ -1235,30 +1248,33 @@ async function stopCapture() {
     }
   })();
 
-  try { await stopPromise; }
+  try { await captureStop; }
   finally {
-    stopPromise = null;
+    captureStop = null;
     captureBusy = false;
     render();
   }
 }
-
 async function applyLayout() {
-  const rows = Number($("rows").value);
-  const cols = Number($("cols").value);
-  const width = Number($("width").value);
-  const fps = Number($("fps").value);
-  layoutCheck(rows, cols, width, fps);
-
-  if (Object.keys(meta.seats || {}).some(seat => Number(seat) > rows * cols)) {
-    throw new Error("Remove students from seats being deleted before shrinking.");
+  const settings = {
+    rows: Number($("rows").value),
+    cols: Number($("cols").value),
+    width: Number($("width").value),
+    fps: Number($("fps").value)
+  };
+  if (!validLayout(settings)) {
+    throw new Error("Use 1–64 seats and supported preview settings.");
   }
-
-  Object.assign(meta, { rows, cols, width, fps });
+  if (Object.keys(meta.seats || {}).some(
+    seat => Number(seat) > settings.rows * settings.cols
+  )) {
+    throw new Error("Remove students from deleted positions before shrinking.");
+  }
+  Object.assign(meta, settings);
   await commit();
   message("Grid settings updated.");
 }
-async function setAutoAccept() {
+async function changeAutoAccept() {
   if (!teacher || closed) return;
   meta.autoAccept = $("autoAccept").value === "true";
   await commit();
@@ -1266,7 +1282,7 @@ async function setAutoAccept() {
   message(meta.autoAccept ? "Auto accept enabled." : "Manual acceptance enabled.");
 }
 async function closeRoom() {
-  if (!confirm("Close the room and disconnect students?")) return;
+  if (!confirm("Close this room and disconnect students?")) return;
   closed = true;
   meta.closed = true;
   await commit();
@@ -1274,11 +1290,12 @@ async function closeRoom() {
   for (const [uid] of [...links]) await release(uid, "Teacher closed the room.");
 
   peersUnsubscribe?.();
+  peersUnsubscribe = null;
   message("Room closed. Reload to create another room.");
   controls();
 }
 
-function setHealth(tile, good, text) {
+function tileHealth(tile, good, text) {
   tile.el.classList.toggle("good", good);
   tile.el.classList.toggle("bad", !good);
   tile.health.textContent = text;
@@ -1294,13 +1311,14 @@ function newTile(seat) {
   video.autoplay = true;
   video.muted = true;
   video.playsInline = true;
-  const title = document.createElement("div");
-  title.className = "title";
+
+  const name = document.createElement("div");
+  name.className = "name";
   const health = document.createElement("div");
   health.className = "health";
-  el.append(video, title, health);
+  el.append(video, name, health);
 
-  const tile = { seat, el, video, title, health, stream: null, binding: 0 };
+  const tile = { seat, el, video, name, health, stream: null, binding: 0 };
 
   el.onclick = () => {
     if (!teacher) {
@@ -1309,7 +1327,7 @@ function newTile(seat) {
     }
     if (!video.srcObject) return;
     zoomSeat = seat;
-    $("zoomTitle").textContent = title.textContent;
+    $("zoomTitle").textContent = name.textContent;
     $("zoomVideo").srcObject = video.srcObject;
     $("zoomVideo").style.visibility = el.classList.contains("good") ? "visible" : "hidden";
     $("zoomStatus").textContent = health.textContent;
@@ -1324,10 +1342,12 @@ function render() {
 
   $("roomTitle").textContent =
     `${meta.label} — ${Object.keys(meta.seats || {}).length} assigned students`;
+
   $("grid").style.setProperty("--cols", meta.cols);
   $("grid").classList.toggle("scroll", $("view").value === "scroll");
 
   const count = meta.rows * meta.cols;
+
   for (const [seat, tile] of tiles) {
     if (seat > count) {
       tile.video.srcObject = null;
@@ -1346,37 +1366,44 @@ function render() {
 
     const assignment = meta.seats?.[String(seat)];
     const link = assignment ? links.get(assignment.uid) : null;
-    const mine = !teacher && selectedSeat === seat;
-    const stream = teacher ? link?.stream || null : mine ? capture?.output || null : null;
+    const mine = !teacher && seatNumber === seat;
+    const stream = teacher
+      ? link?.stream || null
+      : mine ? capture?.output || null : null;
 
     if (tile.stream !== stream) {
       tile.stream = stream;
       tile.binding++;
       tile.video.srcObject = stream;
       if (stream) tile.video.play().catch(() => {});
-      setHealth(tile, false, "Waiting for video");
+      tileHealth(tile, false, "Waiting for video");
+
       if (zoomSeat === seat) {
         $("zoomVideo").srcObject = stream;
         $("zoomVideo").style.visibility = "hidden";
       }
     }
 
-    tile.title.textContent = `Seat ${seat}${assignment ? " — " + assignment.name : ""}`;
+    tile.name.textContent = `Seat ${seat}${assignment ? " — " + assignment.name : ""}`;
     tile.el.classList.toggle("mine", mine);
 
-    if (closed) setHealth(tile, false, "Room closed");
-    else if (mine && capture) setHealth(tile, true, "Your local preview");
-    else if (mine) setHealth(tile, false,
-      studentLink?.pc.connectionState === "connected"
-        ? "Accepted — Share screen" : "Waiting in lobby / connecting");
-    else if (!assignment) setHealth(tile, false, teacher ? "Empty" : "Click to join");
-    else if (!teacher) setHealth(tile, false, "Occupied");
-    else if (!link || link.pc.connectionState !== "connected") {
-      setHealth(tile, false, "Connecting / disconnected");
+    if (closed) tileHealth(tile, false, "Room closed");
+    else if (mine && capture) tileHealth(tile, true, "Your local preview");
+    else if (mine) {
+      tileHealth(tile, false,
+        studentLink?.pc.connectionState === "connected"
+          ? "Accepted — Share screen"
+          : "Waiting in lobby / connecting");
+    } else if (!assignment) {
+      tileHealth(tile, false, teacher ? "Empty" : "Click to join");
+    } else if (!teacher) {
+      tileHealth(tile, false, "Occupied");
+    } else if (!link || link.pc.connectionState !== "connected") {
+      tileHealth(tile, false, "Connecting / disconnected");
     } else if (!link.sharing) {
-      setHealth(tile, false, "Accepted — not sharing");
+      tileHealth(tile, false, "Accepted — not sharing");
     } else if (!stream) {
-      setHealth(tile, false, "Waiting for video");
+      tileHealth(tile, false, "Waiting for video");
     }
   }
 }
@@ -1388,8 +1415,10 @@ async function checkHealth() {
       const tile = tiles.get(link.seat);
       if (!tile || !link.active || !link.receiver || !link.stream || !link.sharing) continue;
 
-      const binding = tile.binding, version = link.version;
+      const binding = tile.binding;
+      const version = link.version;
       let frames = null;
+
       try {
         const stats = await link.receiver.getStats();
         stats.forEach(s => {
@@ -1406,77 +1435,81 @@ async function checkHealth() {
 
       const track = link.stream.getVideoTracks()[0];
       const now = performance.now();
-      if (frames !== null && frames > 0 && frames !== link.frames) link.lastFrame = now;
+
+      if (frames !== null && frames > 0 && frames !== link.frames) {
+        link.lastFrame = now;
+      }
       link.frames = frames;
 
-      if (closed || link.pc.connectionState !== "connected" || track?.readyState !== "live") {
-        setHealth(tile, false, "Video unavailable");
-      } else if (frames === null) setHealth(tile, false, "Health unverified");
-      else if (!link.lastFrame) setHealth(tile, false, "Waiting for frames");
-      else if (now - link.lastFrame > 30000) setHealth(tile, false, "Possibly stalled");
-      else if (track.muted) setHealth(tile, false, "Video temporarily unavailable");
-      else if (tile.video.paused || tile.video.readyState < 2) {
-        setHealth(tile, false, "Playback paused / buffering");
-      } else setHealth(tile, true, "Receiving video");
+      if (closed || link.pc.connectionState !== "connected" ||
+          track?.readyState !== "live") {
+        tileHealth(tile, false, "Video unavailable");
+      } else if (frames === null) {
+        tileHealth(tile, false, "Health unverified");
+      } else if (!link.lastFrame) {
+        tileHealth(tile, false, "Waiting for frames");
+      } else if (now - link.lastFrame > 30000) {
+        tileHealth(tile, false, "Possibly stalled");
+      } else if (track.muted) {
+        tileHealth(tile, false, "Video temporarily unavailable");
+      } else if (tile.video.paused || tile.video.readyState < 2) {
+        tileHealth(tile, false, "Playback paused / buffering");
+      } else {
+        tileHealth(tile, true, "Receiving video");
+      }
     }
   } finally { healthBusy = false; }
 }
+
 setInterval(() => {
   const all = teacher ? [...links.values()] : studentLink ? [studentLink] : [];
   for (const link of all) send(link, "heartbeat");
   if (!teacher && studentLink?.dc?.readyState === "open" &&
       Date.now() - studentLink.lastBeat > 25000) {
-    message("Teacher heartbeat missing. Connection may be interrupted.");
+    message("Teacher heartbeat missing. The connection may be interrupted.");
   }
 }, 5000);
 setInterval(() => checkHealth().catch(fail), 2000);
 
-action("settingsBtn", openSettings);
-action("saveSettingsBtn", () => {
-  const config = validateConfig(JSON.parse($("firebaseConfig").value));
-  const turn = $("turnHost").value.trim().toLowerCase() || readTurn();
-  if (!validHost(turn)) throw new Error("Enter a valid TURN host.");
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-  saveTurn(turn);
-  $("settings").close();
-  message(servicePromise
-    ? "Settings saved. Reload before using changed settings."
-    : "Settings saved. Create a room.");
-});
-$("cancelSettingsBtn").onclick = () => $("settings").close();
-
+action("turnBtn", configureTurn);
 action("createBtn", createRoom);
 action("openBtn", openRoom);
 action("applyBtn", applyLayout);
 action("closeRoomBtn", closeRoom);
 action("shareBtn", startCapture);
-action("leaveSeatBtn", async () => {
+action("stopShareBtn", async () => {
+  await stopCapture();
+  message("Screen stopped. You still have your seat.");
+});
+action("leaveBtn", async () => {
   await leaveSeat();
   message("Seat released. Click an empty seat to join again.");
 });
-$("autoAccept").onchange = () => setAutoAccept().catch(fail);
+$("autoAccept").onchange = () => changeAutoAccept().catch(fail);
+$("role").onchange = controls;
+$("view").onchange = () => {
+  $("grid").classList.toggle("scroll", $("view").value === "scroll");
+};
 
 action("copyBtn", async () => {
   try {
-    await navigator.clipboard.writeText(createShareLink());
+    await navigator.clipboard.writeText(sharedLink());
     message("Student link copied. Send it privately.");
   } catch {
-    $("shareLink").select();
+    $("roomLink").select();
     message("Copy the selected link manually.");
   }
 });
 action("downloadBtn", () => {
-  const url = URL.createObjectURL(new Blob([SOURCE], { type: "text/html;charset=utf-8" }));
+  const url = URL.createObjectURL(new Blob([CLEAN_HTML], {
+    type: "text/html;charset=utf-8"
+  }));
   const a = document.createElement("a");
   a.href = url;
   a.download = "classroom-lobby.html";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
 });
-$("role").onchange = controls;
-$("view").onchange = () => {
-  $("grid").classList.toggle("scroll", $("view").value === "scroll");
-};
 $("closeZoomBtn").onclick = () => $("zoom").close();
 $("zoom").onclose = () => {
   zoomSeat = null;
@@ -1490,38 +1523,64 @@ window.addEventListener("beforeunload", () => {
   destroy(studentLink);
 });
 
-// Student links bootstrap PUBLIC connection configuration.
-// This is convenience, not secrecy: the link recipient can inspect it.
-try {
-  const hash = new URLSearchParams(location.hash.slice(1));
-  const setupText = hash.get("setup");
-  if (setupText) {
-    if (setupText.length > 20000) throw new Error("Configuration link too large.");
-    const setup = JSON.parse(setupText);
-    validateConfig(setup.firebase);
-    if (!validHost(setup.turn)) throw new Error("Invalid TURN host in room link.");
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(setup.firebase));
-    saveTurn(setup.turn);
+// Import TURN host from teacher's room link, then remove it from address bar.
+// The recipient can still inspect the original link and browser cookie.
+turnHost = readTurnCookie();
 
-    // Remove configuration from the displayed address after importing it.
+try {
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const imported = fragment.get("turn");
+
+  if (imported) {
+    if (!validHost(imported)) throw new Error("Invalid TURN host in room link.");
+    turnHost = imported;
+    saveTurn(imported);
     history.replaceState(null, "", location.pathname + location.search);
   }
 } catch (error) { fail(error); }
+
+if (turnHost) {
+  $("turnState").textContent = "TURN configured — not yet connection-tested.";
+}
 
 const incomingRoom = new URL(location.href).searchParams.get("room");
 if (incomingRoom) {
   $("role").value = "student";
   $("roomInput").value = incomingRoom;
-  message("Enter your name, click Enter room, then choose a seat.");
+  message("Enter your name, click Enter room, then click an empty seat.");
 }
+
 controls();
 
-if (!window.isSecureContext) {
-  message("Host this page on HTTPS or localhost.");
-} else {
-  let configured = false;
-  try { configured = !!readTurn() && !!readConfig(); } catch {}
-  if (!configured) setTimeout(openSettings, 250);
+// Initialize supplied Firebase configuration. Analytics is not required.
+try {
+  if (!window.isSecureContext) throw new Error("Host this page on HTTPS or localhost.");
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  await setPersistence(auth, browserSessionPersistence);
+  user = (await signInAnonymously(auth)).user;
+  db = getDatabase(app);
+  firebaseReady = true;
+
+  onValue(ref(db, ".info/connected"), snapshot => {
+    $("serviceState").textContent = snapshot.val()
+      ? "Firebase connected"
+      : "Firebase reconnecting";
+  });
+
+  controls();
+
+  if (!turnHost) {
+    setTimeout(() => {
+      try { configureTurn(); } catch (error) { fail(error); }
+    }, 250);
+  }
+
+} catch (error) {
+  $("serviceState").textContent = "Firebase initialization failed";
+  fail(error);
 }
 </script>
 </body>
