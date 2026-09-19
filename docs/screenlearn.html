@@ -96,30 +96,17 @@ dialog::backdrop{background:#000b}
 <body>
 <main>
 <h1>Classroom Screen Monitor</h1>
+
 <div class="row">
   <span id="firebaseState" class="badge">Firebase: connecting…</span>
   <span class="badge">TURN relay only</span>
-  <span class="badge">Complete SDP · v6</span>
+  <span class="badge">Complete SDP · v7</span>
 </div>
 
 <div id="notice">Loading…</div>
 
 <section>
-  <h2>TURN server requirement</h2>
-  <p>
-    Your previous server log reported
-    <strong>CREATE_PERMISSION: 403 Forbidden IP</strong>.
-    Apply the server-side permission fix before testing this page.
-    JavaScript cannot override a TURN server permission rejection.
-  </p>
-  <p class="muted">
-    A successful test requires an echoed ping, not merely an allocated relay.
-    Both test peers use this same TURN server.
-  </p>
-</section>
-
-<section>
-  <h2>Independent TURN data-path test</h2>
+  <h2>TURN data-path test</h2>
   <div class="row">
     <label>Transport
       <select id="transport">
@@ -129,15 +116,16 @@ dialog::backdrop{background:#000b}
       </select>
     </label>
     <button id="testBtn">Start TURN test</button>
-    <button id="cancelBtn" disabled>Cancel</button>
+    <button id="cancelBtn" disabled>Cancel test</button>
     <button id="diagnoseBtn">Diagnose classroom</button>
-    <button id="downloadBtn">Download live diagnostics</button>
+    <button id="downloadBtn">Download diagnostics</button>
   </div>
-  <div id="testStatus">No test running.</div>
+  <div id="testStatus">No test run in this page session.</div>
   <p class="muted">
-    The test uses unchanged, fully gathered browser SDP. No Firebase or screen
-    capture is involved. Keep this tab visible. TURN over TCP can allocate UDP
-    relay endpoints; that is normal.
+    Success requires an echoed ping between two relay-only connections.
+    This test is independent of Firebase and screen capture.
+    It verifies this browser's test path, not every student network.
+    TURN over TCP can allocate UDP relay endpoints; that is normal.
   </p>
 </section>
 
@@ -149,15 +137,19 @@ dialog::backdrop{background:#000b}
     <button id="openBtn" disabled>Open as student</button>
   </div>
   <p class="muted">
-    One controlling teacher tab per room. Students open the link, click a seat,
-    and approve browser screen capture. No typed student names or pairing codes.
+    Teacher creates a room and shares the link.
+    Students open it, click an available seat, and approve browser screen capture.
+    No typed student names, pairing codes, or manual SDP exchange.
   </p>
 </section>
 
 <section id="roomPanel" hidden>
   <div class="row">
-    <h2>Classroom</h2><span id="role" class="badge"></span>
+    <h2>Classroom</h2>
+    <span id="role" class="badge"></span>
+    <span id="roomHealth" class="badge"></span>
   </div>
+
   <div class="row">
     <input id="roomLink" class="link" readonly aria-label="Student link">
     <button id="copyBtn">Copy student link</button>
@@ -166,8 +158,12 @@ dialog::backdrop{background:#000b}
   <div id="teacherPanel" hidden>
     <div class="row" style="margin-top:14px">
       <label><input id="auto" type="checkbox" checked>Auto accept</label>
-      <label>Rows <input id="rows" type="number" min="1" max="64" value="5"></label>
-      <label>Columns <input id="cols" type="number" min="1" max="64" value="8"></label>
+      <label>Rows
+        <input id="rows" type="number" min="1" max="64" value="5">
+      </label>
+      <label>Columns
+        <input id="cols" type="number" min="1" max="64" value="8">
+      </label>
       <label>Preview
         <select id="width">
           <option value="160">160 × 90</option>
@@ -176,22 +172,27 @@ dialog::backdrop{background:#000b}
         </select>
       </label>
       <label>FPS
-        <select id="fps"><option selected>1</option><option>2</option></select>
+        <select id="fps">
+          <option selected>1</option>
+          <option>2</option>
+        </select>
       </label>
       <button id="applyBtn">Apply settings</button>
       <button id="closeRoomBtn" class="danger">Close room</button>
     </div>
+
     <p class="muted">
-      Maximum 64 seats. Failed connections remain assigned until removed or the
-      student leaves. Keep this teacher tab open. No teacher takeover, reload
-      recovery, or synchronized second teacher is implemented.
+      Maximum 64 positions. Seat numbers remain stable across layout changes.
+      Failed connections remain assigned until removed or the student leaves.
+      Keep this controlling teacher tab open.
     </p>
+
     <div id="people"></div>
   </div>
 
   <div id="studentPanel" hidden>
     <p>
-      Click an available seat, then choose your desktop screen.
+      Click an available seat and choose your desktop screen.
       No audio is captured. Keep this tab open.
       Browser Stop sharing immediately stops capture.
     </p>
@@ -215,7 +216,7 @@ dialog::backdrop{background:#000b}
 <section>
   <details open>
     <summary>Connection diagnostics</summary>
-    <pre id="diagnostics">Run the TURN test after updating coturn.</pre>
+    <pre id="diagnostics">Run a TURN test or diagnose a classroom connection.</pre>
   </details>
   <details>
     <summary>Event log</summary>
@@ -226,13 +227,18 @@ dialog::backdrop{background:#000b}
 <p class="muted">
   Android can display the teacher dashboard and run the TURN test.
   Student screen publishing requires HTTPS and a supported desktop browser.
-  Background tabs and power saving may suspend capture or connections.
+  Background tabs, device sleep, or power saving may interrupt activity.
 </p>
 <p class="muted">
-  Testing deployment: embedded TURN credentials are public.
+  One controlling teacher per room. No teacher takeover, reload recovery,
+  SFU, or synchronized second teacher is implemented.
+  If the controlling teacher tab is lost, create a new room.
+</p>
+<p class="muted">
+  Test deployment: TURN credentials are public in this file.
   Use temporary server-issued credentials and school-appropriate access controls
   before production. Anonymous Firebase IDs do not verify student identity.
-  This page has not been load-tested on 40 devices.
+  This application has not been load-tested on 40 devices.
 </p>
 </main>
 
@@ -258,900 +264,1518 @@ import {
   "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 /*
-  ARCHITECTURE / AGENT REVIEW NOTES
-  --------------------------------
-  GitHub Pages: static frontend.
-  Firebase: anonymous UID, room ownership, lobby, metadata, complete SDP.
-  coturn: relay-only WebRTC video and DataChannel traffic.
+  ARCHITECTURE / AI REVIEW NOTES
+  =============================
+  GitHub Pages serves this file.
+  Firebase supplies anonymous identity, room ownership, lobby, metadata and SDP.
+  coturn relays all WebRTC media and DataChannel traffic.
 
-  IMPORTANT: the observed CREATE_PERMISSION 403 is a server rejection.
-  This HTML does not pretend to repair it or bypass it with direct media.
+  Preserve these invariants:
+  1. Every RTCPeerConnection uses iceTransportPolicy:"relay".
+  2. SDP is sent unchanged, after ICE gathering completes.
+  3. Candidate events are diagnostic-only; no duplicate trickle signaling.
+  4. Student capture is requested directly from the seat click, before awaits.
+  5. Student attaches the tiny canvas track before creating an offer.
+  6. Room/UID/attempt UUID isolates classrooms and retries.
+  7. Teacher-local reservations determine acceptance.
+     Student-written accepted states cannot create a teacher peer.
+  8. Stop raw capture before asynchronous database cleanup.
+  9. Preserve stable video nodes; do not rebuild the grid every stats tick.
+  10. Keep failed peers available for diagnostics until explicitly removed.
 
-  Complete SDP is sent AFTER ICE gathering finishes, unchanged.
-  onicecandidate is used for diagnostics only; no separate trickle records.
-  getDisplayMedia is called directly from the student's seat-click gesture.
-  A tiny canvas track is attached before the student creates its offer.
-  Each attempt uses room + UID + UUID, avoiding stale retry collisions.
-  Teacher-local reservations authorize seats, not student-written state flags.
-  One teacher tab controls each room. No SFU, failover, or coordinator takeover.
-  No audio. No silent capture. Stop capture before asynchronous DB cleanup.
-  Retain early ICE stats, because failed candidate pairs may disappear.
-  Diagnostic exports omit SDP ICE passwords but include network addresses.
+  Limits:
+  - One controlling teacher tab, no SFU or teacher takeover.
+  - Full SDP gathering may take longer than trickle ICE.
+  - Firebase onDisconnect marks a student attempt stopped after signaling loss.
+  - Static TURN credentials are only suitable for this requested test deployment.
+  - Browser-side stats cannot identify every TURN server rejection.
+  - A static source can produce no new encoded frames; stale video is grey
+    with an explicit "static source or stalled" message, not a false diagnosis.
 */
 
-const VERSION="classroom-complete-sdp-v6";
-const TURN={
-  host:"20.24.69.131",port:3478,
-  username:"testuser",password:"testpass"
-};
-const FIREBASE={
-  apiKey:"AIzaSyAif_jjK-aKtEs281TVy91sDHk5YJjNhc8",
-  authDomain:"fbase-7150b.firebaseapp.com",
-  databaseURL:"https://fbase-7150b-default-rtdb.firebaseio.com",
-  projectId:"fbase-7150b",
-  storageBucket:"fbase-7150b.firebasestorage.app",
-  messagingSenderId:"435637585834",
-  appId:"1:435637585834:web:99acf51fcd1aeb525e0dd3",
-  measurementId:"G-H9QM53QYFC"
+const VERSION = "classroom-complete-sdp-v7";
+
+const TURN = {
+  host: "20.24.69.131",
+  port: 3478,
+  username: "testuser",
+  password: "testpass"
 };
 
-const $=id=>document.getElementById(id);
-const uuid=()=>crypto.randomUUID();
-const clone=v=>JSON.parse(JSON.stringify(v));
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const peers=new Map(), tiles=new Map(), handled=new Set();
-const logs=[], subscriptions=[];
+const FIREBASE = {
+  apiKey: "AIzaSyAif_jjK-aKtEs281TVy91sDHk5YJjNhc8",
+  authDomain: "fbase-7150b.firebaseapp.com",
+  databaseURL: "https://fbase-7150b-default-rtdb.firebaseio.com",
+  projectId: "fbase-7150b",
+  storageBucket: "fbase-7150b.firebasestorage.app",
+  messagingSenderId: "435637585834",
+  appId: "1:435637585834:web:99acf51fcd1aeb525e0dd3",
+  measurementId: "G-H9QM53QYFC"
+};
 
-let db,user,ready=false,busy=false;
-let roomId="",teacher=false,meta=null,requests={};
-let student=null,starting=false,cleaning=false;
-let writes=Promise.resolve(),healthBusy=false,lastHeartbeat=0;
-let zoomSeat=null,activeTest=null,lastTestReport="",latestReport="";
+const $ = id => document.getElementById(id);
+const uuid = () => crypto.randomUUID();
+const clone = value => JSON.parse(JSON.stringify(value));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function log(text){
+const peers = new Map();
+const tiles = new Map();
+const handled = new Set();
+const subscriptions = [];
+const logs = [];
+
+let db, user, ready = false, busy = false;
+let roomId = "", teacher = false, meta = null, requests = {};
+let student = null, starting = false, cleaning = false;
+let writes = Promise.resolve();
+let healthBusy = false, lastHeartbeatWrite = 0;
+let zoomSeat = null;
+let activeTest = null, lastTestReport = "", latestReport = "";
+
+function log(text) {
   logs.push(`[${new Date().toISOString()}] ${text}`);
-  if(logs.length>700)logs.shift();
-  $("log").textContent=logs.slice().reverse().join("\n");
+  if (logs.length > 700) logs.shift();
+  $("log").textContent = logs.slice().reverse().join("\n");
 }
-function notice(text,error=false){
-  $("notice").textContent=text;
-  $("notice").classList.toggle("error",error);
+
+function notice(text, error = false) {
+  $("notice").textContent = text;
+  $("notice").classList.toggle("error", error);
 }
-function fail(e){
-  const text=e?.message||String(e);
-  log("ERROR: "+text);notice(text,true);
+
+function fail(error) {
+  const text = error?.message || String(error);
+  log("ERROR: " + text);
+  notice(text, true);
 }
-function action(fn){
-  return(...args)=>Promise.resolve().then(()=>fn(...args)).catch(fail);
+
+function action(fn) {
+  return (...args) => Promise.resolve().then(() => fn(...args)).catch(fail);
 }
-function showReport(text){
-  latestReport=text;$("diagnostics").textContent=text;
+
+function showReport(text) {
+  latestReport = text;
+  $("diagnostics").textContent = text;
 }
-function validMeta(m){
-  return m&&m.protocol===VERSION&&
-    Number.isInteger(m.rows)&&Number.isInteger(m.cols)&&
-    m.rows>0&&m.cols>0&&m.rows*m.cols<=64&&
-    [160,256,320].includes(m.width)&&[1,2].includes(m.fps)&&
-    ["tcp","udp","both"].includes(m.transport);
+
+function validMeta(m) {
+  return m && m.protocol === VERSION &&
+    Number.isInteger(m.rows) && Number.isInteger(m.cols) &&
+    m.rows > 0 && m.cols > 0 && m.rows * m.cols <= 64 &&
+    [160, 256, 320].includes(m.width) &&
+    [1, 2].includes(m.fps) &&
+    ["tcp", "udp", "both"].includes(m.transport);
 }
-function config(mode=meta?.transport||$("transport").value){
-  const kinds=mode==="both"?["udp","tcp"]:[mode];
-  return{
-    iceServers:[{
-      urls:kinds.map(t=>`turn:${TURN.host}:${TURN.port}?transport=${t}`),
-      username:TURN.username,credential:TURN.password
+
+function rtcConfig(mode = meta?.transport || $("transport").value) {
+  const kinds = mode === "both" ? ["udp", "tcp"] : [mode];
+  return {
+    iceServers: [{
+      urls: kinds.map(t =>
+        `turn:${TURN.host}:${TURN.port}?transport=${t}`),
+      username: TURN.username,
+      credential: TURN.password
     }],
-    iceTransportPolicy:"relay",bundlePolicy:"max-bundle",
-    rtcpMuxPolicy:"require",iceCandidatePoolSize:0
+    iceTransportPolicy: "relay",
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require",
+    iceCandidatePoolSize: 0
   };
 }
-function rr(child){return ref(db,`rooms/${roomId}/${child}`);}
-function ar(person,id,child=""){
-  return ref(db,`rooms/${roomId}/peers/${person}/${id}`+(child?"/"+child:""));
-}
-function roomLink(){
-  const u=new URL(location.href);u.search="";u.hash="";
-  u.searchParams.set("room",roomId);return u.href;
-}
-function bind(video,stream){
-  stream||=null;if(video.srcObject===stream)return;
-  video.srcObject=stream;
-  if(stream)video.play().catch(e=>{
-    if(e.name!=="AbortError"&&video.srcObject===stream)
-      log("Playback: "+e.message);
-  });
-}
-function send(p,data){
-  if(!p?.active||p.dc?.readyState!=="open")return;
-  try{p.dc.send(JSON.stringify(data));}catch(e){log(e.message);}
+
+function rr(child) {
+  return ref(db, `rooms/${roomId}/${child}`);
 }
 
-/* Serialize teacher metadata writes so old snapshots cannot win. */
-function commit(){
-  meta.heartbeat=Date.now();
-  const snapshot=clone(meta);
-  for(const p of peers.values())send(p,{type:"config",meta:snapshot});
-  const job=writes.then(()=>set(rr("meta"),snapshot));
-  writes=job.catch(e=>log("Metadata: "+e.message));
+function ar(person, id, child = "") {
+  return ref(db, `rooms/${roomId}/peers/${person}/${id}` +
+    (child ? "/" + child : ""));
+}
+
+function roomLink() {
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("room", roomId);
+  return url.href;
+}
+
+function bindVideo(video, stream) {
+  stream ||= null;
+  if (video.srcObject === stream) return;
+  video.srcObject = stream;
+  if (stream) {
+    video.play().catch(error => {
+      if (error.name !== "AbortError" && video.srcObject === stream)
+        log("Playback: " + error.message);
+    });
+  }
+}
+
+function send(p, data) {
+  if (!p?.active || p.dc?.readyState !== "open") return;
+  try { p.dc.send(JSON.stringify(data)); }
+  catch (error) { log(`${p.label}: channel send: ${error.message}`); }
+}
+
+/* Serialize metadata snapshots to prevent older writes from winning. */
+function commit() {
+  meta.heartbeat = Date.now();
+  const snapshot = clone(meta);
+  for (const p of peers.values()) send(p, {type: "config", meta: snapshot});
+  const job = writes.then(() => set(rr("meta"), snapshot));
+  writes = job.catch(error => log("Metadata: " + error.message));
   return job;
 }
 
-function candidates(d){
-  return(d?.sdp||"").split(/\r?\n/).filter(l=>l.startsWith("a=candidate:"));
+function candidateLines(description) {
+  return (description?.sdp || "").split(/\r?\n/)
+    .filter(line => line.startsWith("a=candidate:"));
 }
-function relayCount(d){
-  return candidates(d).filter(l=>/\styp relay(?:\s|$)/.test(l)).length;
+
+function relayCount(description) {
+  return candidateLines(description)
+    .filter(line => /\styp relay(?:\s|$)/.test(line)).length;
 }
-function validateSDP(d){
-  if(!d||!["offer","answer"].includes(d.type)||
-    typeof d.sdp!=="string"||d.sdp.length>200000)
-    throw Error("Invalid SDP");
-  if(!relayCount(d))throw Error("No relay candidate in complete SDP");
-  if(candidates(d).some(l=>!/\styp relay(?:\s|$)/.test(l)))
-    throw Error("Unexpected non-relay candidate");
+
+function validateSDP(description) {
+  if (!description || !["offer", "answer"].includes(description.type) ||
+      typeof description.sdp !== "string" || description.sdp.length > 200000)
+    throw new Error("Invalid SDP");
+  if (!relayCount(description))
+    throw new Error("Complete SDP has no TURN relay candidate");
+  if (candidateLines(description)
+      .some(line => !/\styp relay(?:\s|$)/.test(line)))
+    throw new Error("Unexpected non-relay candidate in relay-only SDP");
 }
-function outline(d){
-  if(!d)return"(none)";
-  return d.sdp.split(/\r?\n/).filter(l=>
-    l.startsWith("m=")||l.startsWith("a=group:")||
-    l.startsWith("a=mid:")||l.startsWith("a=ice-ufrag:")||
-    l.startsWith("a=ice-options:")||l.startsWith("a=candidate:")||
-    l.startsWith("a=setup:")||l==="a=end-of-candidates"||
-    ["a=sendonly","a=recvonly","a=sendrecv","a=inactive"].includes(l)
+
+function outline(description) {
+  if (!description) return "(none)";
+  // Do not export ICE passwords.
+  return description.sdp.split(/\r?\n/).filter(line =>
+    line.startsWith("m=") ||
+    line.startsWith("a=group:") ||
+    line.startsWith("a=mid:") ||
+    line.startsWith("a=ice-ufrag:") ||
+    line.startsWith("a=ice-options:") ||
+    line.startsWith("a=candidate:") ||
+    line.startsWith("a=setup:") ||
+    line === "a=end-of-candidates" ||
+    ["a=sendonly", "a=recvonly", "a=sendrecv", "a=inactive"].includes(line)
   ).join("\n");
 }
 
-function makePeer(label,cfg=config()){
-  const pc=new RTCPeerConnection(cfg);
-  const p={
-    label,pc,active:true,created:Date.now(),
-    dc:null,stream:null,sender:null,teacherSide:false,
-    phase:"Preparing",error:"",events:[],history:[],stops:[],
-    localSeen:new Set(),published:false,remoteApplied:false,
-    answered:false,applying:false,lastBeat:0,remoteInfo:null,
-    bytes:0,frames:0,lastFrame:0,statsBusy:false,lastStats:"",
-    localOutline:"(none)",remoteOutline:"(none)",timer:null
+function makePeer(label, config = rtcConfig()) {
+  const pc = new RTCPeerConnection(config);
+  const p = {
+    label, pc, active: true, created: Date.now(),
+    dc: null, stream: null, sender: null, teacherSide: false,
+    phase: "Preparing", error: "", events: [], history: [], stops: [],
+    localSeen: new Set(), published: false, remoteApplied: false,
+    answered: false, applying: false, lastBeat: 0, remoteInfo: null,
+    bytes: 0, frames: 0, lastFrame: 0,
+    statsBusy: false, lastStats: "",
+    localOutline: "(none)", remoteOutline: "(none)", timer: null
   };
-  p.event=text=>{
-    p.events.push(`${Date.now()-p.created}ms ${text}`);
-    if(p.events.length>70)p.events.shift();
+
+  p.event = text => {
+    p.events.push(`${Date.now() - p.created}ms ${text}`);
+    if (p.events.length > 70) p.events.shift();
     log(`${p.label}: ${text}`);
-    void sample(p,true);render();
+    void sampleStats(p, true);
+    render();
   };
-  pc.onicecandidate=e=>{
-    if(!p.active||!e.candidate)return;
-    const key=e.candidate.sdpMid+"|"+e.candidate.candidate;
-    if(p.localSeen.has(key))return;
-    p.localSeen.add(key);p.event("local "+e.candidate.candidate);
+
+  pc.onicecandidate = event => {
+    if (!p.active || !event.candidate) return;
+    const c = event.candidate;
+    const key = c.sdpMid + "|" + c.candidate;
+    if (p.localSeen.has(key)) return;
+    p.localSeen.add(key);
+    p.event("local " + c.candidate);
   };
-  pc.onicecandidateerror=e=>
-    p.event(`ICE error ${e.errorCode}; ${e.url||""}; ${e.errorText||""}`);
-  pc.onicegatheringstatechange=()=>p.event("gathering "+pc.iceGatheringState);
-  pc.oniceconnectionstatechange=()=>p.event("ICE "+pc.iceConnectionState);
-  pc.onconnectionstatechange=()=>p.event("connection "+pc.connectionState);
-  p.timer=setInterval(()=>{
-    if(!p.active||Date.now()-p.created>120000){clearInterval(p.timer);return;}
-    void sample(p);
-  },500);
+
+  pc.onicecandidateerror = event => {
+    // A failed interface attempt does not override a successful relay connection.
+    p.event(`ICE attempt ${event.errorCode}; ${event.url || ""}; ` +
+      `${event.errorText || ""}`);
+  };
+
+  pc.onicegatheringstatechange = () =>
+    p.event("gathering " + pc.iceGatheringState);
+
+  pc.oniceconnectionstatechange = () =>
+    p.event("ICE " + pc.iceConnectionState);
+
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === "connected") p.phase = "Transport connected";
+    else if (pc.connectionState === "failed") p.phase = "Transport failed";
+    p.event("connection " + pc.connectionState);
+  };
+
+  p.timer = setInterval(() => {
+    if (!p.active || Date.now() - p.created > 120000) {
+      clearInterval(p.timer);
+      return;
+    }
+    void sampleStats(p);
+  }, 500);
+
   return p;
 }
-function destroy(p){
-  if(!p?.active)return;
-  p.localOutline=outline(p.pc.localDescription);
-  p.remoteOutline=outline(p.pc.remoteDescription);
-  p.active=false;clearInterval(p.timer);
-  for(const stop of p.stops.splice(0)){try{stop();}catch{}}
-  try{p.dc?.close();}catch{}
-  try{p.pc.close();}catch{}
+
+function destroy(p) {
+  if (!p?.active) return;
+  p.localOutline = outline(p.pc.localDescription);
+  p.remoteOutline = outline(p.pc.remoteDescription);
+  p.active = false;
+  clearInterval(p.timer);
+  for (const stop of p.stops.splice(0)) {
+    try { stop(); } catch {}
+  }
+  try { p.dc?.close(); } catch {}
+  try { p.pc.close(); } catch {}
 }
-async function gather(p,d){
-  if(!p.active)throw Error("Connection closed");
-  p.phase="Gathering TURN candidates";
-  await p.pc.setLocalDescription(d);
-  const deadline=Date.now()+45000;
-  while(p.pc.iceGatheringState!=="complete"){
-    if(!p.active)throw Error("Connection closed during gathering");
-    if(Date.now()>deadline)throw Error("ICE gathering timed out after 45 seconds");
+
+async function gather(p, description) {
+  if (!p.active) throw new Error("Connection closed");
+  p.phase = "Gathering TURN candidates";
+  await p.pc.setLocalDescription(description);
+  const deadline = Date.now() + 45000;
+
+  while (p.pc.iceGatheringState !== "complete") {
+    if (!p.active) throw new Error("Connection closed during gathering");
+    if (Date.now() > deadline)
+      throw new Error("ICE gathering timed out after 45 seconds");
     await sleep(100);
   }
-  const local=p.pc.localDescription;
-  const complete={type:local.type,sdp:local.sdp};
+
+  const local = p.pc.localDescription;
+  const complete = {type: local.type, sdp: local.sdp};
   validateSDP(complete);
-  p.localOutline=outline(complete);
+  p.localOutline = outline(complete);
+  p.phase = "Local SDP ready";
   p.event(`complete ${complete.type}; ${relayCount(complete)} relay line(s)`);
   return complete;
 }
-async function applyRemote(p,d){
-  if(!p.active)throw Error("Connection closed");
-  validateSDP(d);
-  await p.pc.setRemoteDescription(d);
-  p.remoteApplied=true;p.remoteOutline=outline(d);
-  p.phase="Checking relay connectivity";
-  p.event(`remote ${d.type} applied; ${relayCount(d)} relay line(s)`);
-  await sample(p,true);
+
+async function applyRemote(p, description) {
+  if (!p.active) throw new Error("Connection closed");
+  validateSDP(description);
+  await p.pc.setRemoteDescription(description);
+  p.remoteApplied = true;
+  p.remoteOutline = outline(description);
+  p.phase = "Checking relay connectivity";
+  p.event(`remote ${description.type} applied; ` +
+    `${relayCount(description)} relay line(s)`);
+  await sampleStats(p, true);
 }
-function classroomPeer(person,id,seat,teacherSide){
-  const p=makePeer(`Seat ${seat} ${teacherSide?"teacher":"student"}`);
-  Object.assign(p,{person,id,seat,teacherSide,key:person+"/"+id});
-  if(teacherSide){
-    p.pc.ondatachannel=e=>attachChannel(p,e.channel);
-    p.pc.ontrack=e=>{
-      if(!p.active||e.track.kind!=="video")return;
-      p.stream=new MediaStream([e.track]);
-      e.track.onmute=render;e.track.onunmute=render;e.track.onended=render;
+
+function classroomPeer(person, id, seat, teacherSide) {
+  const p = makePeer(`Seat ${seat} ${teacherSide ? "teacher" : "student"}`);
+  Object.assign(p, {person, id, seat, teacherSide, key: person + "/" + id});
+
+  if (teacherSide) {
+    p.pc.ondatachannel = event => attachChannel(p, event.channel);
+    p.pc.ontrack = event => {
+      if (!p.active || event.track.kind !== "video") return;
+      p.stream = new MediaStream([event.track]);
+      event.track.onmute = render;
+      event.track.onunmute = render;
+      event.track.onended = render;
       p.event("video track announced; waiting for decoded frames");
     };
   }
   return p;
 }
-function attachChannel(p,ch){
-  if(p.dc&&p.dc!==ch){ch.close();return;}p.dc=ch;
-  ch.onopen=()=>{
-    p.lastBeat=Date.now();p.event("DataChannel open");
-    if(p.teacherSide)send(p,{type:"config",meta:clone(meta)});
-    else heartbeat();
+
+function attachChannel(p, channel) {
+  if (p.dc && p.dc !== channel) {
+    channel.close();
+    return;
+  }
+  p.dc = channel;
+
+  channel.onopen = () => {
+    p.lastBeat = Date.now();
+    p.phase = "DataChannel open";
+    p.event("DataChannel open");
+    if (p.teacherSide) send(p, {type: "config", meta: clone(meta)});
+    else studentHeartbeat();
   };
-  ch.onmessage=e=>{
-    if(!p.active||typeof e.data!=="string"||e.data.length>40000)return;
-    try{
-      const m=JSON.parse(e.data);
-      if(m.type==="beat"){
-        p.lastBeat=Date.now();p.remoteInfo=m;send(p,{type:"ack"});
-      }else if(m.type==="ack")p.lastBeat=Date.now();
-      else if(m.type==="config"&&!p.teacherSide&&validMeta(m.meta))
-        studentMeta(m.meta);
-    }catch{}
+
+  channel.onmessage = event => {
+    if (!p.active || typeof event.data !== "string" ||
+        event.data.length > 40000) return;
+    try {
+      const message = JSON.parse(event.data);
+      if (message.type === "beat") {
+        p.lastBeat = Date.now();
+        p.remoteInfo = message;
+        send(p, {type: "ack"});
+      } else if (message.type === "ack") {
+        p.lastBeat = Date.now();
+      } else if (message.type === "config" && !p.teacherSide &&
+                 validMeta(message.meta)) {
+        applyStudentMeta(message.meta);
+      }
+    } catch {}
   };
-  ch.onclose=()=>p.event("DataChannel closed");
-  ch.onerror=()=>p.event("DataChannel error");
-}
-function heartbeat(){
-  const s=student;if(!s?.active||!s.p)return;
-  const track=s.raw?.getVideoTracks()[0];
-  send(s.p,{type:"beat",draws:s.draws,
-    captureState:track?.readyState||"none",captureMuted:!!track?.muted,
-    visibility:document.visibilityState});
-}
-async function cap(p){
-  if(!p?.active||!p.sender)return;
-  try{
-    const v=p.sender.getParameters();
-    if(!v.encodings?.length)v.encodings=[{}];
-    for(const e of v.encodings){e.maxBitrate=150000;e.maxFramerate=meta.fps;}
-    v.degradationPreference="maintain-resolution";
-    await p.sender.setParameters(v);
-  }catch(e){log(`${p.label}: encoder target: ${e.message}`);}
+
+  channel.onclose = () => p.event("DataChannel closed");
+  channel.onerror = () => p.event("DataChannel error");
 }
 
-function showRoom(){
-  $("startPanel").hidden=true;$("roomPanel").hidden=false;
-  $("gridPanel").hidden=false;
-  $("teacherPanel").hidden=!teacher;$("studentPanel").hidden=teacher;
-  $("role").textContent=teacher?"Controlling teacher":"Student";
-  $("roomLink").value=roomLink();
-  $("transport").value=meta.transport;$("transport").disabled=true;
+function studentHeartbeat() {
+  const s = student;
+  if (!s?.active || !s.p) return;
+  const track = s.raw?.getVideoTracks()[0];
+  send(s.p, {
+    type: "beat", draws: s.draws,
+    captureState: track?.readyState || "none",
+    captureMuted: !!track?.muted,
+    visibility: document.visibilityState
+  });
+}
+
+async function capSender(p) {
+  if (!p?.active || !p.sender) return;
+  try {
+    const parameters = p.sender.getParameters();
+    if (!parameters.encodings?.length) parameters.encodings = [{}];
+    for (const encoding of parameters.encodings) {
+      encoding.maxBitrate = 150000;
+      encoding.maxFramerate = meta.fps;
+    }
+    parameters.degradationPreference = "maintain-resolution";
+    await p.sender.setParameters(parameters);
+  } catch (error) {
+    log(`${p.label}: encoder target not applied: ${error.message}`);
+  }
+}
+
+function showRoom() {
+  $("startPanel").hidden = true;
+  $("roomPanel").hidden = false;
+  $("gridPanel").hidden = false;
+  $("teacherPanel").hidden = !teacher;
+  $("studentPanel").hidden = teacher;
+  $("role").textContent = teacher ? "Controlling teacher" : "Student";
+  $("roomLink").value = roomLink();
+  $("transport").value = meta.transport;
+  $("transport").disabled = true;
   render();
 }
-async function createRoom(){
-  if(!ready||busy||roomId||activeTest)return;
-  busy=true;$("createBtn").disabled=true;
-  try{
-    roomId=uuid();teacher=true;
-    meta={protocol:VERSION,rows:5,cols:8,width:256,fps:1,auto:true,
-      closed:false,revision:1,transport:$("transport").value,
-      heartbeat:Date.now(),seats:{}};
-    await set(rr("owner"),user.uid);await commit();
-    subscriptions.push(onValue(rr("peers"),snap=>{
-      requests=snap.val()||{};processRequests();
-    },fail));
-    showRoom();notice("Room created. Share the student link and keep this tab open.");
-  }catch(e){roomId="";teacher=false;meta=null;throw e;}
-  finally{busy=false;$("createBtn").disabled=!ready;}
+
+async function createRoom() {
+  if (!ready || busy || roomId || activeTest) return;
+  busy = true;
+  $("createBtn").disabled = true;
+  try {
+    roomId = uuid();
+    teacher = true;
+    meta = {
+      protocol: VERSION,
+      rows: 5, cols: 8, width: 256, fps: 1,
+      auto: true, closed: false, revision: 1,
+      transport: $("transport").value,
+      heartbeat: Date.now(), seats: {}
+    };
+
+    // Existing Firebase rules require owner before metadata.
+    await set(rr("owner"), user.uid);
+    await commit();
+
+    subscriptions.push(onValue(rr("peers"), snapshot => {
+      requests = snapshot.val() || {};
+      processRequests();
+    }, fail));
+
+    showRoom();
+    notice("Room created. Share the student link and keep this teacher tab open.");
+    log("Created room " + roomId);
+  } catch (error) {
+    roomId = "";
+    teacher = false;
+    meta = null;
+    throw error;
+  } finally {
+    busy = false;
+    $("createBtn").disabled = !ready;
+  }
 }
-function parseRoom(value){
-  value=value.trim();
-  if(value.includes("://"))value=new URL(value).searchParams.get("room")||"";
-  if(!/^[a-zA-Z0-9_-]{8,100}$/.test(value))throw Error("Invalid room link or ID");
+
+function parseRoom(value) {
+  value = value.trim();
+  if (value.includes("://"))
+    value = new URL(value).searchParams.get("room") || "";
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(value))
+    throw new Error("Invalid room link or ID");
   return value;
 }
-async function openRoom(value=$("roomInput").value){
-  if(!ready||busy||roomId||activeTest)return;
-  const id=parseRoom(value);busy=true;
-  try{
-    const owner=await get(ref(db,`rooms/${id}/owner`));
-    if(!owner.exists())throw Error("Room not found");
-    if(owner.val()===user.uid)throw Error(
-      "This browser session owns the room. Use the original teacher tab. "+
-      "For a student use another device, browser profile, or private window. "+
-      "If the teacher tab was lost, create a new room."
-    );
-    const snap=await get(ref(db,`rooms/${id}/meta`)),m=snap.val();
-    if(!validMeta(m))throw Error("Incompatible room. Create a NEW v6 room.");
-    if(m.closed)throw Error("Room is closed");
-    roomId=id;teacher=false;meta=m;showRoom();
-    subscriptions.push(onValue(rr("meta"),s=>{
-      const v=s.val();
-      if(!validMeta(v)){
-        if(student)void stopStudent("Room unavailable");
-        notice("Room unavailable or incompatible.",true);return;
+
+async function openRoom(value = $("roomInput").value) {
+  if (!ready || busy || roomId || activeTest) return;
+  const id = parseRoom(value);
+  busy = true;
+  try {
+    const owner = await get(ref(db, `rooms/${id}/owner`));
+    if (!owner.exists()) throw new Error("Room not found");
+    if (owner.val() === user.uid) {
+      throw new Error(
+        "This browser session owns the room. Use the original teacher tab. " +
+        "For a student, use another device, browser profile, or private window. " +
+        "If the teacher tab was lost, create a new room."
+      );
+    }
+
+    const snapshot = await get(ref(db, `rooms/${id}/meta`));
+    const m = snapshot.val();
+    if (!validMeta(m)) throw new Error("Incompatible room. Create a NEW v7 room.");
+    if (m.closed) throw new Error("Room is closed");
+
+    roomId = id;
+    teacher = false;
+    meta = m;
+    showRoom();
+
+    subscriptions.push(onValue(rr("meta"), snapshot => {
+      const m = snapshot.val();
+      if (!validMeta(m)) {
+        if (student) void stopStudent("Room unavailable");
+        notice("Room unavailable or incompatible.", true);
+        return;
       }
-      studentMeta(v);
-    },fail));
+      applyStudentMeta(m);
+    }, fail));
+
     notice("Click an available seat to choose and share your desktop.");
-  }finally{busy=false;}
+  } finally {
+    busy = false;
+  }
 }
-function studentMeta(m){
-  if(teacher||(m.revision||0)<(meta?.revision||0))return;
-  const changed=meta?.width!==m.width||meta?.fps!==m.fps;
-  meta=m;if(changed&&student?.p)void cap(student.p);
-  if(m.closed){
-    if(student)void stopStudent("Teacher closed the room");
-    notice("Teacher closed the room.",true);
+
+function applyStudentMeta(m) {
+  if (teacher || (m.revision || 0) < (meta?.revision || 0)) return;
+  const changed = meta?.width !== m.width || meta?.fps !== m.fps;
+  meta = m;
+  if (changed && student?.p) void capSender(student.p);
+  if (m.closed) {
+    if (student) void stopStudent("Teacher closed the room");
+    notice("Teacher closed the room.", true);
   }
   render();
 }
-function validRequest(r){
-  return r&&r.protocol===VERSION&&Number.isInteger(r.seat)&&
-    r.seat>=1&&r.seat<=meta.rows*meta.cols&&r.offer?.type==="offer"&&
-    typeof r.offer.sdp==="string"&&r.offer.sdp.length<=200000&&relayCount(r.offer)>0;
+
+function validRequest(record) {
+  return record && record.protocol === VERSION &&
+    Number.isInteger(record.seat) &&
+    record.seat >= 1 && record.seat <= meta.rows * meta.cols &&
+    record.offer?.type === "offer" &&
+    typeof record.offer.sdp === "string" &&
+    record.offer.sdp.length <= 200000 &&
+    relayCount(record.offer) > 0;
 }
-function processRequests(){
-  if(!teacher||!meta)return;
-  for(const p of [...peers.values()]){
-    const r=requests[p.person]?.[p.id];
-    if(r&&["stopped","setup-error"].includes(r.state))
-      void removePeer(p,"Student departed",false).catch(fail);
+
+function processRequests() {
+  if (!teacher || !meta) return;
+
+  for (const p of [...peers.values()]) {
+    const record = requests[p.person]?.[p.id];
+    if (record && ["stopped", "setup-error"].includes(record.state))
+      void removePeer(p, "Student departed", false).catch(fail);
   }
-  if(meta.auto&&!meta.closed){
-    for(const [person,attempts]of Object.entries(requests))
-      for(const [id,r]of Object.entries(attempts||{}))
-        if(r?.state==="requested"&&!handled.has(person+"/"+id))
-          void accept(person,id,r).catch(fail);
+
+  if (meta.auto && !meta.closed) {
+    for (const [person, attempts] of Object.entries(requests)) {
+      for (const [id, record] of Object.entries(attempts || {})) {
+        if (record?.state === "requested" && !handled.has(person + "/" + id))
+          void accept(person, id, record).catch(fail);
+      }
+    }
   }
   renderPeople();
 }
-async function reject(person,id,reason="Teacher declined the request"){
-  handled.add(person+"/"+id);
-  await update(ar(person,id),{state:"rejected",reason});renderPeople();
-}
-async function accept(person,id,r){
-  const key=person+"/"+id;
-  if(!teacher||meta.closed||handled.has(key))return;
-  handled.add(key);
-  if(!validRequest(r))return reject(person,id,"Invalid request");
-  if(meta.seats?.[r.seat])return reject(person,id,"Seat already occupied");
-  if([...peers.values()].some(p=>p.active&&p.person===person))
-    return reject(person,id,"Browser already has an assigned seat");
 
-  // Synchronous reservation before any asynchronous work.
-  const p=classroomPeer(person,id,r.seat,true);peers.set(key,p);
-  meta.seats||={};meta.seats[r.seat]={person,attempt:id};meta.revision++;
-  render();renderPeople();
-  try{
-    await commit();if(!p.active)return;
-    await applyRemote(p,r.offer);
-    const answer=await gather(p,await p.pc.createAnswer());
-    if(!p.active)return;
-    await update(ar(person,id),{state:"accepted",answer});
-    p.published=true;p.answered=true;p.phase="Answer published";
+async function reject(person, id, reason = "Teacher declined the request") {
+  handled.add(person + "/" + id);
+  await update(ar(person, id), {state: "rejected", reason});
+  renderPeople();
+}
+
+async function accept(person, id, record) {
+  const key = person + "/" + id;
+  if (!teacher || meta.closed || handled.has(key)) return;
+  handled.add(key);
+
+  if (!validRequest(record))
+    return reject(person, id, "Invalid or incompatible request");
+  if (meta.seats?.[record.seat])
+    return reject(person, id, "Seat already occupied");
+  if ([...peers.values()].some(p => p.active && p.person === person))
+    return reject(person, id, "Browser already has an assigned seat");
+
+  // Reserve synchronously, before the first await.
+  const p = classroomPeer(person, id, record.seat, true);
+  peers.set(key, p);
+  meta.seats ||= {};
+  meta.seats[record.seat] = {person, attempt: id};
+  meta.revision++;
+  render();
+  renderPeople();
+
+  try {
+    await commit();
+    if (!p.active) return;
+    await applyRemote(p, record.offer);
+    const answer = await gather(p, await p.pc.createAnswer());
+    if (!p.active) return;
+    await update(ar(person, id), {state: "accepted", answer});
+    p.published = true;
+    p.answered = true;
+    if (p.pc.connectionState !== "connected") p.phase = "Answer published";
     p.event("complete answer published");
-  }catch(e){
-    if(!p.active)return;
-    p.error=e.message;p.phase="Setup failed";p.event(e.message);
-    render();renderPeople();
+  } catch (error) {
+    if (!p.active) return;
+    p.error = error.message;
+    p.phase = "Setup failed";
+    p.event(error.message);
+    render();
+    renderPeople();
   }
 }
-async function removePeer(p,reason="Teacher removed this seat",notify=true){
-  if(!peers.has(p.key))return;
-  peers.delete(p.key);destroy(p);
-  if(meta.seats?.[p.seat]?.attempt===p.id){
-    delete meta.seats[p.seat];meta.revision++;
+
+async function removePeer(p, reason = "Teacher removed this seat", notify = true) {
+  if (!peers.has(p.key)) return;
+  peers.delete(p.key);
+  destroy(p);
+
+  if (meta.seats?.[p.seat]?.attempt === p.id) {
+    delete meta.seats[p.seat];
+    meta.revision++;
   }
-  render();renderPeople();
-  const jobs=[commit()];
-  if(notify)jobs.push(update(ar(p.person,p.id),{state:"rejected",reason}));
+
+  render();
+  renderPeople();
+
+  const jobs = [commit()];
+  if (notify)
+    jobs.push(update(ar(p.person, p.id), {state: "rejected", reason}));
   await Promise.all(jobs);
 }
-function renderPeople(){
-  if(!teacher||!meta)return;
-  const box=$("people");box.replaceChildren();
-  function row(text,buttons){
-    const el=document.createElement("div");el.className="person";
-    const label=document.createElement("span");label.textContent=text;
-    const controls=document.createElement("div");controls.className="row";
-    for(const [caption,fn]of buttons){
-      const b=document.createElement("button");b.textContent=caption;
-      b.onclick=action(fn);controls.append(b);
+
+function renderPeople() {
+  if (!teacher || !meta) return;
+  const box = $("people");
+  box.replaceChildren();
+
+  function row(text, buttons) {
+    const element = document.createElement("div");
+    element.className = "person";
+    const label = document.createElement("span");
+    label.textContent = text;
+    const controls = document.createElement("div");
+    controls.className = "row";
+
+    for (const [caption, fn] of buttons) {
+      const button = document.createElement("button");
+      button.textContent = caption;
+      button.onclick = action(fn);
+      controls.append(button);
     }
-    el.append(label,controls);box.append(el);
+    element.append(label, controls);
+    box.append(element);
   }
-  for(const p of peers.values())row(`Seat ${p.seat}: ${health(p).label}`,[
-    ["Diagnose",async()=>showReport(await summarize(p))],
-    ["Remove",()=>removePeer(p)]
-  ]);
-  let count=0;
-  for(const [person,attempts]of Object.entries(requests)){
-    for(const [id,r]of Object.entries(attempts||{})){
-      if(r?.state!=="requested"||handled.has(person+"/"+id))continue;
-      if(++count>100)continue;
-      row(`Lobby: requested seat ${r.seat}`,[
-        ["Accept",()=>accept(person,id,r)],["Reject",()=>reject(person,id)]
+
+  for (const p of peers.values()) {
+    row(`Seat ${p.seat}: ${health(p).label}`, [
+      ["Diagnose", async () => showReport(await summarize(p))],
+      ["Remove", () => removePeer(p)]
+    ]);
+  }
+
+  let count = 0;
+  for (const [person, attempts] of Object.entries(requests)) {
+    for (const [id, record] of Object.entries(attempts || {})) {
+      if (record?.state !== "requested" || handled.has(person + "/" + id)) continue;
+      if (++count > 100) continue;
+      row(`Lobby: requested seat ${record.seat}`, [
+        ["Accept", () => accept(person, id, record)],
+        ["Reject", () => reject(person, id)]
       ]);
     }
   }
-  if(!count&&!peers.size){
-    const s=document.createElement("small");s.textContent="No student requests yet.";
-    box.append(s);
+
+  if (!count && !peers.size) {
+    const text = document.createElement("small");
+    text.textContent = "No student requests yet.";
+    box.append(text);
   }
 }
 
 /*
-  Do not wrap startSeat in action(): getDisplayMedia must execute
-  during the original tile-click gesture, before the first await.
+  Called DIRECTLY from tile.onclick.
+  Do not defer getDisplayMedia through action(), a timer, or a network request.
 */
-async function startSeat(seat){
-  if(!ready||teacher||!meta||meta.closed||student||starting||cleaning||
-    meta.seats?.[seat])return;
-  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
-    notice("Use HTTPS and a supported desktop browser for screen publishing.",true);return;
+async function startSeat(seat) {
+  if (!ready || teacher || !meta || meta.closed ||
+      student || starting || cleaning || meta.seats?.[seat]) return;
+
+  if (!isSecureContext || !navigator.mediaDevices?.getDisplayMedia) {
+    notice("Use HTTPS and a supported desktop browser for screen publishing.", true);
+    return;
   }
-  const s={person:user.uid,id:uuid(),seat,active:true,
-    raw:null,video:null,canvas:null,output:null,p:null,timer:null,draws:0,
-    created:false,disconnect:null,write:Promise.resolve(),guard:Promise.resolve()};
-  student=s;starting=true;$("leaveBtn").disabled=false;
+
+  const s = {
+    person: user.uid, id: uuid(), seat, active: true,
+    raw: null, video: null, canvas: null, output: null, p: null,
+    timer: null, draws: 0, created: false, disconnect: null,
+    write: Promise.resolve(), guard: Promise.resolve()
+  };
+
+  student = s;
+  starting = true;
+  $("leaveBtn").disabled = false;
+
   let permission;
-  try{
-    permission=navigator.mediaDevices.getDisplayMedia({
-      video:{frameRate:{ideal:2,max:5}},audio:false
+  try {
+    // Must stay before the first await.
+    permission = navigator.mediaDevices.getDisplayMedia({
+      video: {frameRate: {ideal: 2, max: 5}},
+      audio: false
     });
-  }catch(e){starting=false;await stopStudent(e.message);return;}
+  } catch (error) {
+    starting = false;
+    await stopStudent(error.message);
+    return;
+  }
 
-  try{
-    notice(`Seat ${seat}: approve browser screen sharing.`);render();
-    s.raw=await permission;
-    if(!s.active){s.raw.getTracks().forEach(t=>t.stop());return;}
-    s.raw.getVideoTracks()[0].addEventListener("ended",()=>{
-      if(student===s)void stopStudent("Browser screen sharing stopped");
-    },{once:true});
-    s.video=document.createElement("video");
-    s.video.muted=true;s.video.autoplay=true;s.video.playsInline=true;
-    s.video.srcObject=s.raw;await s.video.play();if(!s.active)return;
+  try {
+    notice(`Seat ${seat}: approve browser screen sharing.`);
+    render();
 
-    s.canvas=document.createElement("canvas");
-    const ctx=s.canvas.getContext("2d",{alpha:false});
-    if(!ctx)throw Error("Canvas unavailable");
-    function draw(){
-      if(!s.active)return;
-      const w=meta.width,h=Math.round(w*9/16);
-      if(s.canvas.width!==w||s.canvas.height!==h){
-        s.canvas.width=w;s.canvas.height=h;
+    s.raw = await permission;
+    if (!s.active) {
+      s.raw.getTracks().forEach(track => track.stop());
+      return;
+    }
+
+    s.raw.getVideoTracks()[0].addEventListener("ended", () => {
+      if (student === s) void stopStudent("Browser screen sharing stopped");
+    }, {once: true});
+
+    s.video = document.createElement("video");
+    s.video.muted = true;
+    s.video.autoplay = true;
+    s.video.playsInline = true;
+    s.video.srcObject = s.raw;
+    await s.video.play();
+    if (!s.active) return;
+
+    s.canvas = document.createElement("canvas");
+    const context = s.canvas.getContext("2d", {alpha: false});
+    if (!context) throw new Error("Canvas unavailable");
+
+    function draw() {
+      if (!s.active) return;
+      const width = meta.width;
+      const height = Math.round(width * 9 / 16);
+
+      if (s.canvas.width !== width || s.canvas.height !== height) {
+        s.canvas.width = width;
+        s.canvas.height = height;
       }
-      ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
-      const vw=s.video.videoWidth,vh=s.video.videoHeight;
-      if(vw&&vh&&s.video.readyState>=2){
-        const k=Math.min(w/vw,h/vh),dw=vw*k,dh=vh*k;
-        ctx.drawImage(s.video,(w-dw)/2,(h-dh)/2,dw,dh);s.draws++;
+
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, width, height);
+
+      const vw = s.video.videoWidth, vh = s.video.videoHeight;
+      if (vw && vh && s.video.readyState >= 2) {
+        const scale = Math.min(width / vw, height / vh);
+        const dw = vw * scale, dh = vh * scale;
+        context.drawImage(s.video, (width - dw) / 2, (height - dh) / 2, dw, dh);
+        s.draws++;
       }
-      s.timer=setTimeout(draw,1000/meta.fps);
+      s.timer = setTimeout(draw, 1000 / meta.fps);
     }
     draw();
-    s.output=s.canvas.captureStream(2);
-    const track=s.output.getVideoTracks()[0];
-    if(!track)throw Error("Canvas video capture unavailable");
-    try{track.contentHint="detail";}catch{}
 
-    s.write=set(ar(s.person,s.id),{
-      protocol:VERSION,state:"preparing",seat,createdAt:Date.now()
-    }).then(()=>{s.created=true;});
-    await s.write;if(!s.active)return;
-    s.disconnect=onDisconnect(ar(s.person,s.id));
-    s.guard=s.disconnect.update({state:"stopped",reason:"Signaling disconnected"});
-    await s.guard;if(!s.active)return;
+    s.output = s.canvas.captureStream(2);
+    const track = s.output.getVideoTracks()[0];
+    if (!track) throw new Error("Canvas video capture unavailable");
+    try { track.contentHint = "detail"; } catch {}
 
-    const p=s.p=classroomPeer(s.person,s.id,seat,false);
-    p.stream=s.output;
-    p.sender=p.pc.addTransceiver(track,{
-      direction:"sendonly",streams:[s.output]
-    }).sender;
-    attachChannel(p,p.pc.createDataChannel("classroom",{ordered:true}));
-    p.stops.push(onValue(ar(s.person,s.id,"answer"),snap=>{
-      const answer=snap.val();
-      if(!answer||!p.active||p.answered||p.applying)return;
-      p.applying=true;
-      applyRemote(p,answer).then(async()=>{
-        if(!p.active)return;p.answered=true;await cap(p);
-        notice(`Seat ${seat}: teacher answer applied; checking TURN connectivity.`);
-      }).catch(e=>{
-        if(!p.active)return;p.error=e.message;p.event(e.message);render();
-      });
-    },fail));
-    p.stops.push(onValue(ar(s.person,s.id,"state"),snap=>{
-      if(!s.active||student!==s)return;
-      if(["rejected","stopped"].includes(snap.val()))
-        void stopStudent("Teacher removed this seat or the attempt was stopped");
-    },fail));
+    s.write = set(ar(s.person, s.id), {
+      protocol: VERSION, state: "preparing", seat, createdAt: Date.now()
+    }).then(() => { s.created = true; });
 
-    const offer=await gather(p,await p.pc.createOffer());
-    if(!s.active)return;await cap(p);if(!s.active)return;
-    s.write=update(ar(s.person,s.id),{state:"requested",offer});
-    await s.write;if(!s.active)return;
-    p.published=true;p.phase="Waiting for teacher";
-    notice(`Seat ${seat}: request sent. Waiting for teacher acceptance.`);render();
-  }catch(e){
-    if(s.active){log("Student setup: "+e.message);await stopStudent(e.message);}
-  }finally{starting=false;render();}
-}
-async function stopStudent(reason="You stopped sharing"){
-  const s=student;if(!s?.active)return;
-  s.active=false;cleaning=true;
-  clearTimeout(s.timer);
-  s.raw?.getTracks().forEach(t=>t.stop());
-  s.output?.getTracks().forEach(t=>t.stop());
-  if(s.video){s.video.pause();s.video.srcObject=null;}
-  destroy(s.p);$("leaveBtn").disabled=true;notice(reason);render();
-  try{
-    try{await s.write;}catch{}
-    try{await s.guard;}catch{}
-    if(s.created)await update(ar(s.person,s.id),{
-      state:"stopped",reason,stoppedAt:Date.now()
+    await s.write;
+    if (!s.active) return;
+
+    s.disconnect = onDisconnect(ar(s.person, s.id));
+    s.guard = s.disconnect.update({
+      state: "stopped", reason: "Signaling disconnected"
     });
-    try{await s.disconnect?.cancel();}catch{}
-  }catch(e){log("Departure persistence: "+e.message);}
-  finally{if(student===s)student=null;cleaning=false;render();}
+    await s.guard;
+    if (!s.active) return;
+
+    const p = s.p = classroomPeer(s.person, s.id, seat, false);
+    p.stream = s.output;
+
+    p.sender = p.pc.addTransceiver(track, {
+      direction: "sendonly", streams: [s.output]
+    }).sender;
+
+    attachChannel(p, p.pc.createDataChannel("classroom", {ordered: true}));
+
+    p.stops.push(onValue(ar(s.person, s.id, "answer"), snapshot => {
+      const answer = snapshot.val();
+      if (!answer || !p.active || p.answered || p.applying) return;
+      p.applying = true;
+
+      applyRemote(p, answer).then(async () => {
+        if (!p.active) return;
+        p.answered = true;
+        await capSender(p);
+        notice(`Seat ${seat}: teacher accepted. Keep this tab open while sharing.`);
+      }).catch(error => {
+        if (!p.active) return;
+        p.error = error.message;
+        p.event(error.message);
+        render();
+      });
+    }, fail));
+
+    p.stops.push(onValue(ar(s.person, s.id, "state"), snapshot => {
+      if (!s.active || student !== s) return;
+      if (["rejected", "stopped"].includes(snapshot.val()))
+        void stopStudent("Teacher removed this seat or the attempt was stopped");
+    }, fail));
+
+    notice(`Seat ${seat}: gathering TURN candidates…`);
+    const offer = await gather(p, await p.pc.createOffer());
+    if (!s.active) return;
+    await capSender(p);
+    if (!s.active) return;
+
+    s.write = update(ar(s.person, s.id), {state: "requested", offer});
+    await s.write;
+    if (!s.active) return;
+
+    p.published = true;
+    p.phase = "Waiting for teacher";
+    notice(`Seat ${seat}: request sent. Waiting for teacher acceptance.`);
+    render();
+  } catch (error) {
+    if (s.active) {
+      log("Student setup: " + error.message);
+      await stopStudent(error.message);
+    }
+  } finally {
+    starting = false;
+    render();
+  }
 }
 
-async function applyGrid(){
-  if(!teacher||meta.closed)return;
-  const rows=Number($("rows").value),cols=Number($("cols").value);
-  if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<1||cols<1||
-    rows*cols>64)throw Error("Use positive integer rows/columns, at most 64 seats.");
-  if(Math.max(0,...Object.keys(meta.seats||{}).map(Number))>rows*cols)
-    throw Error("Remove occupied seats outside the proposed grid first.");
-  Object.assign(meta,{rows,cols,width:Number($("width").value),fps:Number($("fps").value)});
-  meta.revision++;render();await commit();notice("Shared settings updated.");
+async function stopStudent(reason = "You stopped sharing") {
+  const s = student;
+  if (!s?.active) return;
+
+  s.active = false;
+  cleaning = true;
+
+  // Capture stops immediately, before any database operation.
+  clearTimeout(s.timer);
+  s.raw?.getTracks().forEach(track => track.stop());
+  s.output?.getTracks().forEach(track => track.stop());
+  if (s.video) {
+    s.video.pause();
+    s.video.srcObject = null;
+  }
+  destroy(s.p);
+
+  $("leaveBtn").disabled = true;
+  notice(reason);
+  render();
+
+  try {
+    try { await s.write; } catch {}
+    try { await s.guard; } catch {}
+
+    if (s.created) {
+      await update(ar(s.person, s.id), {
+        state: "stopped", reason, stoppedAt: Date.now()
+      });
+    }
+    try { await s.disconnect?.cancel(); } catch {}
+  } catch (error) {
+    log("Departure persistence: " + error.message);
+  } finally {
+    if (student === s) student = null;
+    cleaning = false;
+    render();
+  }
 }
-async function closeRoom(){
-  if(!teacher||meta.closed||!confirm("Close room and stop all students?"))return;
-  meta.closed=true;meta.revision++;
-  for(const p of peers.values())send(p,{type:"config",meta:clone(meta)});
+
+async function applyGrid() {
+  if (!teacher || meta.closed) return;
+  const rows = Number($("rows").value);
+  const cols = Number($("cols").value);
+
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) ||
+      rows < 1 || cols < 1 || rows * cols > 64)
+    throw new Error("Use positive integer rows/columns, at most 64 seats.");
+
+  if (Math.max(0, ...Object.keys(meta.seats || {}).map(Number)) > rows * cols)
+    throw new Error("Remove occupied seats outside the proposed grid first.");
+
+  Object.assign(meta, {
+    rows, cols,
+    width: Number($("width").value),
+    fps: Number($("fps").value)
+  });
+  meta.revision++;
+  render();
   await commit();
-  for(const p of peers.values()){
-    destroy(p);
-    void update(ar(p.person,p.id),{state:"rejected",reason:"Room closed"})
-      .catch(e=>log(e.message));
-  }
-  render();renderPeople();notice("Room closed. Reload to create another room.");
+  notice("Shared settings updated.");
 }
 
-function health(p){
-  if(!p)return{live:false,label:"Unavailable",detail:"No connection"};
-  if(!p.active)return{live:false,label:"Closed",detail:p.error};
-  const state=p.pc.connectionState;
-  if(p.error&&state!=="connected")
-    return{live:false,label:"Connection error",detail:p.error};
-  if(state!=="connected")
-    return{live:false,label:state==="new"?p.phase:state,
-      detail:`ICE ${p.pc.iceConnectionState}; ${p.phase}`};
-  if(p.lastBeat&&Date.now()-p.lastBeat>20000)
-    return{live:false,label:"Heartbeat delayed",detail:"Remote tab may be suspended"};
-  if(p.teacherSide){
-    if(p.remoteInfo?.captureMuted||p.remoteInfo?.captureState==="ended")
-      return{live:false,label:"Capture unavailable",detail:"Source muted or ended"};
-    if(!p.lastFrame)return{live:false,label:"Waiting for video",detail:`${p.bytes} bytes`};
-    if(Date.now()-p.lastFrame>20000)
-      return{live:false,label:"No recent video frames",detail:"Static source or stalled video"};
+async function closeRoom() {
+  if (!teacher || meta.closed || !confirm("Close room and stop all students?")) return;
+  meta.closed = true;
+  meta.revision++;
+
+  for (const p of peers.values()) send(p, {type: "config", meta: clone(meta)});
+  await commit();
+
+  for (const p of peers.values()) {
+    destroy(p);
+    void update(ar(p.person, p.id), {
+      state: "rejected", reason: "Room closed"
+    }).catch(error => log(error.message));
   }
-  return{live:true,label:p.teacherSide?"Live":"Sharing",
-    detail:`${p.frames} ${p.teacherSide?"decoded":"encoded"} · ${Math.round(p.bytes/1024)} KiB`};
+
+  render();
+  renderPeople();
+  notice("Room closed. Reload to create another room.");
 }
-function seatPeer(seat){
-  if(!teacher)return student?.seat===seat?student.p:null;
-  const a=meta?.seats?.[seat];return a?peers.get(a.person+"/"+a.attempt):null;
-}
-function makeTile(seat){
-  const tile=document.createElement("button");tile.type="button";tile.className="tile";
-  const head=document.createElement("div");head.className="head";head.textContent="Seat "+seat;
-  const picture=document.createElement("div");picture.className="picture";
-  const video=document.createElement("video");
-  video.autoplay=true;video.muted=true;video.playsInline=true;
-  const overlay=document.createElement("div");overlay.className="overlay";
-  const foot=document.createElement("div");foot.className="foot";
-  picture.append(video,overlay);tile.append(head,picture,foot);
-  tile.onclick=()=>{
-    if(teacher){zoomSeat=seat;updateZoom();if(!$("zoom").open)$("zoom").showModal();}
-    else void startSeat(seat);
+
+function health(p) {
+  if (!p) return {live: false, label: "Unavailable", detail: "No connection"};
+  if (!p.active) return {live: false, label: "Closed", detail: p.error || ""};
+
+  const state = p.pc.connectionState;
+  if (p.error && state !== "connected")
+    return {live: false, label: "Connection error", detail: p.error};
+
+  if (state !== "connected") {
+    return {
+      live: false,
+      label: state === "new" ? p.phase : state,
+      detail: `ICE ${p.pc.iceConnectionState}; ${p.phase}`
+    };
+  }
+
+  if (p.dc?.readyState !== "open")
+    return {live: false, label: "Connected; channel pending", detail: "Waiting for control channel"};
+
+  if (p.lastBeat && Date.now() - p.lastBeat > 20000)
+    return {live: false, label: "Heartbeat delayed", detail: "Remote tab may be suspended"};
+
+  if (p.teacherSide) {
+    if (p.remoteInfo?.captureMuted || p.remoteInfo?.captureState === "ended")
+      return {live: false, label: "Capture unavailable", detail: "Source muted or ended"};
+
+    if (!p.lastFrame)
+      return {live: false, label: "Waiting for video", detail: `${p.bytes} inbound bytes`};
+
+    if (Date.now() - p.lastFrame > 20000)
+      return {
+        live: false, label: "No recent video frames",
+        detail: "Static source or stalled video"
+      };
+  }
+
+  return {
+    live: true,
+    label: p.teacherSide ? "Live" : "Sharing",
+    detail: `${p.frames} ${p.teacherSide ? "decoded" : "encoded"} · ` +
+      `${Math.round(p.bytes / 1024)} KiB`
   };
-  const t={tile,video,overlay,foot};tiles.set(seat,t);$("grid").append(tile);return t;
 }
-function render(){
-  if(!meta||!roomId)return;
-  const count=meta.rows*meta.cols,large=$("view").value==="large";
-  $("grid").style.gridTemplateColumns=large
-    ?`repeat(${meta.cols},minmax(200px,1fr))`:`repeat(${meta.cols},minmax(0,1fr))`;
-  $("grid").style.minWidth=large?meta.cols*210+"px":"0";
-  for(const [seat,t]of tiles)if(seat>count){
-    bind(t.video,null);t.tile.remove();tiles.delete(seat);
+
+function seatPeer(seat) {
+  if (!teacher) return student?.seat === seat ? student.p : null;
+  const assignment = meta?.seats?.[seat];
+  return assignment ? peers.get(assignment.person + "/" + assignment.attempt) : null;
+}
+
+function makeTile(seat) {
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "tile";
+
+  const head = document.createElement("div");
+  head.className = "head";
+  head.textContent = "Seat " + seat;
+
+  const picture = document.createElement("div");
+  picture.className = "picture";
+
+  const video = document.createElement("video");
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+
+  const foot = document.createElement("div");
+  foot.className = "foot";
+
+  picture.append(video, overlay);
+  tile.append(head, picture, foot);
+
+  tile.onclick = () => {
+    if (teacher) {
+      zoomSeat = seat;
+      updateZoom();
+      if (!$("zoom").open) $("zoom").showModal();
+    } else {
+      void startSeat(seat);
+    }
+  };
+
+  const t = {tile, video, overlay, foot};
+  tiles.set(seat, t);
+  $("grid").append(tile);
+  return t;
+}
+
+function render() {
+  if (!meta || !roomId) return;
+
+  const count = meta.rows * meta.cols;
+  const large = $("view").value === "large";
+
+  $("grid").style.gridTemplateColumns = large
+    ? `repeat(${meta.cols},minmax(200px,1fr))`
+    : `repeat(${meta.cols},minmax(0,1fr))`;
+  $("grid").style.minWidth = large ? meta.cols * 210 + "px" : "0";
+
+  for (const [seat, t] of tiles) {
+    if (seat > count) {
+      bindVideo(t.video, null);
+      t.tile.remove();
+      tiles.delete(seat);
+    }
   }
-  for(let seat=1;seat<=count;seat++){
-    const t=tiles.get(seat)||makeTile(seat),p=seatPeer(seat);
-    const occupied=!!meta.seats?.[seat],own=!teacher&&student?.seat===seat;
+
+  let live = 0;
+  for (let seat = 1; seat <= count; seat++) {
+    const t = tiles.get(seat) || makeTile(seat);
+    const p = seatPeer(seat);
+    const occupied = !!meta.seats?.[seat];
+    const own = !teacher && student?.seat === seat;
     let h;
-    if(meta.closed)h={live:false,label:"Room closed",detail:""};
-    else if(p)h=health(p);
-    else if(own)h={live:false,label:"Preparing share",detail:"Please wait"};
-    else if(occupied)h={live:false,label:teacher?"Unavailable":"Occupied",detail:"Assigned"};
-    else h={live:false,label:teacher?"Empty":"Click to share here",detail:"Available"};
-    t.tile.classList.toggle("live",h.live);
-    t.tile.classList.toggle("unavailable",!h.live);
-    t.overlay.textContent=h.label;t.foot.textContent=h.detail||h.label;
-    t.tile.title=`Seat ${seat}: ${h.label}. ${h.detail||""}`;
-    bind(t.video,teacher?p?.stream:own?student?.output:null);
-    t.tile.disabled=!teacher&&(!!meta.closed||occupied||!!student||starting||cleaning);
+
+    if (meta.closed) h = {live: false, label: "Room closed", detail: ""};
+    else if (p) h = health(p);
+    else if (own) h = {live: false, label: "Preparing share", detail: "Please wait"};
+    else if (occupied)
+      h = {live: false, label: teacher ? "Unavailable" : "Occupied", detail: "Assigned"};
+    else
+      h = {live: false, label: teacher ? "Empty" : "Click to share here", detail: "Available"};
+
+    if (h.live) live++;
+    t.tile.classList.toggle("live", h.live);
+    t.tile.classList.toggle("unavailable", !h.live);
+    t.overlay.textContent = h.label;
+    t.foot.textContent = h.detail || h.label;
+    t.tile.title = `Seat ${seat}: ${h.label}. ${h.detail || ""}`;
+
+    bindVideo(t.video, teacher ? p?.stream : own ? student?.output : null);
+
+    t.tile.disabled = !teacher &&
+      (!!meta.closed || occupied || !!student || starting || cleaning);
   }
+
+  if (meta.closed) $("roomHealth").textContent = "Closed";
+  else if (teacher)
+    $("roomHealth").textContent =
+      `${Object.keys(meta.seats || {}).length} assigned · ${live} live`;
+  else {
+    $("roomHealth").textContent = student?.p
+      ? health(student.p).label
+      : Date.now() - (meta.heartbeat || 0) > 60000
+        ? "Teacher heartbeat old"
+        : "Choose a seat";
+  }
+
   updateZoom();
 }
-function updateZoom(){
-  if(zoomSeat===null)return;
-  const p=seatPeer(zoomSeat),h=health(p);
-  $("zoomTitle").textContent=`Seat ${zoomSeat} — existing tiny preview`;
-  $("zoomStatus").textContent=`${h.label}. ${h.detail}`;
-  bind($("zoomVideo"),p?.stream);
+
+function updateZoom() {
+  if (zoomSeat === null) return;
+  const p = seatPeer(zoomSeat);
+  const h = health(p);
+  $("zoomTitle").textContent = `Seat ${zoomSeat} — existing tiny preview`;
+  $("zoomStatus").textContent = `${h.label}. ${h.detail}`;
+  bindVideo($("zoomVideo"), p?.stream);
 }
 
-/* Stats are evidence, not a browser-side inference of TURN error codes. */
-function address(c){
-  return c?`${c.address||c.ip||"hidden"}:${c.port||"?"} `+
-    `${c.candidateType||"?"}/${c.protocol||"?"}`+
-    (c.relayProtocol?` TURN-${c.relayProtocol}`:""):"?";
+/* Preserve early candidate-pair evidence while negotiation is in progress. */
+function address(candidate) {
+  if (!candidate) return "?";
+  return `${candidate.address || candidate.ip || "hidden"}:${candidate.port || "?"} ` +
+    `${candidate.candidateType || "?"}/${candidate.protocol || "?"}` +
+    (candidate.relayProtocol ? ` TURN-${candidate.relayProtocol}` : "");
 }
-async function readStats(p){
-  const stats=await p.pc.getStats(),all=[...stats.values()];
-  const lines=[
+
+async function readStats(p) {
+  const stats = await p.pc.getStats();
+  const all = [...stats.values()];
+  const lines = [
     `ICE=${p.pc.iceConnectionState}; connection=${p.pc.connectionState}`,
-    `SCTP=${p.pc.sctp?.state||"none"}; DTLS=${p.pc.sctp?.transport?.state||"unknown"}`
+    `SCTP=${p.pc.sctp?.state || "none"}; DTLS=${p.pc.sctp?.transport?.state || "unknown"}`
   ];
-  for(const c of all.filter(s=>["local-candidate","remote-candidate"].includes(s.type)))
-    lines.push(`${c.type}: ${address(c)}`);
-  const pairs=all.filter(s=>s.type==="candidate-pair");
-  if(!pairs.length)lines.push("Candidate pairs: none exposed by browser");
-  for(const q of pairs.slice(0,24))lines.push(
-    `Pair state=${q.state} nominated=${!!q.nominated}\n`+
-    ` local ${address(stats.get(q.localCandidateId))}\n`+
-    ` remote ${address(stats.get(q.remoteCandidateId))}\n`+
-    ` requestsSent=${q.requestsSent??"?"} responsesReceived=${q.responsesReceived??"?"}`+
-    ` requestsReceived=${q.requestsReceived??"?"} responsesSent=${q.responsesSent??"?"}\n`+
-    ` bytesSent=${q.bytesSent||0} bytesReceived=${q.bytesReceived||0}`
-  );
-  let bytes=0,frames=0;
-  for(const r of all){
-    if(r.type==="transport")lines.push(
-      `Transport DTLS=${r.dtlsState||"?"} selectedPair=${r.selectedCandidatePairId||"none"}`+
-      ` bytes=${r.bytesSent||0}/${r.bytesReceived||0}`);
-    if(r.isRemote||(r.kind||r.mediaType)!=="video")continue;
-    if(r.type==="inbound-rtp"){
-      lines.push(`Inbound video: bytes=${r.bytesReceived||0} decoded=${r.framesDecoded||0}`);
-      if(p.teacherSide){bytes+=r.bytesReceived||0;frames+=r.framesDecoded||0;}
+
+  const selected = new Set(all.filter(report =>
+    report.type === "transport" && report.selectedCandidatePairId
+  ).map(report => report.selectedCandidatePairId));
+
+  for (const candidate of all.filter(report =>
+    ["local-candidate", "remote-candidate"].includes(report.type)))
+    lines.push(`${candidate.type}: ${address(candidate)}`);
+
+  const pairs = all.filter(report => report.type === "candidate-pair");
+  if (!pairs.length) lines.push("Candidate pairs: none exposed by browser");
+
+  for (const pair of pairs.slice(0, 24)) {
+    lines.push(
+      `Pair ${selected.has(pair.id) ? "SELECTED " : ""}` +
+      `state=${pair.state} nominated=${!!pair.nominated}\n` +
+      ` local ${address(stats.get(pair.localCandidateId))}\n` +
+      ` remote ${address(stats.get(pair.remoteCandidateId))}\n` +
+      ` requestsSent=${pair.requestsSent ?? "?"}` +
+      ` responsesReceived=${pair.responsesReceived ?? "?"}` +
+      ` requestsReceived=${pair.requestsReceived ?? "?"}` +
+      ` responsesSent=${pair.responsesSent ?? "?"}\n` +
+      ` bytesSent=${pair.bytesSent || 0} bytesReceived=${pair.bytesReceived || 0}`
+    );
+  }
+
+  let bytes = 0, frames = 0;
+  for (const report of all) {
+    if (report.type === "transport") {
+      lines.push(
+        `Transport DTLS=${report.dtlsState || "?"}` +
+        ` selectedPair=${report.selectedCandidatePairId || "none"}` +
+        ` bytes=${report.bytesSent || 0}/${report.bytesReceived || 0}`
+      );
     }
-    if(r.type==="outbound-rtp"){
-      lines.push(`Outbound video: bytes=${r.bytesSent||0} encoded=${r.framesEncoded||0}`);
-      if(!p.teacherSide){bytes+=r.bytesSent||0;frames+=r.framesEncoded||0;}
+
+    if (report.isRemote || (report.kind || report.mediaType) !== "video") continue;
+
+    if (report.type === "inbound-rtp") {
+      lines.push(
+        `Inbound video: bytes=${report.bytesReceived || 0}` +
+        ` decoded=${report.framesDecoded || 0}` +
+        ` lost=${report.packetsLost ?? "?"}`
+      );
+      if (p.teacherSide) {
+        bytes += report.bytesReceived || 0;
+        frames += report.framesDecoded || 0;
+      }
+    }
+
+    if (report.type === "outbound-rtp") {
+      lines.push(
+        `Outbound video: bytes=${report.bytesSent || 0}` +
+        ` encoded=${report.framesEncoded || 0}` +
+        ` fps=${report.framesPerSecond ?? "?"}`
+      );
+      if (!p.teacherSide) {
+        bytes += report.bytesSent || 0;
+        frames += report.framesEncoded || 0;
+      }
     }
   }
-  if(frames>p.frames)p.lastFrame=Date.now();
-  p.bytes=bytes;p.frames=frames;p.lastStats=lines.join("\n");return p.lastStats;
-}
-async function sample(p,force=false){
-  if(!p?.active||p.statsBusy)return;p.statsBusy=true;
-  try{
-    const text=await readStats(p),last=p.history[p.history.length-1];
-    if(force||!last||last.text!==text){
-      p.history.push({at:Date.now()-p.created,text});
-      if(p.history.length>32)p.history.splice(10,1);
-    }
-  }catch{}finally{p.statsBusy=false;}
-}
-async function summarize(p){
-  let current=p.lastStats;
-  if(p.active)try{current=await readStats(p);}catch(e){current+="\n"+e.message;}
-  const out=[
-    p.label,`Signaling: ${p.pc.signalingState}; gathering: ${p.pc.iceGatheringState}`,
-    `Phase: ${p.phase}; DataChannel: ${p.dc?.readyState||"none"}`,
-    `Published: ${p.published}; remote applied: ${p.remoteApplied}`,
-    p.error?"Error: "+p.error:"",
-    "\nCURRENT STATS",current,
-    "\nLOCAL SDP OUTLINE — passwords omitted",
-    p.active?outline(p.pc.localDescription):p.localOutline,
-    "\nREMOTE SDP OUTLINE — passwords omitted",
-    p.active?outline(p.pc.remoteDescription):p.remoteOutline,
-    "\nEARLY / CHANGING STATS"
-  ];
-  for(const h of p.history)out.push(`\nAt ${h.at}ms:\n${h.text}`);
-  out.push("\nEVENTS",...p.events);
-  if(p.remoteInfo)out.push("Student heartbeat: "+JSON.stringify(p.remoteInfo));
-  if(student?.p===p)out.push(`Canvas draws: ${student.draws}`);
-  return out.join("\n");
-}
-async function classroomReport(){
-  const list=teacher?[...peers.values()]:student?.p?[student.p]:[];
-  const parts=[];
-  for(const p of list)parts.push(await summarize(p));
-  return parts.length?`Room: ${roomId}\n\n`+parts.join("\n\n================\n\n")
-    :"No classroom peer connections.";
-}
-async function checkHealth(){
-  if(healthBusy)return;healthBusy=true;
-  try{
-    const list=teacher?[...peers.values()]:student?.p?[student.p]:[];
-    await Promise.all(list.map(p=>sample(p)));heartbeat();
-    if(teacher&&meta&&!meta.closed&&Date.now()-lastHeartbeat>15000){
-      lastHeartbeat=Date.now();meta.heartbeat=lastHeartbeat;
-      const value=lastHeartbeat;
-      const job=writes.then(()=>update(rr("meta"),{heartbeat:value}));
-      writes=job.catch(e=>log("Heartbeat: "+e.message));
-    }
-    render();if(teacher)renderPeople();
-  }finally{healthBusy=false;}
+
+  if (frames > p.frames) p.lastFrame = Date.now();
+  p.bytes = bytes;
+  p.frames = frames;
+  p.lastStats = lines.join("\n");
+  return p.lastStats;
 }
 
-/* Test downloads query active peers rather than exporting only a progress label. */
-function progress(t){
-  $("testStatus").textContent=
-    `${t.result} · ${t.mode} · ${((Date.now()-t.started)/1000).toFixed(1)}s\n`+
-    `${t.phase}\n`+
-    `A: ${t.a?.pc.iceConnectionState||"-"} / ${t.a?.pc.connectionState||"-"}\n`+
-    `B: ${t.b?.pc.iceConnectionState||"-"} / ${t.b?.pc.connectionState||"-"}\n`+
+async function sampleStats(p, force = false) {
+  if (!p?.active || p.statsBusy) return;
+  p.statsBusy = true;
+  try {
+    const text = await readStats(p);
+    const last = p.history[p.history.length - 1];
+
+    // Long-running connections retain early negotiation evidence and a small tail.
+    const recording = force || Date.now() - p.created < 120000;
+    if (recording && (force || !last || last.text !== text)) {
+      p.history.push({at: Date.now() - p.created, text});
+      if (p.history.length > 32) p.history.splice(10, 1);
+    }
+  } catch {}
+  finally { p.statsBusy = false; }
+}
+
+async function summarize(p) {
+  let current = p.lastStats;
+  if (p.active) {
+    try { current = await readStats(p); }
+    catch (error) { current += "\n" + error.message; }
+  }
+
+  const out = [
+    p.label,
+    `Signaling: ${p.pc.signalingState}; gathering: ${p.pc.iceGatheringState}`,
+    `Phase: ${p.phase}; DataChannel: ${p.dc?.readyState || "none"}`,
+    `Published: ${p.published}; remote applied: ${p.remoteApplied}`,
+    p.error ? "Error: " + p.error : "",
+    "\nCURRENT STATS", current,
+    "\nLOCAL SDP OUTLINE — passwords omitted",
+    p.active ? outline(p.pc.localDescription) : p.localOutline,
+    "\nREMOTE SDP OUTLINE — passwords omitted",
+    p.active ? outline(p.pc.remoteDescription) : p.remoteOutline,
+    "\nEARLY / CHANGING STATS"
+  ];
+
+  for (const h of p.history) out.push(`\nAt ${h.at}ms:\n${h.text}`);
+  out.push("\nEVENTS", ...p.events);
+
+  if (p.remoteInfo)
+    out.push("Student heartbeat: " + JSON.stringify(p.remoteInfo));
+  if (student?.p === p)
+    out.push(`Canvas draws: ${student.draws}`);
+
+  return out.join("\n");
+}
+
+async function classroomReport() {
+  const list = teacher ? [...peers.values()] : student?.p ? [student.p] : [];
+  const parts = [];
+  for (const p of list) parts.push(await summarize(p));
+  return parts.length
+    ? `Room: ${roomId}\n\n` + parts.join("\n\n================\n\n")
+    : "No classroom peer connections.";
+}
+
+async function checkHealth() {
+  if (healthBusy) return;
+  healthBusy = true;
+  try {
+    const list = teacher ? [...peers.values()] : student?.p ? [student.p] : [];
+    await Promise.all(list.map(p => sampleStats(p)));
+    studentHeartbeat();
+
+    if (teacher && meta && !meta.closed &&
+        Date.now() - lastHeartbeatWrite > 15000) {
+      lastHeartbeatWrite = Date.now();
+      meta.heartbeat = lastHeartbeatWrite;
+      const value = lastHeartbeatWrite;
+      const job = writes.then(() => update(rr("meta"), {heartbeat: value}));
+      writes = job.catch(error => log("Heartbeat: " + error.message));
+    }
+
+    render();
+    if (teacher) renderPeople();
+  } finally {
+    healthBusy = false;
+  }
+}
+
+/* Independent test: complete SDP + echoed random token, no Firebase. */
+function testProgress(t) {
+  $("testStatus").textContent =
+    `${t.result} · ${t.mode} · ${((Date.now() - t.started) / 1000).toFixed(1)}s\n` +
+    `${t.phase}\n` +
+    `A: ${t.a?.pc.iceConnectionState || "-"} / ${t.a?.pc.connectionState || "-"}\n` +
+    `B: ${t.b?.pc.iceConnectionState || "-"} / ${t.b?.pc.connectionState || "-"}\n` +
     `Echoes sent by B: ${t.echoes}; received by A: ${t.passed}`;
 }
-function ensure(t){if(t.cancelled)throw Error("Test cancelled");}
-async function testReport(t){
-  const out=[
-    `--- TURN TEST: ${t.result} ---`,VERSION,
+
+function ensureTest(t) {
+  if (t.cancelled) throw new Error("Test cancelled");
+}
+
+async function testReport(t) {
+  const out = [
+    `--- TURN TEST: ${t.result} ---`,
+    VERSION,
     `Started: ${new Date(t.started).toISOString()}`,
     `Report: ${new Date().toISOString()}`,
     `TURN: ${TURN.host}:${TURN.port}; ${t.mode}; relay only`,
     `Phase: ${t.phase}; visibility: ${document.visibilityState}`,
     `Echoes sent by B: ${t.echoes}; received by A: ${t.passed}`,
-    t.error?"Error: "+t.error:"",
-    t.result==="RUNNING"?"LIVE SNAPSHOT — not a final result.":"",
-    "Server check: CREATE_PERMISSION must succeed. Browser stats cannot override or reliably identify a TURN 403."
+    t.error ? "Error: " + t.error : "",
+    t.result === "RUNNING"
+      ? "LIVE SNAPSHOT — not a final result."
+      : t.result === "PASS"
+        ? "Relay-only peers exchanged a ping. This proves this test path, not classroom video or load capacity."
+        : "No successful echoed ping. Check browser diagnostics and contemporaneous coturn logs."
   ];
-  if(t.a)out.push(await summarize(t.a));
-  if(t.b)out.push(await summarize(t.b));
+
+  if (t.a) out.push(await summarize(t.a));
+  if (t.b) out.push(await summarize(t.b));
   return out.join("\n\n");
 }
-async function startTest(){
-  if(activeTest)return;
-  const t={started:Date.now(),mode:meta?.transport||$("transport").value,
-    result:"RUNNING",phase:"Creating peers",error:"",cancelled:false,
-    passed:false,echoes:0,token:uuid(),a:null,b:null,ping:null,progress:null};
-  activeTest=t;
-  $("testBtn").disabled=true;$("cancelBtn").disabled=false;
-  $("transport").disabled=true;
-  notice("Testing TURN. Watch coturn logs for CREATE_PERMISSION success or rejection.");
+
+async function startTest() {
+  if (activeTest || busy) return;
+  const t = {
+    started: Date.now(),
+    mode: meta?.transport || $("transport").value,
+    result: "RUNNING", phase: "Creating peers", error: "",
+    cancelled: false, passed: false, echoes: 0,
+    token: uuid(), a: null, b: null, ping: null, progress: null
+  };
+
+  activeTest = t;
+  $("testBtn").disabled = true;
+  $("cancelBtn").disabled = false;
+  $("transport").disabled = true;
+
+  notice("Testing TURN. Keep this tab visible.");
   showReport("Test running. Live diagnostics can be downloaded now.");
-  try{
-    const a=t.a=makePeer("Test A",config(t.mode));
-    const b=t.b=makePeer("Test B",config(t.mode));
-    b.pc.ondatachannel=e=>{
-      b.dc=e.channel;b.event("DataChannel received");
-      b.dc.onmessage=event=>{
-        if(event.data===t.token&&b.dc.readyState==="open"){
-          t.echoes++;b.dc.send(t.token);
+
+  try {
+    const a = t.a = makePeer("Test A", rtcConfig(t.mode));
+    const b = t.b = makePeer("Test B", rtcConfig(t.mode));
+
+    b.pc.ondatachannel = event => {
+      b.dc = event.channel;
+      b.event("DataChannel received");
+      b.dc.onopen = () => { b.phase = "DataChannel open"; };
+      b.dc.onmessage = event => {
+        if (event.data === t.token && b.dc.readyState === "open") {
+          t.echoes++;
+          b.dc.send(t.token);
         }
       };
     };
-    a.dc=a.pc.createDataChannel("relay-test",{ordered:true});
-    a.dc.onmessage=e=>{if(e.data===t.token)t.passed=true;};
-    const ping=()=>{
-      if(a.dc.readyState==="open")try{a.dc.send(t.token);}catch{}
+
+    a.dc = a.pc.createDataChannel("relay-test", {ordered: true});
+    a.dc.onmessage = event => {
+      if (event.data === t.token) {
+        t.passed = true;
+        a.phase = "Echoed ping received";
+      }
     };
-    a.dc.onopen=ping;t.ping=setInterval(ping,1000);
-    t.progress=setInterval(()=>progress(t),500);
 
-    t.phase="Gathering complete offer";
-    const offer=await gather(a,await a.pc.createOffer());ensure(t);a.published=true;
-    t.phase="Applying offer";await applyRemote(b,offer);ensure(t);
-    t.phase="Gathering complete answer";
-    const answer=await gather(b,await b.pc.createAnswer());ensure(t);b.published=true;
-    t.phase="Applying answer";await applyRemote(a,answer);ensure(t);
-    t.phase="Waiting up to 40 seconds for echoed ping";
-    const deadline=Date.now()+40000;
-    while(!t.passed&&Date.now()<deadline){ensure(t);await sleep(200);}
-    t.result=t.passed?"PASS":"FAIL";
-    t.phase=t.passed?"Echoed ping received":"No echoed ping within 40 seconds";
-  }catch(e){
-    t.error=e.message;t.result=t.cancelled?"CANCELLED":"FAIL";
-    t.phase=t.cancelled?"Cancelled":"Test could not complete";
-  }finally{
-    clearInterval(t.ping);clearInterval(t.progress);
-    $("cancelBtn").disabled=true;
-    try{lastTestReport=await testReport(t);showReport(lastTestReport);}
-    catch(e){showReport("Report error: "+e.message);}
-    progress(t);log(`TURN test ${t.result} (${t.mode})`);
-    if(t.passed)notice("TURN ping passed. Create a NEW v6 room and test another device.");
-    else if(t.cancelled)notice("Test cancelled. Partial diagnostics retained.");
-    else notice(
-      "TURN ping failed. Check coturn: if CREATE_PERMISSION still returns 403, "+
-      "the server permission problem remains. If permissions succeed, inspect relay routing.",
-      true
-    );
-    destroy(t.a);destroy(t.b);activeTest=null;
-    $("testBtn").disabled=false;$("transport").disabled=!!roomId;
+    const ping = () => {
+      if (a.dc.readyState === "open") {
+        try { a.dc.send(t.token); } catch {}
+      }
+    };
+
+    a.dc.onopen = () => {
+      a.phase = "DataChannel open";
+      ping();
+    };
+    t.ping = setInterval(ping, 1000);
+    t.progress = setInterval(() => testProgress(t), 500);
+
+    t.phase = "Gathering complete offer";
+    const offer = await gather(a, await a.pc.createOffer());
+    ensureTest(t);
+    a.published = true;
+
+    t.phase = "Applying offer";
+    await applyRemote(b, offer);
+    ensureTest(t);
+
+    t.phase = "Gathering complete answer";
+    const answer = await gather(b, await b.pc.createAnswer());
+    ensureTest(t);
+    b.published = true;
+
+    t.phase = "Applying answer";
+    await applyRemote(a, answer);
+    ensureTest(t);
+
+    t.phase = "Waiting up to 40 seconds for echoed ping";
+    const deadline = Date.now() + 40000;
+    while (!t.passed && Date.now() < deadline) {
+      ensureTest(t);
+      await sleep(200);
+    }
+
+    t.result = t.passed ? "PASS" : "FAIL";
+    t.phase = t.passed ? "Echoed ping received" : "No echoed ping within 40 seconds";
+  } catch (error) {
+    t.error = error.message;
+    t.result = t.cancelled ? "CANCELLED" : "FAIL";
+    t.phase = t.cancelled ? "Cancelled" : "Test could not complete";
+  } finally {
+    clearInterval(t.ping);
+    clearInterval(t.progress);
+    $("cancelBtn").disabled = true;
+
+    // Save diagnostics BEFORE intentionally closing the test connections.
+    try {
+      lastTestReport = await testReport(t);
+      showReport(lastTestReport);
+    } catch (error) {
+      showReport("Report error: " + error.message);
+    }
+
+    testProgress(t);
+    log(`TURN test ${t.result} (${t.mode})`);
+
+    if (t.passed)
+      notice("TURN ping passed. Create a NEW v7 room and test one desktop student.");
+    else if (t.cancelled)
+      notice("Test cancelled. Partial diagnostics retained.");
+    else
+      notice("TURN ping failed. Download diagnostics and inspect coturn logs from this test.", true);
+
+    destroy(t.a);
+    destroy(t.b);
+    activeTest = null;
+    $("testBtn").disabled = false;
+    $("transport").disabled = !!roomId;
   }
 }
-function cancelTest(){
-  const t=activeTest;if(!t)return;t.cancelled=true;
-  $("cancelBtn").disabled=true;
-  if(t.a?.pc.iceGatheringState==="gathering")destroy(t.a);
-  if(t.b?.pc.iceGatheringState==="gathering")destroy(t.b);
+
+function cancelTest() {
+  const t = activeTest;
+  if (!t) return;
+  t.cancelled = true;
+  $("cancelBtn").disabled = true;
+  if (t.a?.pc.iceGatheringState === "gathering") destroy(t.a);
+  if (t.b?.pc.iceGatheringState === "gathering") destroy(t.b);
 }
-async function download(){
-  $("downloadBtn").disabled=true;
-  try{
-    const t=activeTest;
-    const text=[
-      "Classroom Screen Monitor diagnostics",new Date().toISOString(),VERSION,
-      navigator.userAgent,`Visibility: ${document.visibilityState}`,"",
-      t?await testReport(t):lastTestReport||latestReport,
-      "\nCLASSROOM",await classroomReport(),"\nEVENT LOG",logs.join("\n")
+
+async function downloadDiagnostics() {
+  $("downloadBtn").disabled = true;
+  try {
+    const t = activeTest;
+    const text = [
+      "Classroom Screen Monitor diagnostics",
+      new Date().toISOString(),
+      VERSION,
+      navigator.userAgent,
+      `Visibility: ${document.visibilityState}`,
+      "",
+      t ? await testReport(t) : lastTestReport || latestReport,
+      "\nCLASSROOM",
+      await classroomReport(),
+      "\nEVENT LOG",
+      logs.join("\n")
     ].join("\n");
-    const url=URL.createObjectURL(new Blob(["\uFEFF",text],{
-      type:"text/plain;charset=utf-8"}));
-    const a=document.createElement("a");a.href=url;
-    a.download="classroom-v6-diagnostics.txt";a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-  }finally{$("downloadBtn").disabled=false;}
+
+    // UTF-8 BOM avoids mojibake in text viewers.
+    const url = URL.createObjectURL(new Blob(["\uFEFF", text], {
+      type: "text/plain;charset=utf-8"
+    }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "classroom-v7-diagnostics.txt";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } finally {
+    $("downloadBtn").disabled = false;
+  }
 }
 
-$("createBtn").onclick=action(createRoom);
-$("openBtn").onclick=action(()=>openRoom());
-$("testBtn").onclick=action(startTest);
-$("cancelBtn").onclick=cancelTest;
-$("downloadBtn").onclick=action(download);
-$("diagnoseBtn").onclick=action(async()=>showReport(await classroomReport()));
-$("applyBtn").onclick=action(applyGrid);
-$("auto").onchange=action(async()=>{
-  if(!teacher||meta.closed)return;
-  meta.auto=$("auto").checked;meta.revision++;await commit();processRequests();
+$("createBtn").onclick = action(createRoom);
+$("openBtn").onclick = action(() => openRoom());
+$("testBtn").onclick = action(startTest);
+$("cancelBtn").onclick = cancelTest;
+$("downloadBtn").onclick = action(downloadDiagnostics);
+$("diagnoseBtn").onclick = action(async () => showReport(await classroomReport()));
+$("applyBtn").onclick = action(applyGrid);
+
+$("auto").onchange = action(async () => {
+  if (!teacher || meta.closed) return;
+  meta.auto = $("auto").checked;
+  meta.revision++;
+  await commit();
+  processRequests();
 });
-$("closeRoomBtn").onclick=action(closeRoom);
-$("leaveBtn").onclick=action(()=>stopStudent());
-$("view").onchange=render;
-$("closeZoomBtn").onclick=()=>$("zoom").close();
-$("zoom").addEventListener("close",()=>{zoomSeat=null;bind($("zoomVideo"),null);});
-$("copyBtn").onclick=action(async()=>{
-  try{await navigator.clipboard.writeText($("roomLink").value);notice("Link copied.");}
-  catch{$("roomLink").focus();$("roomLink").select();notice("Copy the highlighted link.");}
+
+$("closeRoomBtn").onclick = action(closeRoom);
+$("leaveBtn").onclick = action(() => stopStudent());
+$("view").onchange = render;
+$("closeZoomBtn").onclick = () => $("zoom").close();
+
+$("zoom").addEventListener("close", () => {
+  zoomSeat = null;
+  bindVideo($("zoomVideo"), null);
 });
-document.addEventListener("visibilitychange",()=>log("Visibility: "+document.visibilityState));
-window.addEventListener("pagehide",()=>{
-  if(student){
+
+$("copyBtn").onclick = action(async () => {
+  try {
+    await navigator.clipboard.writeText($("roomLink").value);
+    notice("Link copied.");
+  } catch {
+    $("roomLink").focus();
+    $("roomLink").select();
+    notice("Copy the highlighted link.");
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  log("Visibility: " + document.visibilityState);
+});
+
+window.addEventListener("pagehide", () => {
+  if (student) {
     clearTimeout(student.timer);
-    student.raw?.getTracks().forEach(t=>t.stop());
-    student.output?.getTracks().forEach(t=>t.stop());destroy(student.p);
+    student.raw?.getTracks().forEach(track => track.stop());
+    student.output?.getTracks().forEach(track => track.stop());
+    destroy(student.p);
   }
-  for(const p of peers.values())destroy(p);
-  if(activeTest){
-    activeTest.cancelled=true;destroy(activeTest.a);destroy(activeTest.b);
+  for (const p of peers.values()) destroy(p);
+  if (activeTest) {
+    activeTest.cancelled = true;
+    destroy(activeTest.a);
+    destroy(activeTest.b);
   }
 });
-setInterval(()=>void checkHealth().catch(e=>log(e.message)),2500);
 
-async function boot(){
+setInterval(() => {
+  void checkHealth().catch(error => log(error.message));
+}, 2500);
+
+async function boot() {
   log(`Loaded ${VERSION}; TURN ${TURN.host}:${TURN.port}`);
-  const app=initializeApp(FIREBASE),auth=getAuth(app);
-  await setPersistence(auth,browserSessionPersistence);
-  user=(await signInAnonymously(auth)).user;
-  db=getDatabase(app);ready=true;
-  $("createBtn").disabled=false;$("openBtn").disabled=false;
-  onValue(ref(db,".info/connected"),snap=>{
-    $("firebaseState").textContent=snap.val()?"Firebase: connected":"Firebase: disconnected";
+  const app = initializeApp(FIREBASE);
+  const auth = getAuth(app);
+  await setPersistence(auth, browserSessionPersistence);
+  user = (await signInAnonymously(auth)).user;
+  db = getDatabase(app);
+  ready = true;
+
+  $("createBtn").disabled = false;
+  $("openBtn").disabled = false;
+
+  onValue(ref(db, ".info/connected"), snapshot => {
+    $("firebaseState").textContent = snapshot.val()
+      ? "Firebase: connected"
+      : "Firebase: disconnected";
   });
-  const room=new URL(location.href).searchParams.get("room");
-  if(room){$("roomInput").value=room;await openRoom(room);}
-  else notice("Apply the coturn permission fix, then run the independent TURN test.");
+
+  const room = new URL(location.href).searchParams.get("room");
+  if (room) {
+    $("roomInput").value = room;
+    await openRoom(room);
+  } else {
+    notice("Create a teacher room, or run the TURN test to verify this network.");
+  }
 }
-boot().catch(e=>{$("firebaseState").textContent="Firebase: setup error";fail(e);});
+
+boot().catch(error => {
+  $("firebaseState").textContent = "Firebase: setup error";
+  fail(error);
+});
 </script>
 </body>
 </html>
