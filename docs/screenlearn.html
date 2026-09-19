@@ -1,0 +1,3031 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TURN Classroom Monitor — v3</title>
+<style>
+/*
+  Presentation:
+  - Stable numbered seats preserve classroom position.
+  - Fit/scroll/zoom are local viewing preferences.
+  - Grey tiles hide stale images rather than presenting them as live.
+*/
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #101827;
+  color: #e5e7eb;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px; }
+main { max-width: 1600px; margin: auto; }
+h1 { font-size: 1.45rem; }
+h2 { font-size: 1.05rem; margin-top: 0; }
+p, li { line-height: 1.5; }
+.panel {
+  background: #1e293b;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+label { display: grid; gap: 5px; font-size: .9rem; }
+button, input, select, textarea {
+  font: inherit;
+  padding: 9px;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  background: #0f172a;
+  color: inherit;
+}
+button { background: #1d4ed8; cursor: pointer; }
+button.secondary { background: #374151; }
+button.danger { background: #991b1b; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+input[type=number] { width: 80px; }
+textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  font: 12px ui-monospace, monospace;
+}
+.small { font-size: .83rem; color: #cbd5e1; }
+.warning { color: #fbbf24; }
+.hidden { display: none !important; }
+#notice { white-space: pre-wrap; margin-top: 8px; }
+#syncStatus { font-weight: bold; }
+#gridViewport { overflow: auto; max-height: 78vh; }
+#grid {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr));
+}
+#grid.scroll {
+  grid-template-columns: repeat(var(--cols, 8), minmax(165px, 1fr));
+}
+.tile {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-width: 0;
+  overflow: hidden;
+  background: #555;
+  border: 2px solid #9ca3af;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: black;
+}
+.tile.bad video { visibility: hidden; }
+.tile.good { border-color: #22c55e; }
+.tile.disabled {
+  opacity: .6;
+  border-style: dashed;
+  background: #303846;
+}
+.tile .title, .tile .health {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 3px 5px;
+  background: #000a;
+  font-size: clamp(9px, 1vw, 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile .title { top: 0; white-space: nowrap; }
+.tile .health { bottom: 0; }
+.tile.bad .health { background: transparent; }
+#log {
+  white-space: pre-wrap;
+  font: 12px ui-monospace, monospace;
+  max-height: 240px;
+  overflow: auto;
+}
+dialog {
+  width: min(96vw, 1200px);
+  background: #111827;
+  color: white;
+  border: 1px solid #64748b;
+  border-radius: 10px;
+}
+dialog::backdrop { background: #000c; }
+dialog video {
+  width: 100%;
+  max-height: 72vh;
+  background: black;
+}
+@media (max-width: 600px) {
+  body { padding: 7px; }
+  .panel { padding: 10px; }
+  .row > label { flex: 1 1 125px; }
+  button { min-height: 42px; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>TURN Classroom Monitor — v3</h1>
+
+<section class="panel small">
+  <strong>Single-file prototype with manual pairing.</strong>
+  Screen video and live configuration use TURN-relayed WebRTC.
+  The creating teacher coordinates the classroom and forwards screens to
+  additional teachers. Keep that browser open.
+  Screen capture requires permission and a supported desktop browser.
+</section>
+
+<section class="panel">
+  <div class="row">
+    <button id="configureTurn" class="secondary">Configure TURN</button>
+    <button id="forgetTurn" class="secondary">Forget saved TURN</button>
+    <span id="turnStatus">TURN not configured</span>
+    <button id="download" class="secondary">Download clean HTML</button>
+  </div>
+  <p class="small">
+    No TURN IP address is embedded. Enter an IPv4 address or hostname when
+    prompted. It is stored in this browser's cookie, not hidden from its user.
+    Port: 3489. Static test credentials are public in the source.
+  </p>
+</section>
+
+<section id="startPanel" class="panel">
+  <h2>Create or join</h2>
+  <div class="row">
+    <label>Your name
+      <input id="name" maxlength="64" placeholder="Your name">
+    </label>
+    <label>Role
+      <select id="role">
+        <option value="teacher">Teacher</option>
+        <option value="student">Student</option>
+      </select>
+    </label>
+    <label>Classroom name
+      <input id="roomName" maxlength="64" placeholder="Class A">
+    </label>
+    <button id="create">Create classroom</button>
+  </div>
+  <p class="small">
+    A joining participant's invitation determines their role.
+    Selecting Teacher does not grant access to another classroom.
+    Each created lesson receives a unique session ID.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>Pair browsers</h2>
+
+  <div id="hostPairControls" class="row hidden">
+    <label>Invite as
+      <select id="inviteRole">
+        <option value="student">Student</option>
+        <option value="teacher">Additional teacher</option>
+      </select>
+    </label>
+    <button id="makeInvite">Create invitation</button>
+    <button id="acceptAnswer">Accept pasted answer</button>
+  </div>
+
+  <div id="joinPairControls" class="row">
+    <button id="join">Join using pasted invitation</button>
+  </div>
+
+  <p class="small">
+    Coordinator: create an invitation and send it privately.
+    Recipient: paste invitation, click Join, and send the generated answer back.
+    Coordinator: paste that answer and accept it.
+    Create a separate invitation for every participant.
+  </p>
+
+  <label>Received invitation or answer
+    <textarea id="pairIn" spellcheck="false"></textarea>
+  </label>
+  <label>Generated invitation or answer
+    <textarea id="pairOut" spellcheck="false" readonly></textarea>
+  </label>
+
+  <div class="row">
+    <button id="copy" class="secondary">Copy generated text</button>
+    <button id="clearPair" class="secondary">Clear displayed pairing text</button>
+  </div>
+
+  <p class="small warning">
+    Exchange pairing text privately. It contains connection information and
+    acts as admission material. There is no account-authentication backend.
+  </p>
+</section>
+
+<section class="panel">
+  <div id="syncStatus">Not in a classroom</div>
+  <div id="notice" role="status">Ready.</div>
+</section>
+
+<section id="roomPanel" class="panel hidden">
+  <h2 id="roomTitle"></h2>
+
+  <div id="teacherControls">
+    <h2>Shared classroom settings</h2>
+
+    <div class="row">
+      <label>Rows
+        <input id="rows" type="number" min="1" max="12" value="5">
+      </label>
+      <label>Columns
+        <input id="cols" type="number" min="1" max="12" value="8">
+      </label>
+      <label>Preview size
+        <select id="width">
+          <option value="160">160 × 90</option>
+          <option value="256" selected>256 × 144</option>
+          <option value="320">320 × 180</option>
+        </select>
+      </label>
+      <label>Frames per second
+        <select id="fps">
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </label>
+      <label>Disabled seats
+        <input id="disabledSeats" placeholder="6, 12, 18">
+      </label>
+      <label>Student seat changes
+        <select id="locked">
+          <option value="false">Allowed</option>
+          <option value="true">Locked</option>
+        </select>
+      </label>
+      <button id="applyLayout">Apply shared settings</button>
+      <button id="resetDraft" class="secondary">Discard local draft</button>
+    </div>
+
+    <p id="draftStatus" class="small"></p>
+    <p class="small">
+      Maximum 64 positions. Occupied seats cannot be removed or disabled.
+      Incoming updates preserve unsent settings drafts.
+      All admitted teachers can edit; the coordinator serializes changes.
+    </p>
+
+    <div class="row">
+      <label>Participant
+        <select id="participant"></select>
+      </label>
+      <label>Destination seat
+        <select id="moveSeat"></select>
+      </label>
+      <button id="move">Move participant</button>
+      <button id="remove" class="danger">Remove participant</button>
+    </div>
+    <hr>
+  </div>
+
+  <div class="row">
+    <label>My seat
+      <select id="mySeat"></select>
+    </label>
+    <button id="chooseSeat">Choose my seat</button>
+    <button id="share">Share screen</button>
+    <button id="stop" class="danger">Stop sharing</button>
+    <label>Local viewing mode
+      <select id="view">
+        <option value="fit">Fit classroom width</option>
+        <option value="scroll">Scroll larger tiles</option>
+      </select>
+    </label>
+  </div>
+
+  <p class="small">
+    Tap a tile to enlarge. Enlargement does not recover detail missing from a
+    tiny preview. Students receive classroom seat metadata but not other
+    students' screen video. Health is measured independently by each viewer.
+  </p>
+</section>
+
+<section id="gridPanel" class="panel hidden">
+  <div id="gridViewport"><div id="grid"></div></div>
+</section>
+
+<details class="panel">
+  <summary>Diagnostics, limitations, and review notes</summary>
+  <pre id="log"></pre>
+  <ul class="small">
+    <li>No automatic discovery, account login, or coordinator failover.</li>
+    <li>coturn is a relay, not a signaling server, database, or SFU.</li>
+    <li>Additional teachers increase coordinator upload and processing.</li>
+    <li>Layout defaults persist locally by classroom name.</li>
+    <li>Background throttling and device sleep may interrupt updates.</li>
+    <li>Grey means unavailable or uncertain, not proof of misconduct.</li>
+    <li>Static desktops can remain healthy if encoded frames continue arriving.</li>
+    <li>Bitrate settings are targets, not guaranteed total bandwidth.</li>
+    <li>Long sessions can accumulate stopped SDP sections.</li>
+    <li>Production needs authenticated signaling, temporary TURN credentials,
+      persistent authority, and usually an SFU for multiple viewers.</li>
+  </ul>
+</details>
+
+<dialog id="zoom">
+  <h2 id="zoomTitle">Screen</h2>
+  <video id="zoomVideo" autoplay muted playsinline></video>
+  <p id="zoomStatus"></p>
+  <button id="closeZoom">Close</button>
+</dialog>
+</main>
+
+<script>
+"use strict";
+
+/*
+===========================================================================
+CLASSROOM MONITOR v3 — DEVELOPER / AI AGENT DOCUMENTATION
+===========================================================================
+
+PURPOSE
+Single-file HTTPS frontend prototype for tiny TURN-relayed screen previews.
+
+DO NOT CLAIM
+- Account-based authentication.
+- Automatic discovery or signaling.
+- Server-side persistence.
+- Coordinator failover.
+- Proof that the intended desktop was selected.
+- Successful 40-device testing without actually performing it.
+
+BOOTSTRAP
+Initial SDP uses private copy/paste invitations and answers.
+After pairing, configuration and renegotiation use WebRTC DataChannels.
+Every peer connection uses iceTransportPolicy: "relay".
+
+AUTHORITY / ISOLATION
+The creating teacher is the single configuration authority.
+Each admitted link is bound to classroom ID, session ID, participant ID and role.
+Identity comes from the admitted connection, not from an edit payload.
+Private invitations are bearer admission material, not account authentication.
+Students receive room metadata but not other students' video.
+
+CONFIGURATION
+Edits carry requestId and baseRevision.
+Authority serializes edits and sends complete revisioned snapshots.
+Stale edits receive explicit rejection and current state.
+Pending timers and acknowledgements affect only matching request IDs.
+Local settings drafts have version counters so later typing is not erased
+by acknowledgement of an earlier submission.
+Shared layout and local receiver health are intentionally separate.
+
+TRANSCEIVERS
+One reserved upload transceiver per participant:
+  coordinator: recvonly
+  participant: sendonly
+Forwarded screens use explicit separate sendonly transceivers.
+Never replace this with addTrack without considering transceiver reuse.
+Removed forwarding transceivers are stopped and renegotiated.
+A production implementation should reuse a managed transceiver pool or an SFU.
+
+NEGOTIATION
+Only the coordinator makes subsequent offers.
+One outstanding renegotiation offer per connection.
+ICE gathering completes before sending SDP: non-trickle ICE.
+Frames split large DataChannel messages with queue and reassembly bounds.
+
+LIVENESS
+Validate message envelopes before updating lastSeen.
+Process heartbeat liveness before the asynchronous SDP handler queue.
+Heartbeat liveness does NOT prove fresh desktop capture.
+
+STREAM IDENTITY
+Publishing sessions have unique stream IDs.
+Manifests bind participant + publishing-session ID to receiver transceiver MID.
+Track events can precede manifests.
+Receiver cleanup preserves early live tracks but removes ended/inactive ones.
+
+CAPTURE
+Explicit getDisplayMedia permission is mandatory.
+Capture objects have identity, cancelled and ended flags.
+Old source-ended events cannot stop a replacement capture.
+Start/stop are guarded across asynchronous replaceTrack operations.
+Canvas draws are low resolution and low FPS.
+A draw timestamp is not proof of original desktop freshness.
+
+HEALTH
+Check transport, track availability, playback and decoded/presented progress.
+After asynchronous stats, recheck participant and source identity.
+No recent frames is labelled "Possibly stalled", not certain failure.
+A static desktop may keep producing frames and remain healthy.
+
+CHANGES IN v3
+- Heartbeats bypass slow SDP application processing.
+- Receiving sources retain transceiver references for safe cleanup.
+- Draft-version-aware acknowledgements.
+- Sender caps reapplied after negotiation.
+- Removal clears receiving state and pending edits.
+- Explicit request and connection lifecycle guards.
+
+FOR FUTURE CHANGES
+Document reason, protocol compatibility, authorization effects,
+resource cleanup, tests performed, and known limitations.
+===========================================================================
+*/
+
+// Snapshot source before runtime configuration or pairing data is displayed.
+// Downloaded source does not intentionally contain the entered TURN address.
+const CLEAN_HTML = "<!doctype html>\n" + document.documentElement.outerHTML;
+
+const $ = id => document.getElementById(id);
+const uuid = () => crypto.randomUUID();
+
+const VERSION = 3;
+const PORT = 3489;
+
+// Public test credentials, not secrets.
+// Production should obtain short-lived credentials from an authenticated backend.
+const TURN_USERNAME = "username";
+const TURN_PASSWORD = "password";
+
+const COOKIE = "classroom_turn_host_v3";
+const COOKIE_PATH =
+  location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1) || "/";
+
+const MAX_SEATS = 64;
+const STALE_MS = 30000;
+const HEARTBEAT_MS = 5000;
+const OFFLINE_MS = 25000;
+const FRAME_SIZE = 8000;
+const MAX_MESSAGE = 2000000;
+const MAX_QUEUE = 4000000;
+
+let turnHost = "";
+let room = null;
+let selfId = "";
+let isCoordinator = false;
+let upstream = null;
+let removed = false;
+let pendingEdit = null;
+let layoutDirty = false;
+let layoutDraftVersion = 0;
+let capture = null;
+let mediaBusy = false;
+let pairingBusy = false;
+let healthBusy = false;
+let zoomPerson = null;
+
+// Coordinator: linkId -> admitted or pending connection.
+const links = new Map();
+
+// participantId -> current local/received source.
+const sources = new Map();
+
+// Joining teacher: MID -> receiver source; manifest can arrive later.
+const receivedByMid = new Map();
+let manifest = [];
+
+// Stable seat DOM objects.
+const tiles = new Map();
+
+function log(text) {
+  $("log").textContent =
+    `[${new Date().toLocaleTimeString()}] ${text}\n` +
+    $("log").textContent.slice(0, 18000);
+}
+
+function notice(text) {
+  $("notice").textContent = text;
+}
+
+function report(error) {
+  const text = error?.message || String(error);
+  notice(text);
+  log(text);
+}
+
+function action(id, handler) {
+  $(id).addEventListener("click", async () => {
+    if ($(id).dataset.running) return;
+    $(id).dataset.running = "1";
+    refreshControls();
+
+    try {
+      await handler();
+    } catch (error) {
+      report(error);
+    } finally {
+      delete $(id).dataset.running;
+      refreshControls();
+    }
+  });
+}
+
+function validHost(value) {
+  if (!value || value.length > 253) return false;
+
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(value)) {
+    return value.split(".").every(
+      part => Number(part) >= 0 && Number(part) <= 255
+    );
+  }
+
+  return value.split(".").every(part =>
+    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(part)
+  );
+}
+
+function readCookie() {
+  const entry = document.cookie.split(";")
+    .map(value => value.trim())
+    .find(value => value.startsWith(COOKIE + "="));
+
+  try {
+    return entry
+      ? decodeURIComponent(entry.slice(COOKIE.length + 1))
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+function writeCookie(value, age) {
+  document.cookie =
+    `${COOKIE}=${encodeURIComponent(value)}; Max-Age=${age}` +
+    `; Path=${COOKIE_PATH}; SameSite=Lax` +
+    (location.protocol === "https:" ? "; Secure" : "");
+}
+
+function configureTurn() {
+  const value = prompt(
+    `Enter coturn IPv4 address or hostname only.\nPort ${PORT} is used.\n` +
+    "Do not include a protocol, path, or port.",
+    ""
+  );
+
+  if (value === null) return false;
+
+  const host = value.trim().toLowerCase();
+  if (!validHost(host)) {
+    throw new Error("Invalid IPv4 address or hostname.");
+  }
+
+  turnHost = host;
+  writeCookie(host, 31536000);
+  $("turnStatus").textContent = "TURN saved — connection not yet tested";
+  return true;
+}
+
+function connectionConfig() {
+  if (!turnHost && !configureTurn()) {
+    throw new Error("TURN configuration is required.");
+  }
+
+  return {
+    iceServers: [{
+      urls: [
+        `turn:${turnHost}:${PORT}?transport=udp`,
+        `turn:${turnHost}:${PORT}?transport=tcp`
+      ],
+      username: TURN_USERNAME,
+      credential: TURN_PASSWORD
+    }],
+    iceTransportPolicy: "relay"
+  };
+}
+
+function me() {
+  return room?.participants.find(person => person.id === selfId);
+}
+
+function teacher() {
+  return me()?.role === "teacher";
+}
+
+function synchronized() {
+  if (!room || removed || room.revision < 1) return false;
+  if (isCoordinator) return true;
+
+  return !!(
+    upstream?.active &&
+    upstream.dc?.readyState === "open" &&
+    upstream.pc.connectionState === "connected" &&
+    Date.now() - upstream.lastSeen < OFFLINE_MS
+  );
+}
+
+function envelope(type, extra = {}) {
+  return {
+    protocol: VERSION,
+    roomId: room.id,
+    sessionId: room.sessionId,
+    type,
+    ...extra
+  };
+}
+
+function envelopeMatches(message) {
+  return !!(
+    room &&
+    message &&
+    message.protocol === VERSION &&
+    message.roomId === room.id &&
+    message.sessionId === room.sessionId
+  );
+}
+
+function refreshControls() {
+  const ready = synchronized();
+
+  $("startPanel").classList.toggle("hidden", !!room);
+  $("hostPairControls").classList.toggle("hidden", !isCoordinator);
+  $("joinPairControls").classList.toggle("hidden", !!room || pairingBusy);
+  $("roomPanel").classList.toggle("hidden", !room);
+  $("gridPanel").classList.toggle("hidden", !room);
+  $("teacherControls").classList.toggle("hidden", !teacher());
+
+  const disabled = {
+    create: !!room || pairingBusy || $("role").value !== "teacher",
+    join: !!room || pairingBusy,
+    makeInvite: !isCoordinator || pairingBusy,
+    acceptAnswer: !isCoordinator || pairingBusy,
+    applyLayout: !ready || !teacher() || !!pendingEdit,
+    move: !ready || !teacher() || !!pendingEdit,
+    remove: !ready || !teacher() || !!pendingEdit,
+    chooseSeat: !ready || !!pendingEdit ||
+      (!!room?.layout.locked && !teacher()),
+    share: !ready || mediaBusy || !!capture || !me()?.slot,
+    stop: !capture || mediaBusy
+  };
+
+  for (const button of document.querySelectorAll("button")) {
+    button.disabled =
+      !!button.dataset.running || !!disabled[button.id];
+  }
+
+  $("syncStatus").textContent = !room
+    ? "Not in a classroom"
+    : removed
+      ? "Removed from classroom — reload to join again"
+      : ready
+        ? isCoordinator
+          ? "Coordinator online"
+          : "Configuration synchronized"
+        : "Configuration out of sync / connecting";
+
+  $("syncStatus").style.color = ready ? "#86efac" : "#fbbf24";
+
+  $("draftStatus").textContent = layoutDirty
+    ? "Unsent local draft. Shared updates have not overwritten it."
+    : "Displaying committed classroom settings.";
+}
+
+/*
+ * DataChannel framing:
+ * Per-link reassembly, bounded fragments, conflicting-duplicate rejection,
+ * bounded completed-ID cache, and bufferedAmount backpressure.
+ */
+function send(link, message) {
+  if (!link?.active || link.dc?.readyState !== "open") return false;
+
+  const text = JSON.stringify(message);
+  if (text.length > MAX_MESSAGE) {
+    throw new Error("Message size limit exceeded.");
+  }
+
+  const id = uuid();
+  const count = Math.max(1, Math.ceil(text.length / FRAME_SIZE));
+  const frames = [];
+
+  for (let index = 0; index < count; index++) {
+    frames.push(JSON.stringify({
+      id,
+      i: index,
+      n: count,
+      s: text.slice(index * FRAME_SIZE, (index + 1) * FRAME_SIZE)
+    }));
+  }
+
+  const total = frames.reduce((sum, frame) => sum + frame.length, 0);
+  if (link.queueSize + total > MAX_QUEUE) {
+    throw new Error("Send queue overloaded. Reconnect the affected participant.");
+  }
+
+  link.queue.push(...frames);
+  link.queueSize += total;
+  pump(link);
+  return true;
+}
+
+function safeSend(link, message) {
+  try {
+    return send(link, message);
+  } catch (error) {
+    log(error.message);
+    return false;
+  }
+}
+
+function pump(link) {
+  if (!link.active || link.dc?.readyState !== "open") return;
+
+  try {
+    while (link.queue.length && link.dc.bufferedAmount < 262144) {
+      const frame = link.queue[0];
+      link.dc.send(frame);
+      link.queue.shift();
+      link.queueSize -= frame.length;
+    }
+  } catch (error) {
+    log("DataChannel send failed: " + error.message);
+  }
+}
+
+function cleanInbox(link) {
+  const now = Date.now();
+
+  for (const [id, value] of link.inbox) {
+    if (now - value.at > 30000) {
+      link.inboxSize -= value.size;
+      link.inbox.delete(id);
+    }
+  }
+
+  for (const [id, at] of link.completed) {
+    if (now - at > 60000) link.completed.delete(id);
+  }
+}
+
+function receiveFrame(link, raw) {
+  if (!link.active || typeof raw !== "string" || raw.length > 60000) {
+    return;
+  }
+
+  const frame = JSON.parse(raw);
+
+  if (
+    typeof frame.id !== "string" || frame.id.length > 80 ||
+    typeof frame.s !== "string" || frame.s.length > FRAME_SIZE ||
+    !Number.isInteger(frame.n) || frame.n < 1 || frame.n > 250 ||
+    !Number.isInteger(frame.i) || frame.i < 0 || frame.i >= frame.n
+  ) {
+    throw new Error("Invalid transport frame.");
+  }
+
+  cleanInbox(link);
+  if (link.completed.has(frame.id)) return;
+
+  let partial = link.inbox.get(frame.id);
+
+  if (!partial) {
+    if (link.inbox.size >= 8) {
+      throw new Error("Too many incomplete messages.");
+    }
+
+    partial = {
+      at: Date.now(),
+      n: frame.n,
+      parts: new Map(),
+      size: 0
+    };
+    link.inbox.set(frame.id, partial);
+  }
+
+  if (partial.n !== frame.n) {
+    throw new Error("Conflicting frame count.");
+  }
+
+  if (partial.parts.has(frame.i)) {
+    if (partial.parts.get(frame.i) !== frame.s) {
+      throw new Error("Conflicting duplicate fragment.");
+    }
+    return;
+  }
+
+  if (link.inboxSize + frame.s.length > MAX_MESSAGE) {
+    throw new Error("Receive buffer limit exceeded.");
+  }
+
+  partial.parts.set(frame.i, frame.s);
+  partial.size += frame.s.length;
+  link.inboxSize += frame.s.length;
+
+  if (partial.parts.size !== partial.n) return;
+
+  const text = Array.from(
+    { length: partial.n },
+    (_, index) => partial.parts.get(index)
+  ).join("");
+
+  link.inbox.delete(frame.id);
+  link.inboxSize -= partial.size;
+  link.completed.set(frame.id, Date.now());
+
+  while (link.completed.size > 256) {
+    link.completed.delete(link.completed.keys().next().value);
+  }
+
+  const message = JSON.parse(text);
+
+  // Liveness must not wait behind asynchronous SDP handling.
+  if (!link.active || !envelopeMatches(message)) {
+    throw new Error("Message belongs to another classroom/session.");
+  }
+
+  link.lastSeen = Date.now();
+  if (message.type === "heartbeat") return;
+
+  // Bound queued application work as well as fragment buffers.
+  if (link.pendingHandlers >= 128) {
+    throw new Error("Application message queue limit exceeded.");
+  }
+
+  link.pendingHandlers++;
+
+  link.receiveChain = link.receiveChain
+    .then(() => handleMessage(link, message))
+    .catch(error => log("Message rejected: " + error.message))
+    .finally(() => {
+      link.pendingHandlers--;
+    });
+}
+
+/** Create a connection bound to a participant and an assigned role. */
+function createLink(id, participantId, role, hostSide) {
+  const pc = new RTCPeerConnection(connectionConfig());
+
+  const link = {
+    id,
+    participantId,
+    role,
+    hostSide,
+    pc,
+    active: true,
+    admitted: false,
+    name: role === "teacher" ? "Teacher" : "Student",
+    dc: null,
+    upload: null,
+    queue: [],
+    queueSize: 0,
+    inbox: new Map(),
+    inboxSize: 0,
+    completed: new Map(),
+    receiveChain: Promise.resolve(),
+    pendingHandlers: 0,
+    lastSeen: Date.now(),
+    forwards: new Map(),
+    dirty: false,
+    preparing: false,
+    waitingAnswer: false,
+    negotiationFailed: false,
+    offerTimer: null,
+    editTimes: []
+  };
+
+  pc.onicecandidateerror = () => {
+    // Never log entered TURN addresses, credentials, or full SDP.
+    log("An ICE server attempt failed; check TURN if the connection does not establish.");
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (!link.active) return;
+
+    log(
+      `${hostSide ? "Participant" : "Coordinator"}: ` +
+      pc.connectionState
+    );
+
+    if (hostSide && room) {
+      const person = room.participants.find(
+        value => value.id === participantId
+      );
+
+      const online =
+        pc.connectionState === "connected" &&
+        link.dc?.readyState === "open";
+
+      if (person && person.online !== online) {
+        person.online = online;
+        commit();
+      }
+    }
+
+    render();
+  };
+
+  pc.ontrack = event => {
+    if (!link.active || event.track.kind !== "video") return;
+
+    const stream = event.streams[0] || new MediaStream([event.track]);
+    const source = {
+      track: event.track,
+      stream,
+      receiver: event.receiver,
+      transceiver: event.transceiver,
+      pc,
+      local: false,
+      version: uuid()
+    };
+
+    if (hostSide) {
+      // Identity is bound to the reserved upload transceiver.
+      if (event.transceiver !== link.upload) return;
+
+      sources.set(participantId, source);
+
+      event.track.addEventListener("ended", () => {
+        if (
+          !link.active ||
+          sources.get(participantId)?.track !== event.track
+        ) return;
+
+        sources.delete(participantId);
+
+        const person = room?.participants.find(
+          value => value.id === participantId
+        );
+
+        if (person) {
+          person.sharing = false;
+          person.streamId = null;
+          commit();
+        }
+      }, { once: true });
+
+      render();
+      reconcileAll();
+
+    } else {
+      const mid = event.transceiver.mid;
+      if (mid === null) return;
+
+      receivedByMid.set(mid, source);
+
+      event.track.addEventListener("ended", () => {
+        if (receivedByMid.get(mid)?.track === event.track) {
+          receivedByMid.delete(mid);
+          bindManifest();
+        }
+      }, { once: true });
+
+      bindManifest();
+    }
+  };
+
+  pc.onnegotiationneeded = () => {
+    if (hostSide && link.dc?.readyState === "open") {
+      link.dirty = true;
+      void negotiate(link);
+    }
+  };
+
+  pc.ondatachannel = event => {
+    if (link.dc) {
+      event.channel.close();
+      return;
+    }
+    attachChannel(link, event.channel);
+  };
+
+  return link;
+}
+
+function attachChannel(link, dc) {
+  link.dc = dc;
+  dc.bufferedAmountLowThreshold = 65536;
+
+  dc.onbufferedamountlow = () => pump(link);
+
+  dc.onmessage = event => {
+    try {
+      receiveFrame(link, event.data);
+    } catch (error) {
+      log(error.message);
+    }
+  };
+
+  dc.onclose = () => {
+    if (!link.active) return;
+
+    if (link.hostSide && room) {
+      const person = room.participants.find(
+        value => value.id === link.participantId
+      );
+
+      if (person && person.online) {
+        person.online = false;
+        commit();
+      }
+    }
+
+    render();
+  };
+
+  dc.onopen = () => {
+    if (!link.active) return;
+
+    link.lastSeen = Date.now();
+
+    if (link.hostSide) {
+      let person = room.participants.find(
+        value => value.id === link.participantId
+      );
+
+      if (!person) {
+        person = {
+          id: link.participantId,
+          name: link.name,
+          role: link.role,
+          slot: null,
+          online: true,
+          sharing: false,
+          streamId: null
+        };
+        room.participants.push(person);
+      } else {
+        person.online = true;
+      }
+
+      link.admitted = true;
+
+      // Includes coordinator sources, including for late-joining teachers.
+      commit();
+
+    } else {
+      link.admitted = true;
+      safeSend(link, envelope("sync"));
+      notice("Paired. Waiting for the coordinator's classroom state.");
+    }
+
+    render();
+  };
+}
+
+function closeLink(link) {
+  if (!link) return;
+
+  link.active = false;
+  clearTimeout(link.offerTimer);
+  link.offerTimer = null;
+  link.queue = [];
+  link.queueSize = 0;
+  link.inbox.clear();
+  link.completed.clear();
+
+  try { link.dc?.close(); } catch {}
+  try { link.pc.close(); } catch {}
+
+  link.forwards.clear();
+}
+
+/** Complete ICE gathering before exchanging SDP. */
+async function completeDescription(pc) {
+  if (pc.iceGatheringState !== "complete") {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error("ICE gathering timed out. Verify coturn connectivity."));
+      }, 30000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        pc.removeEventListener("icegatheringstatechange", check);
+        pc.removeEventListener("connectionstatechange", check);
+      }
+
+      function check() {
+        if (pc.connectionState === "closed") {
+          cleanup();
+          reject(new Error("Connection closed during ICE gathering."));
+        } else if (pc.iceGatheringState === "complete") {
+          cleanup();
+          resolve();
+        }
+      }
+
+      pc.addEventListener("icegatheringstatechange", check);
+      pc.addEventListener("connectionstatechange", check);
+      check();
+    });
+  }
+
+  const description = pc.localDescription;
+
+  if (!description?.sdp?.includes(" typ relay")) {
+    throw new Error(
+      "No TURN relay candidate obtained. Check host, port, credentials and firewall."
+    );
+  }
+
+  return {
+    type: description.type,
+    sdp: description.sdp
+  };
+}
+
+/*
+ * Coordinator-only negotiation.
+ * Dirty changes wait for the outstanding answer.
+ * A failed negotiation is explicitly diagnosed; automatic ICE recovery is
+ * not implemented in this prototype.
+ */
+async function negotiate(link) {
+  if (
+    !link.active || !link.hostSide ||
+    link.dc?.readyState !== "open" ||
+    !link.dirty || link.preparing || link.waitingAnswer ||
+    link.negotiationFailed ||
+    link.pc.signalingState !== "stable"
+  ) return;
+
+  link.preparing = true;
+  link.dirty = false;
+
+  try {
+    await link.pc.setLocalDescription(await link.pc.createOffer());
+    const description = await completeDescription(link.pc);
+
+    if (!link.active) return;
+
+    link.waitingAnswer = true;
+
+    if (!safeSend(link, envelope("offer", { description }))) {
+      throw new Error("Could not send renegotiation offer.");
+    }
+
+    link.offerTimer = setTimeout(() => {
+      if (link.active && link.waitingAnswer) {
+        log(
+          `Video negotiation is delayed for ${link.name}. ` +
+          "If it does not recover, remove and invite that participant again."
+        );
+      }
+    }, 45000);
+
+  } catch (error) {
+    link.negotiationFailed = true;
+    log(
+      "Renegotiation failed; remove and re-pair the affected participant: " +
+      error.message
+    );
+  } finally {
+    link.preparing = false;
+
+    if (
+      link.active && link.dirty &&
+      !link.waitingAnswer && !link.negotiationFailed
+    ) {
+      setTimeout(() => void negotiate(link), 0);
+    }
+  }
+}
+
+function parsePairing() {
+  const text = $("pairIn").value.trim();
+
+  if (!text || text.length > MAX_MESSAGE) {
+    throw new Error("Invalid pairing input.");
+  }
+
+  const value = JSON.parse(text);
+
+  if (
+    value.protocol !== VERSION ||
+    !["roomId", "sessionId", "linkId", "participantId"].every(
+      key => typeof value[key] === "string" &&
+        value[key].length > 0 && value[key].length < 100
+    ) ||
+    typeof value.description?.sdp !== "string"
+  ) {
+    throw new Error("Malformed pairing data or incompatible page version.");
+  }
+
+  return value;
+}
+
+function storageKey(name) {
+  return "classroom-layout-v3:" + name.trim().toLowerCase();
+}
+
+function validateLayout(value, participants = []) {
+  if (!value) throw new Error("Missing layout.");
+
+  const rows = Number(value.rows);
+  const cols = Number(value.cols);
+  const width = Number(value.width);
+  const fps = Number(value.fps);
+
+  if (
+    !Number.isInteger(rows) || !Number.isInteger(cols) ||
+    rows < 1 || cols < 1 || rows > 12 || cols > 12 ||
+    rows * cols > MAX_SEATS ||
+    ![160, 256, 320].includes(width) ||
+    ![1, 2].includes(fps) ||
+    !Array.isArray(value.disabled)
+  ) {
+    throw new Error(
+      "Invalid layout: use 1–64 seats and supported preview settings."
+    );
+  }
+
+  const disabled = [...new Set(value.disabled.map(Number))];
+
+  if (disabled.some(
+    seat => !Number.isInteger(seat) ||
+      seat < 1 || seat > rows * cols
+  )) {
+    throw new Error("A disabled seat is outside the classroom grid.");
+  }
+
+  for (const person of participants) {
+    if (
+      person.slot &&
+      (person.slot > rows * cols || disabled.includes(person.slot))
+    ) {
+      throw new Error(
+        `Move ${person.name} before removing or disabling seat ${person.slot}.`
+      );
+    }
+  }
+
+  return {
+    rows,
+    cols,
+    width,
+    fps,
+    locked: value.locked === true,
+    disabled
+  };
+}
+
+function savedLayout(name) {
+  try {
+    const value = JSON.parse(localStorage.getItem(storageKey(name)));
+    if (value) return validateLayout(value);
+  } catch {}
+
+  return {
+    rows: 5,
+    cols: 8,
+    width: 256,
+    fps: 1,
+    locked: false,
+    disabled: []
+  };
+}
+
+function createRoom() {
+  if (room || pairingBusy) {
+    throw new Error("Reload to create another lesson.");
+  }
+
+  if ($("role").value !== "teacher") {
+    throw new Error("Select Teacher.");
+  }
+
+  if (!turnHost && !configureTurn()) return;
+
+  isCoordinator = true;
+  selfId = uuid();
+
+  const label = $("roomName").value.trim() || "Classroom";
+
+  room = {
+    id: uuid(),
+    sessionId: uuid(),
+    coordinatorId: selfId,
+    label,
+    revision: 1,
+    layout: savedLayout(label),
+    participants: [{
+      id: selfId,
+      name: $("name").value.trim() || "Coordinator",
+      role: "teacher",
+      slot: null,
+      online: true,
+      sharing: false,
+      streamId: null
+    }]
+  };
+
+  notice("Classroom created. Generate one private invitation per participant.");
+  render();
+}
+
+async function makeInvitation() {
+  if (!isCoordinator) {
+    throw new Error("Only the coordinator creates invitations.");
+  }
+
+  if (links.size >= 80) {
+    throw new Error("Connection limit reached. Remove unused participants.");
+  }
+
+  pairingBusy = true;
+  refreshControls();
+
+  let link;
+
+  try {
+    link = createLink(uuid(), uuid(), $("inviteRole").value, true);
+    links.set(link.id, link);
+
+    // Dedicated upload; never reused for a forwarded download.
+    link.upload = link.pc.addTransceiver("video", {
+      direction: "recvonly"
+    });
+
+    attachChannel(
+      link,
+      link.pc.createDataChannel("classroom-v3", { ordered: true })
+    );
+
+    await link.pc.setLocalDescription(await link.pc.createOffer());
+    const description = await completeDescription(link.pc);
+
+    $("pairOut").value = JSON.stringify({
+      protocol: VERSION,
+      kind: "invitation",
+      roomId: room.id,
+      sessionId: room.sessionId,
+      label: room.label,
+      linkId: link.id,
+      participantId: link.participantId,
+      role: link.role,
+      description
+    });
+
+    notice("Invitation generated. Send it privately to the intended participant.");
+
+  } catch (error) {
+    if (link) {
+      closeLink(link);
+      links.delete(link.id);
+    }
+    throw error;
+
+  } finally {
+    pairingBusy = false;
+    refreshControls();
+  }
+}
+
+async function joinInvitation() {
+  if (room || pairingBusy) {
+    throw new Error("Reload before joining another lesson.");
+  }
+
+  const invitation = parsePairing();
+
+  if (
+    invitation.kind !== "invitation" ||
+    invitation.description.type !== "offer" ||
+    !["teacher", "student"].includes(invitation.role)
+  ) {
+    throw new Error("Paste a valid invitation.");
+  }
+
+  pairingBusy = true;
+  refreshControls();
+
+  try {
+    selfId = invitation.participantId;
+    isCoordinator = false;
+    removed = false;
+
+    room = {
+      id: invitation.roomId,
+      sessionId: invitation.sessionId,
+      coordinatorId: "",
+      label: String(invitation.label || "Classroom").slice(0, 64),
+      revision: 0,
+      layout: savedLayout(""),
+      participants: [{
+        id: selfId,
+        name: $("name").value.trim() || invitation.role,
+        role: invitation.role,
+        slot: null,
+        online: false,
+        sharing: false,
+        streamId: null
+      }]
+    };
+
+    upstream = createLink(
+      invitation.linkId,
+      selfId,
+      invitation.role,
+      false
+    );
+
+    await upstream.pc.setRemoteDescription(invitation.description);
+
+    const upload = upstream.pc.getTransceivers().find(
+      transceiver => transceiver.receiver.track.kind === "video"
+    );
+
+    if (!upload) {
+      throw new Error("Invitation lacks its reserved upload transceiver.");
+    }
+
+    upload.direction = "sendonly";
+    upstream.upload = upload;
+
+    await upstream.pc.setLocalDescription(await upstream.pc.createAnswer());
+    const description = await completeDescription(upstream.pc);
+
+    $("pairOut").value = JSON.stringify({
+      protocol: VERSION,
+      kind: "answer",
+      roomId: room.id,
+      sessionId: room.sessionId,
+      linkId: upstream.id,
+      participantId: selfId,
+      name: me().name,
+      description
+    });
+
+    notice("Answer generated. Send it to the coordinator for acceptance.");
+    render();
+
+  } catch (error) {
+    closeLink(upstream);
+    upstream = null;
+    room = null;
+    receivedByMid.clear();
+    manifest = [];
+    sources.clear();
+    throw error;
+
+  } finally {
+    pairingBusy = false;
+    refreshControls();
+  }
+}
+
+async function acceptAnswer() {
+  if (!isCoordinator) {
+    throw new Error("Only the coordinator accepts answers.");
+  }
+
+  const answer = parsePairing();
+
+  if (
+    answer.kind !== "answer" ||
+    answer.description.type !== "answer" ||
+    answer.roomId !== room.id ||
+    answer.sessionId !== room.sessionId
+  ) {
+    throw new Error("Answer belongs to another classroom or lesson.");
+  }
+
+  const link = links.get(answer.linkId);
+
+  if (
+    !link?.active ||
+    link.admitted ||
+    link.participantId !== answer.participantId ||
+    link.pc.signalingState !== "have-local-offer"
+  ) {
+    throw new Error("Unknown, expired, or already accepted invitation.");
+  }
+
+  link.name = String(answer.name || link.role).slice(0, 64);
+  await link.pc.setRemoteDescription(answer.description);
+  notice("Answer accepted. Establishing the TURN connection.");
+}
+
+/** Commit actual state changes and send complete authoritative snapshots. */
+function commit() {
+  if (!isCoordinator || !room) return;
+
+  room.revision++;
+
+  try {
+    localStorage.setItem(
+      storageKey(room.label),
+      JSON.stringify(room.layout)
+    );
+  } catch {
+    log("Layout defaults could not be saved in browser storage.");
+  }
+
+  for (const link of links.values()) {
+    if (link.admitted) {
+      safeSend(link, envelope("snapshot", { state: room }));
+    }
+  }
+
+  render();
+  reconcileAll();
+}
+
+/**
+ * Permission enforcement:
+ * actorId comes from the admitted connection, not an edit payload.
+ */
+function applyEdit(actorId, edit) {
+  const actor = room.participants.find(person => person.id === actorId);
+
+  if (!actor || !edit || typeof edit.kind !== "string") {
+    throw new Error("Invalid actor or edit.");
+  }
+
+  if (edit.kind === "layout") {
+    if (actor.role !== "teacher") {
+      throw new Error("Teacher permission required.");
+    }
+
+    room.layout = validateLayout(edit.layout, room.participants);
+
+  } else if (edit.kind === "seat") {
+    if (actor.role !== "teacher" && room.layout.locked) {
+      throw new Error("Student seat changes are locked.");
+    }
+
+    const targetId =
+      actor.role === "teacher" ? edit.participantId : actorId;
+
+    const target = room.participants.find(person => person.id === targetId);
+    const slot = Number(edit.slot);
+
+    if (
+      !target || !Number.isInteger(slot) ||
+      slot < 1 || slot > room.layout.rows * room.layout.cols ||
+      room.layout.disabled.includes(slot)
+    ) {
+      throw new Error("Invalid destination seat.");
+    }
+
+    if (room.participants.some(
+      person => person.id !== targetId && person.slot === slot
+    )) {
+      throw new Error("That seat is already reserved.");
+    }
+
+    target.slot = slot;
+
+  } else if (edit.kind === "remove") {
+    if (actor.role !== "teacher") {
+      throw new Error("Teacher permission required.");
+    }
+
+    if (edit.participantId === room.coordinatorId) {
+      throw new Error("The coordinator cannot be removed.");
+    }
+
+    const target = room.participants.find(
+      person => person.id === edit.participantId
+    );
+
+    if (!target) {
+      throw new Error("Participant no longer exists.");
+    }
+
+    for (const [id, link] of links) {
+      if (link.participantId === target.id) {
+        safeSend(link, envelope("removed"));
+        links.delete(id);
+
+        // Prevent late messages from modifying state immediately.
+        link.active = false;
+        setTimeout(() => closeLink(link), 250);
+      }
+    }
+
+    sources.delete(target.id);
+    room.participants = room.participants.filter(
+      person => person.id !== target.id
+    );
+
+  } else {
+    throw new Error("Unsupported edit.");
+  }
+
+  commit();
+}
+
+function clearPending(requestId) {
+  if (!pendingEdit || pendingEdit.id !== requestId) return null;
+
+  const old = pendingEdit;
+  clearTimeout(old.timer);
+  pendingEdit = null;
+  return old;
+}
+
+function requestEdit(edit) {
+  if (!synchronized()) {
+    throw new Error("Configuration is out of sync.");
+  }
+
+  if (pendingEdit) {
+    throw new Error("Wait for the current edit.");
+  }
+
+  if (isCoordinator) {
+    applyEdit(selfId, edit);
+
+    if (edit.kind === "layout") {
+      layoutDirty = false;
+    }
+
+    render();
+    notice("Shared change committed.");
+    return;
+  }
+
+  const id = uuid();
+
+  const timer = setTimeout(() => {
+    if (!clearPending(id)) return;
+
+    notice(
+      "Edit acknowledgement timed out. Check current state before retrying."
+    );
+
+    safeSend(upstream, envelope("sync"));
+    refreshControls();
+  }, 15000);
+
+  pendingEdit = {
+    id,
+    edit,
+    timer,
+    draftVersion: edit.kind === "layout"
+      ? layoutDraftVersion
+      : null
+  };
+
+  if (!safeSend(upstream, envelope("edit", {
+    requestId: id,
+    baseRevision: room.revision,
+    edit
+  }))) {
+    clearPending(id);
+    throw new Error("Could not send the edit.");
+  }
+
+  refreshControls();
+}
+
+function permitEdit(link) {
+  const now = Date.now();
+
+  link.editTimes = link.editTimes.filter(
+    time => now - time < 10000
+  );
+
+  if (link.editTimes.length >= 30) return false;
+
+  link.editTimes.push(now);
+  return true;
+}
+
+function validateSnapshot(state) {
+  if (
+    state?.id !== room.id ||
+    state?.sessionId !== room.sessionId ||
+    !Number.isInteger(state.revision) ||
+    state.revision < 1 ||
+    typeof state.label !== "string" ||
+    state.label.length > 64 ||
+    !Array.isArray(state.participants) ||
+    state.participants.length > 81
+  ) {
+    throw new Error("Invalid snapshot.");
+  }
+
+  const ids = new Set();
+  const slots = new Set();
+
+  for (const person of state.participants) {
+    if (
+      typeof person.id !== "string" || person.id.length > 100 ||
+      ids.has(person.id) ||
+      typeof person.name !== "string" || person.name.length > 64 ||
+      !["teacher", "student"].includes(person.role) ||
+      typeof person.online !== "boolean" ||
+      typeof person.sharing !== "boolean" ||
+      (person.slot !== null &&
+        (!Number.isInteger(person.slot) || person.slot < 1)) ||
+      (person.streamId !== null &&
+        (typeof person.streamId !== "string" || person.streamId.length > 100))
+    ) {
+      throw new Error("Invalid participant snapshot.");
+    }
+
+    ids.add(person.id);
+
+    if (person.slot !== null) {
+      if (slots.has(person.slot)) {
+        throw new Error("Duplicate seat in snapshot.");
+      }
+      slots.add(person.slot);
+    }
+  }
+
+  validateLayout(state.layout, state.participants);
+}
+
+async function handleMessage(link, message) {
+  if (!link.active || !room) return;
+
+  // Defense in depth; receiveFrame already validated this envelope.
+  if (!envelopeMatches(message)) {
+    throw new Error("Message belongs to another classroom/session.");
+  }
+
+  if (message.type === "heartbeat") return;
+
+  if (link.hostSide) {
+    if (!link.admitted) {
+      throw new Error("Participant not admitted.");
+    }
+
+    if (message.type === "sync") {
+      safeSend(link, envelope("snapshot", { state: room }));
+      sendManifest(link);
+
+    } else if (message.type === "edit") {
+      if (
+        typeof message.requestId !== "string" ||
+        message.requestId.length > 100
+      ) {
+        throw new Error("Invalid request ID.");
+      }
+
+      try {
+        if (!permitEdit(link)) {
+          throw new Error("Too many edits; wait and retry.");
+        }
+
+        if (message.baseRevision !== room.revision) {
+          throw new Error(
+            "Settings changed elsewhere. Review current state and retry."
+          );
+        }
+
+        applyEdit(link.participantId, message.edit);
+
+        safeSend(link, envelope("ack", {
+          requestId: message.requestId
+        }));
+
+      } catch (error) {
+        safeSend(link, envelope("editError", {
+          requestId: message.requestId,
+          text: error.message
+        }));
+
+        safeSend(link, envelope("snapshot", { state: room }));
+      }
+
+    } else if (message.type === "publishing") {
+      if (!permitEdit(link)) {
+        throw new Error("Publishing updates rate-limited.");
+      }
+
+      const person = room.participants.find(
+        value => value.id === link.participantId
+      );
+
+      if (!person) throw new Error("Participant not admitted.");
+
+      const active = message.active === true;
+
+      if (
+        active &&
+        (!person.slot ||
+          typeof message.streamId !== "string" ||
+          message.streamId.length > 100)
+      ) {
+        throw new Error("Choose a seat before publishing.");
+      }
+
+      const streamId = active ? message.streamId : null;
+
+      // Redundant status messages must not churn configuration revisions.
+      if (
+        person.sharing !== active ||
+        person.streamId !== streamId
+      ) {
+        person.sharing = active;
+        person.streamId = streamId;
+        commit();
+      }
+
+    } else if (message.type === "answer") {
+      if (
+        !link.waitingAnswer ||
+        message.description?.type !== "answer"
+      ) {
+        throw new Error("Unexpected renegotiation answer.");
+      }
+
+      await link.pc.setRemoteDescription(message.description);
+
+      clearTimeout(link.offerTimer);
+      link.offerTimer = null;
+      link.waitingAnswer = false;
+
+      for (const item of link.forwards.values()) {
+        void limitSender(item.sender);
+      }
+
+      sendManifest(link);
+      void negotiate(link);
+    }
+
+  } else {
+    if (message.type === "snapshot") {
+      const state = message.state;
+      validateSnapshot(state);
+
+      if (state.revision >= room.revision) {
+        room = state;
+
+        if (!me()) {
+          removed = true;
+          if (capture) await stopCapture(capture, false);
+        }
+
+        bindManifest();
+        render();
+      }
+
+    } else if (message.type === "offer") {
+      if (message.description?.type !== "offer") {
+        throw new Error("Invalid renegotiation offer.");
+      }
+
+      await link.pc.setRemoteDescription(message.description);
+      await link.pc.setLocalDescription(await link.pc.createAnswer());
+
+      const description = await completeDescription(link.pc);
+
+      safeSend(link, envelope("answer", { description }));
+
+      // Remote transceiver removals are now negotiated locally.
+      bindManifest();
+
+    } else if (message.type === "manifest") {
+      if (
+        !Array.isArray(message.entries) ||
+        message.entries.length > 80 ||
+        message.entries.some(entry =>
+          typeof entry.participantId !== "string" ||
+          typeof entry.streamId !== "string" ||
+          typeof entry.mid !== "string" ||
+          entry.participantId.length > 100 ||
+          entry.streamId.length > 100 ||
+          entry.mid.length > 100
+        )
+      ) {
+        throw new Error("Invalid stream manifest.");
+      }
+
+      manifest = message.entries;
+      bindManifest();
+
+    } else if (message.type === "ack") {
+      const finished = clearPending(message.requestId);
+
+      // Do not erase typing performed after the submitted draft.
+      if (
+        finished?.edit.kind === "layout" &&
+        finished.draftVersion === layoutDraftVersion
+      ) {
+        layoutDirty = false;
+      }
+
+      if (finished) {
+        notice(
+          finished.edit.kind === "layout" && layoutDirty
+            ? "Submitted settings committed. Your newer draft is still unsent."
+            : "Shared change committed."
+        );
+      }
+
+      render();
+
+    } else if (message.type === "editError") {
+      clearPending(message.requestId);
+      notice("Edit rejected: " + String(message.text));
+      refreshControls();
+
+    } else if (message.type === "removed") {
+      removed = true;
+
+      if (pendingEdit) {
+        clearPending(pendingEdit.id);
+      }
+
+      if (capture) {
+        await stopCapture(capture, false);
+      }
+
+      manifest = [];
+      receivedByMid.clear();
+
+      for (const participantId of sources.keys()) {
+        if (participantId !== selfId) {
+          sources.delete(participantId);
+        }
+      }
+
+      closeLink(link);
+      notice("Removed from classroom. Reload to join another session.");
+      render();
+    }
+  }
+}
+
+/**
+ * Remove obsolete receiving sources without discarding early live tracks.
+ * Only inspect negotiated direction while signaling is stable.
+ */
+function pruneReceivedSources() {
+  if (isCoordinator || !upstream) return;
+
+  const pc = upstream.pc;
+
+  if (pc.connectionState === "closed") {
+    receivedByMid.clear();
+    return;
+  }
+
+  const stable = pc.signalingState === "stable";
+  const transceivers = new Set(pc.getTransceivers());
+
+  for (const [mid, source] of receivedByMid) {
+    const transceiver = source.transceiver;
+    const ended = source.track.readyState === "ended";
+
+    const noLongerReceiving = stable && (
+      !transceiver ||
+      !transceivers.has(transceiver) ||
+      transceiver.stopped === true ||
+      transceiver.mid === null ||
+      transceiver.currentDirection === "inactive" ||
+      transceiver.currentDirection === "sendonly"
+    );
+
+    if (ended || noLongerReceiving) {
+      receivedByMid.delete(mid);
+    }
+  }
+}
+
+/** Bind MID sources only to the current authoritative publishing session. */
+function bindManifest() {
+  if (isCoordinator || !room) return;
+
+  pruneReceivedSources();
+
+  const keep = new Set([selfId]);
+
+  for (const entry of manifest) {
+    const person = room.participants.find(
+      value => value.id === entry.participantId
+    );
+
+    const source = receivedByMid.get(entry.mid);
+
+    if (
+      !person ||
+      !person.sharing ||
+      person.streamId !== entry.streamId ||
+      !source ||
+      source.track.readyState !== "live"
+    ) continue;
+
+    keep.add(person.id);
+
+    const version =
+      `${entry.streamId}:${entry.mid}:${source.version}`;
+
+    if (sources.get(person.id)?.version !== version) {
+      sources.set(person.id, {
+        ...source,
+        version
+      });
+    }
+  }
+
+  for (const participantId of sources.keys()) {
+    if (!keep.has(participantId)) {
+      sources.delete(participantId);
+    }
+  }
+
+  render();
+}
+
+function sendManifest(link) {
+  const entries = [];
+
+  for (const [participantId, item] of link.forwards) {
+    if (
+      item.transceiver.mid !== null &&
+      !item.transceiver.stopped
+    ) {
+      entries.push({
+        participantId,
+        streamId: item.streamId,
+        mid: item.transceiver.mid
+      });
+    }
+  }
+
+  safeSend(link, envelope("manifest", { entries }));
+}
+
+async function limitSender(sender) {
+  try {
+    const parameters = sender.getParameters();
+    if (!parameters.encodings?.length) return;
+
+    parameters.encodings[0].maxBitrate = 80000;
+    parameters.encodings[0].maxFramerate = 2;
+
+    await sender.setParameters(parameters);
+  } catch {
+    // Requested targets; support varies by codec/browser and negotiated state.
+  }
+}
+
+/**
+ * Forward only to admitted teachers, never ordinary students.
+ * Includes the coordinator's own source.
+ * The recipient's own screen is not reflected back.
+ */
+function reconcile(link) {
+  if (
+    !isCoordinator || !link.active || !link.admitted ||
+    link.dc?.readyState !== "open"
+  ) return;
+
+  const wanted = new Map();
+
+  if (link.role === "teacher") {
+    for (const person of room.participants) {
+      const source = sources.get(person.id);
+
+      if (
+        person.id !== link.participantId &&
+        person.online &&
+        person.sharing &&
+        person.streamId &&
+        source?.track.readyState === "live"
+      ) {
+        wanted.set(person.id, { person, source });
+      }
+    }
+  }
+
+  let changed = false;
+
+  for (const [id, item] of [...link.forwards]) {
+    const next = wanted.get(id);
+
+    if (
+      !next ||
+      next.source.track !== item.track ||
+      next.person.streamId !== item.streamId
+    ) {
+      try { item.transceiver.stop(); } catch {}
+      link.forwards.delete(id);
+      changed = true;
+    }
+  }
+
+  for (const [id, value] of wanted) {
+    if (link.forwards.has(id)) continue;
+
+    const stream = new MediaStream([value.source.track]);
+
+    // Explicitly allocate a download transceiver.
+    // addTrack() could reuse the reserved upload transceiver.
+    const transceiver = link.pc.addTransceiver(value.source.track, {
+      direction: "sendonly",
+      streams: [stream]
+    });
+
+    link.forwards.set(id, {
+      transceiver,
+      sender: transceiver.sender,
+      stream,
+      track: value.source.track,
+      streamId: value.person.streamId
+    });
+
+    void limitSender(transceiver.sender);
+    changed = true;
+  }
+
+  sendManifest(link);
+
+  if (changed) {
+    link.dirty = true;
+    void negotiate(link);
+  }
+}
+
+function reconcileAll() {
+  if (!isCoordinator) return;
+
+  for (const link of links.values()) {
+    try {
+      reconcile(link);
+    } catch (error) {
+      log("Forwarding update failed: " + error.message);
+    }
+  }
+}
+
+function announcePublishing(active, streamId = null) {
+  if (!room || removed) return;
+
+  if (isCoordinator) {
+    const person = me();
+
+    if (
+      person &&
+      (person.sharing !== active || person.streamId !== streamId)
+    ) {
+      person.sharing = active;
+      person.streamId = active ? streamId : null;
+      commit();
+    }
+
+  } else {
+    safeSend(upstream, envelope("publishing", {
+      active,
+      streamId
+    }));
+  }
+}
+
+/*
+ * Capture lifecycle:
+ * mediaBusy guards asynchronous startup/teardown.
+ * Each callback captures its own session object.
+ * Old callbacks cannot stop a new capture.
+ */
+async function startCapture() {
+  if (!synchronized() || !me()?.slot) {
+    throw new Error("Connect and reserve a seat before sharing.");
+  }
+
+  if (mediaBusy || capture) return;
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    throw new Error(
+      "Use HTTPS and a desktop browser supporting screen capture."
+    );
+  }
+
+  mediaBusy = true;
+  refreshControls();
+
+  let current = null;
+
+  try {
+    const desktop = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        frameRate: { ideal: 2, max: 5 }
+      },
+      audio: false
+    });
+
+    current = {
+      id: uuid(),
+      desktop,
+      video: document.createElement("video"),
+      canvas: document.createElement("canvas"),
+      output: null,
+      track: null,
+      timer: null,
+      cancelled: false,
+      ended: false,
+      lastDraw: 0
+    };
+
+    capture = current;
+    current.video.muted = true;
+    current.video.playsInline = true;
+    current.video.srcObject = desktop;
+
+    desktop.getVideoTracks()[0].addEventListener("ended", () => {
+      current.ended = true;
+
+      if (capture === current && !mediaBusy) {
+        stopCapture(current).catch(report);
+      }
+    }, { once: true });
+
+    await current.video.play();
+
+    if (
+      current.ended ||
+      capture !== current ||
+      !synchronized()
+    ) {
+      throw new Error(
+        "Capture ended or classroom disconnected during startup."
+      );
+    }
+
+    current.canvas.width = room.layout.width;
+    current.canvas.height = Math.round(room.layout.width * 9 / 16);
+
+    const context = current.canvas.getContext("2d", { alpha: false });
+
+    if (!context || !current.canvas.captureStream) {
+      throw new Error("Canvas video capture is unavailable.");
+    }
+
+    function draw() {
+      if (
+        capture !== current ||
+        current.cancelled ||
+        current.ended
+      ) return;
+
+      try {
+        const width = room.layout.width;
+        const height = Math.round(width * 9 / 16);
+
+        if (
+          current.canvas.width !== width ||
+          current.canvas.height !== height
+        ) {
+          current.canvas.width = width;
+          current.canvas.height = height;
+        }
+
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, width, height);
+
+        const video = current.video;
+
+        if (video.videoWidth && video.videoHeight) {
+          const scale = Math.min(
+            width / video.videoWidth,
+            height / video.videoHeight
+          );
+
+          const w = video.videoWidth * scale;
+          const h = video.videoHeight * scale;
+
+          context.drawImage(
+            video,
+            (width - w) / 2,
+            (height - h) / 2,
+            w,
+            h
+          );
+
+          current.lastDraw = performance.now();
+        }
+
+        current.timer = setTimeout(
+          draw,
+          1000 / room.layout.fps
+        );
+
+      } catch (error) {
+        current.ended = true;
+        log("Capture drawing stopped: " + error.message);
+
+        if (!mediaBusy) {
+          stopCapture(current).catch(report);
+        }
+      }
+    }
+
+    draw();
+
+    current.output = current.canvas.captureStream(2);
+    current.track = current.output.getVideoTracks()[0];
+
+    if (!current.track) {
+      throw new Error("Canvas did not produce a video track.");
+    }
+
+    if (!isCoordinator) {
+      await upstream.upload.sender.replaceTrack(current.track);
+      await limitSender(upstream.upload.sender);
+    }
+
+    if (
+      current.ended ||
+      current.cancelled ||
+      !synchronized()
+    ) {
+      throw new Error("Sharing ended or connection was lost during startup.");
+    }
+
+    sources.set(selfId, {
+      track: current.track,
+      stream: current.output,
+      receiver: null,
+      transceiver: null,
+      pc: null,
+      local: true,
+      version: current.id
+    });
+
+    // Source exists before commit -> reconcileAll.
+    announcePublishing(true, current.id);
+    notice("Screen sharing started.");
+    render();
+
+  } catch (error) {
+    if (current) {
+      current.cancelled = true;
+      clearTimeout(current.timer);
+
+      current.desktop.getTracks().forEach(track => track.stop());
+      current.output?.getTracks().forEach(track => track.stop());
+      current.video.srcObject = null;
+
+      if (capture === current) capture = null;
+
+      if (sources.get(selfId)?.version === current.id) {
+        sources.delete(selfId);
+      }
+
+      if (!isCoordinator && upstream?.upload) {
+        try {
+          await upstream.upload.sender.replaceTrack(null);
+        } catch {}
+      }
+    }
+
+    throw error;
+
+  } finally {
+    mediaBusy = false;
+    refreshControls();
+
+    if (current?.ended && capture === current) {
+      stopCapture(current).catch(report);
+    }
+  }
+}
+
+async function stopCapture(expected = capture, announce = true) {
+  if (
+    !expected ||
+    capture !== expected ||
+    expected.cancelled
+  ) return;
+
+  // Startup will detect this flag and complete cleanup.
+  if (mediaBusy) {
+    expected.ended = true;
+    return;
+  }
+
+  mediaBusy = true;
+  expected.cancelled = true;
+  capture = null;
+  clearTimeout(expected.timer);
+
+  if (sources.get(selfId)?.version === expected.id) {
+    sources.delete(selfId);
+  }
+
+  // Shared status changes immediately; sender cleanup can finish asynchronously.
+  if (announce) announcePublishing(false);
+  render();
+
+  try {
+    expected.desktop.getTracks().forEach(track => track.stop());
+    expected.output?.getTracks().forEach(track => track.stop());
+    expected.video.srcObject = null;
+
+    if (!isCoordinator && upstream?.upload) {
+      try {
+        await upstream.upload.sender.replaceTrack(null);
+      } catch {}
+    }
+
+  } finally {
+    mediaBusy = false;
+    render();
+  }
+}
+
+function replaceOptions(select, entries) {
+  const previous = select.value;
+  select.replaceChildren();
+
+  for (const [value, text] of entries) {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = text;
+    select.append(option);
+  }
+
+  if ([...select.options].some(option => option.value === previous)) {
+    select.value = previous;
+  }
+}
+
+function paintHealth(tile, healthy, text) {
+  tile.element.classList.toggle("good", healthy);
+  tile.element.classList.toggle("bad", !healthy);
+  tile.health.textContent = text;
+
+  if (tile.personId && tile.personId === zoomPerson) {
+    $("zoomStatus").textContent = text;
+    $("zoomVideo").style.visibility = healthy ? "visible" : "hidden";
+  }
+}
+
+function newTile(slot) {
+  const element = document.createElement("div");
+  element.className = "tile bad";
+
+  const video = document.createElement("video");
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+
+  const title = document.createElement("div");
+  title.className = "title";
+
+  const health = document.createElement("div");
+  health.className = "health";
+
+  element.append(video, title, health);
+
+  const tile = {
+    slot,
+    element,
+    video,
+    title,
+    health,
+    personId: null,
+    sourceVersion: null,
+    lastCounter: null,
+    lastFrameAt: 0,
+    presented: 0,
+    frameCallback: null,
+    binding: 0
+  };
+
+  element.onclick = () => {
+    if (!tile.personId || !tile.video.srcObject) return;
+
+    zoomPerson = tile.personId;
+    $("zoomTitle").textContent = title.textContent;
+    $("zoomVideo").srcObject = tile.video.srcObject;
+    $("zoomVideo").style.visibility =
+      element.classList.contains("good") ? "visible" : "hidden";
+    $("zoomStatus").textContent = health.textContent;
+    $("zoomVideo").play().catch(() => {});
+
+    if (!$("zoom").open) $("zoom").showModal();
+  };
+
+  return tile;
+}
+
+function bindTileSource(tile, person, source) {
+  const personId = person?.id || null;
+  const version = source?.version || null;
+
+  if (
+    tile.personId === personId &&
+    tile.sourceVersion === version
+  ) return;
+
+  tile.binding++;
+
+  if (
+    tile.frameCallback !== null &&
+    tile.video.cancelVideoFrameCallback
+  ) {
+    tile.video.cancelVideoFrameCallback(tile.frameCallback);
+  }
+
+  tile.personId = personId;
+  tile.sourceVersion = version;
+  tile.lastCounter = null;
+  tile.lastFrameAt = 0;
+  tile.presented = 0;
+  tile.frameCallback = null;
+  tile.video.srcObject = source?.stream || null;
+
+  if (source) {
+    tile.video.play().catch(() => {});
+
+    if (source.local && tile.video.requestVideoFrameCallback) {
+      const binding = tile.binding;
+
+      const presented = () => {
+        if (tile.binding !== binding) return;
+
+        tile.presented++;
+        tile.frameCallback =
+          tile.video.requestVideoFrameCallback(presented);
+      };
+
+      tile.frameCallback =
+        tile.video.requestVideoFrameCallback(presented);
+    }
+  }
+
+  paintHealth(tile, false, "Waiting for video");
+}
+
+function syncLayoutInputs() {
+  if (!room || layoutDirty) return;
+
+  const layout = room.layout;
+
+  $("rows").value = layout.rows;
+  $("cols").value = layout.cols;
+  $("width").value = layout.width;
+  $("fps").value = layout.fps;
+  $("disabledSeats").value = layout.disabled.join(", ");
+  $("locked").value = String(layout.locked);
+}
+
+/** Update stable video nodes without restarting media connections. */
+function render() {
+  refreshControls();
+  if (!room) return;
+
+  $("roomTitle").textContent =
+    `${room.label} — revision ${room.revision} — ` +
+    `${room.participants.filter(person => person.online).length} connected`;
+
+  syncLayoutInputs();
+
+  const layout = room.layout;
+  const count = layout.rows * layout.cols;
+  const options = [];
+
+  for (let seat = 1; seat <= count; seat++) {
+    if (layout.disabled.includes(seat)) continue;
+
+    const person = room.participants.find(value => value.slot === seat);
+    options.push([
+      seat,
+      `Seat ${seat}${person ? " — " + person.name : ""}`
+    ]);
+  }
+
+  replaceOptions($("mySeat"), options);
+  replaceOptions($("moveSeat"), options);
+  replaceOptions(
+    $("participant"),
+    room.participants.map(person => [
+      person.id,
+      `${person.name} (${person.role})`
+    ])
+  );
+
+  $("grid").style.setProperty("--cols", layout.cols);
+  $("grid").classList.toggle("scroll", $("view").value === "scroll");
+
+  for (const [slot, tile] of tiles) {
+    if (slot > count) {
+      bindTileSource(tile, null, null);
+      tile.element.remove();
+      tiles.delete(slot);
+    }
+  }
+
+  for (let slot = 1; slot <= count; slot++) {
+    let tile = tiles.get(slot);
+
+    if (!tile) {
+      tile = newTile(slot);
+      tiles.set(slot, tile);
+    }
+
+    // Append only new nodes. Existing seats retain DOM and playback state.
+    if (!tile.element.parentNode) {
+      $("grid").append(tile.element);
+    }
+
+    const person = room.participants.find(value => value.slot === slot);
+    const source = person && sources.get(person.id);
+    const disabled = layout.disabled.includes(slot);
+
+    tile.element.classList.toggle("disabled", disabled);
+    tile.title.textContent =
+      `Seat ${slot}${person ? " — " + person.name : ""}`;
+
+    bindTileSource(tile, person, source);
+
+    if (disabled) {
+      paintHealth(tile, false, "Disabled / aisle");
+    } else if (!person) {
+      paintHealth(tile, false, "Empty");
+    } else if (!synchronized()) {
+      paintHealth(tile, false, "Configuration out of sync");
+    } else if (!person.online) {
+      paintHealth(tile, false, "Publisher disconnected");
+    } else if (!person.sharing) {
+      paintHealth(tile, false, "Not sharing");
+    } else if (!source) {
+      paintHealth(
+        tile,
+        false,
+        teacher() || person.id === selfId
+          ? "Waiting for video"
+          : "Teacher-only video"
+      );
+    } else if (
+      source.pc &&
+      source.pc.connectionState !== "connected"
+    ) {
+      paintHealth(tile, false, "Connection interrupted");
+    }
+  }
+
+  if (zoomPerson) {
+    const person = room.participants.find(value => value.id === zoomPerson);
+    const source = person?.sharing ? sources.get(zoomPerson) : null;
+
+    if ($("zoomVideo").srcObject !== (source?.stream || null)) {
+      $("zoomVideo").srcObject = source?.stream || null;
+      $("zoomVideo").style.visibility = "hidden";
+      $("zoomVideo").play().catch(() => {});
+    }
+
+    if (!person || !person.sharing || !synchronized()) {
+      $("zoomVideo").style.visibility = "hidden";
+      $("zoomStatus").textContent = "Unavailable / not sharing";
+    }
+  }
+}
+
+/**
+ * Local health checks.
+ * Verify identity again after asynchronous stats so an old result cannot
+ * mark a replacement source or reassigned seat healthy.
+ */
+async function checkHealth() {
+  if (healthBusy || !room) return;
+  healthBusy = true;
+
+  try {
+    for (const tile of tiles.values()) {
+      const person = room.participants.find(
+        value => value.id === tile.personId
+      );
+      const source = person && sources.get(person.id);
+
+      if (
+        !person || !person.sharing ||
+        !person.online || !source
+      ) continue;
+
+      if (!synchronized()) {
+        paintHealth(tile, false, "Configuration out of sync");
+        continue;
+      }
+
+      if (source.track.readyState !== "live") {
+        paintHealth(tile, false, "Screen ended");
+        continue;
+      }
+
+      if (
+        source.pc &&
+        source.pc.connectionState !== "connected"
+      ) {
+        paintHealth(tile, false, "Disconnected / connecting");
+        continue;
+      }
+
+      const expectedVersion = source.version;
+      const expectedPerson = person.id;
+      const expectedBinding = tile.binding;
+      let counter = null;
+
+      try {
+        if (source.local) {
+          counter = tile.video.requestVideoFrameCallback
+            ? tile.presented
+            : tile.video.getVideoPlaybackQuality
+              ? tile.video.getVideoPlaybackQuality().totalVideoFrames
+              : tile.video.currentTime;
+
+        } else {
+          const reports = await source.receiver.getStats();
+
+          reports.forEach(report => {
+            if (
+              report.type === "inbound-rtp" &&
+              (report.kind === "video" || report.mediaType === "video") &&
+              typeof report.framesDecoded === "number"
+            ) {
+              counter = (counter ?? 0) + report.framesDecoded;
+            }
+          });
+        }
+      } catch {
+        counter = null;
+      }
+
+      const currentPerson = room.participants.find(
+        value => value.id === expectedPerson
+      );
+
+      if (
+        tile.binding !== expectedBinding ||
+        tile.personId !== expectedPerson ||
+        sources.get(expectedPerson)?.version !== expectedVersion ||
+        !currentPerson?.sharing ||
+        !currentPerson.online
+      ) continue;
+
+      if (!synchronized()) {
+        paintHealth(tile, false, "Configuration out of sync");
+        continue;
+      }
+
+      if (
+        source.track.readyState !== "live" ||
+        (source.pc && source.pc.connectionState !== "connected")
+      ) {
+        paintHealth(tile, false, "Video connection unavailable");
+        continue;
+      }
+
+      const now = performance.now();
+
+      if (
+        counter !== null &&
+        counter > 0 &&
+        counter !== tile.lastCounter
+      ) {
+        tile.lastFrameAt = now;
+      }
+
+      tile.lastCounter = counter;
+
+      if (counter === null) {
+        paintHealth(tile, false, "Video health unverified");
+      } else if (!tile.lastFrameAt) {
+        paintHealth(tile, false, "Waiting for frames");
+      } else if (now - tile.lastFrameAt > STALE_MS) {
+        paintHealth(tile, false, "Possibly stalled — no recent frames");
+      } else if (source.track.muted) {
+        paintHealth(tile, false, "Video temporarily unavailable");
+      } else if (tile.video.paused || tile.video.readyState < 2) {
+        paintHealth(tile, false, "Playback paused / buffering");
+      } else {
+        paintHealth(
+          tile,
+          true,
+          source.local ? "Local preview playing" : "Receiving video"
+        );
+      }
+    }
+
+  } finally {
+    healthBusy = false;
+  }
+}
+
+/*
+ * Heartbeats measure application connectivity only.
+ * Commit online/offline transitions once, not on every heartbeat.
+ */
+setInterval(() => {
+  if (!room) return;
+
+  const activeLinks = isCoordinator
+    ? [...links.values()]
+    : [upstream].filter(Boolean);
+
+  let changed = false;
+
+  for (const link of activeLinks) {
+    if (!link.active) continue;
+
+    cleanInbox(link);
+
+    if (link.dc?.readyState === "open") {
+      safeSend(link, envelope("heartbeat"));
+      pump(link);
+    }
+
+    if (isCoordinator && link.admitted) {
+      const person = room.participants.find(
+        value => value.id === link.participantId
+      );
+
+      const online =
+        link.dc?.readyState === "open" &&
+        link.pc.connectionState === "connected" &&
+        Date.now() - link.lastSeen < OFFLINE_MS;
+
+      if (person && person.online !== online) {
+        person.online = online;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    commit();
+  } else if (!isCoordinator) {
+    // Periodic defensive receiver cleanup.
+    bindManifest();
+  } else {
+    render();
+  }
+}, HEARTBEAT_MS);
+
+setInterval(() => {
+  checkHealth().catch(error => log(error.message));
+}, 2000);
+
+/*
+ * UI bindings.
+ * User-provided names and text are inserted using textContent, not innerHTML.
+ */
+action("configureTurn", () => {
+  if (configureTurn()) {
+    notice(
+      "TURN saved. Existing connections are unchanged. " +
+      "Reload and re-pair to use the new setting."
+    );
+  }
+});
+
+action("forgetTurn", () => {
+  writeCookie("", 0);
+  turnHost = "";
+  $("turnStatus").textContent = "Saved TURN setting forgotten";
+  notice("Saved host removed. Existing connections remain unchanged.");
+});
+
+action("create", createRoom);
+action("makeInvite", makeInvitation);
+action("join", joinInvitation);
+action("acceptAnswer", acceptAnswer);
+action("share", startCapture);
+action("stop", () => stopCapture());
+
+action("copy", async () => {
+  if (!$("pairOut").value) {
+    throw new Error("Nothing generated yet.");
+  }
+
+  try {
+    await navigator.clipboard.writeText($("pairOut").value);
+    notice("Copied. Send privately.");
+  } catch {
+    $("pairOut").focus();
+    $("pairOut").select();
+    notice("Copy the selected text manually.");
+  }
+});
+
+action("clearPair", () => {
+  $("pairIn").value = "";
+  $("pairOut").value = "";
+});
+
+action("applyLayout", () => {
+  const text = $("disabledSeats").value.trim();
+
+  requestEdit({
+    kind: "layout",
+    layout: {
+      rows: Number($("rows").value),
+      cols: Number($("cols").value),
+      width: Number($("width").value),
+      fps: Number($("fps").value),
+      locked: $("locked").value === "true",
+      disabled: text
+        ? text.split(",").map(value => Number(value.trim()))
+        : []
+    }
+  });
+});
+
+action("resetDraft", () => {
+  // Invalidates the draft identity of any earlier pending submission.
+  layoutDraftVersion++;
+  layoutDirty = false;
+  syncLayoutInputs();
+  refreshControls();
+});
+
+action("chooseSeat", () => requestEdit({
+  kind: "seat",
+  participantId: selfId,
+  slot: Number($("mySeat").value)
+}));
+
+action("move", () => requestEdit({
+  kind: "seat",
+  participantId: $("participant").value,
+  slot: Number($("moveSeat").value)
+}));
+
+action("remove", () => {
+  if (confirm("Remove this participant and release their seat?")) {
+    requestEdit({
+      kind: "remove",
+      participantId: $("participant").value
+    });
+  }
+});
+
+action("download", () => {
+  const blob = new Blob([CLEAN_HTML], {
+    type: "text/html;charset=utf-8"
+  });
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = "classroom-monitor-v3.html";
+  anchor.click();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+for (const id of [
+  "rows", "cols", "width", "fps", "disabledSeats", "locked"
+]) {
+  $(id).addEventListener("input", () => {
+    layoutDraftVersion++;
+    layoutDirty = true;
+    refreshControls();
+  });
+}
+
+$("role").addEventListener("change", refreshControls);
+
+$("view").addEventListener("change", () => {
+  $("grid").classList.toggle(
+    "scroll",
+    $("view").value === "scroll"
+  );
+});
+
+$("closeZoom").onclick = () => $("zoom").close();
+
+$("zoom").addEventListener("close", () => {
+  zoomPerson = null;
+  $("zoomVideo").srcObject = null;
+});
+
+window.addEventListener("beforeunload", () => {
+  capture?.desktop.getTracks().forEach(track => track.stop());
+  capture?.output?.getTracks().forEach(track => track.stop());
+
+  for (const link of links.values()) closeLink(link);
+  closeLink(upstream);
+});
+
+// Startup: no default TURN address exists in the source.
+const saved = readCookie();
+
+if (validHost(saved)) {
+  turnHost = saved;
+  $("turnStatus").textContent =
+    "TURN loaded from cookie — connection not yet tested";
+}
+
+refreshControls();
+
+if (!window.isSecureContext) {
+  notice(
+    "Host this page on HTTPS or localhost. " +
+    "Ordinary HTTP cannot capture screens."
+  );
+}
+
+// First-use prompt. Cancel is allowed; create/join can prompt again.
+setTimeout(() => {
+  if (!turnHost) {
+    try {
+      configureTurn();
+    } catch (error) {
+      report(error);
+    }
+  }
+}, 250);
+</script>
+</body>
+</html>
