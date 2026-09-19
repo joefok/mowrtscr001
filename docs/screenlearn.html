@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Classroom Screen Monitor</title>
+<title>Classroom Screen Monitor — Trickle ICE</title>
 <style>
 :root {
   color-scheme: dark;
   font-family: system-ui,sans-serif;
-  background: #101827;
   color: #e5e7eb;
+  background: #101827;
 }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 12px; }
@@ -17,11 +17,11 @@ main { max-width: 1550px; margin: auto; }
 h1 { font-size: 1.4rem; }
 h2 { font-size: 1.05rem; }
 .panel {
-  background: #1e293b;
-  border: 1px solid #475569;
-  border-radius: 10px;
   padding: 14px;
   margin-bottom: 12px;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #1e293b;
 }
 .row {
   display: flex;
@@ -30,15 +30,15 @@ h2 { font-size: 1.05rem; }
   gap: 10px;
 }
 label { display: grid; gap: 5px; font-size: .9rem; }
-input,select,button {
-  font: inherit;
+button,input,select {
   padding: 9px;
-  border: 1px solid #64748b;
-  border-radius: 6px;
+  font: inherit;
   color: inherit;
   background: #0f172a;
+  border: 1px solid #64748b;
+  border-radius: 6px;
 }
-button { cursor: pointer; background: #1d4ed8; }
+button { background: #1d4ed8; cursor: pointer; }
 button.secondary { background: #374151; }
 button.danger { background: #991b1b; }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -47,7 +47,7 @@ input[type=number] { width: 80px; }
 .warning { color: #fbbf24; }
 .hidden { display: none !important; }
 #message { white-space: pre-wrap; }
-#roomLink { width: min(100%,800px); }
+#roomLink { width: min(100%,850px); }
 #viewport { overflow: auto; max-height: 75vh; }
 #grid {
   display: grid;
@@ -58,14 +58,14 @@ input[type=number] { width: 80px; }
   grid-template-columns: repeat(var(--cols,8),minmax(175px,1fr));
 }
 .tile {
+  position: relative;
   min-width: 0;
   aspect-ratio: 16/9;
-  position: relative;
   padding: 0;
-  background: #555;
+  overflow: hidden;
   border: 2px solid #999;
   border-radius: 7px;
-  overflow: hidden;
+  background: #555;
 }
 .tile.good { border-color: #22c55e; }
 .tile.mine { border-color: #60a5fa; }
@@ -78,7 +78,8 @@ input[type=number] { width: 80px; }
 .tile.bad video { visibility: hidden; }
 .tile .title,.tile .health {
   position: absolute;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   padding: 4px;
   background: #000a;
   font-size: clamp(9px,1vw,12px);
@@ -88,23 +89,23 @@ input[type=number] { width: 80px; }
 .tile .health { bottom: 0; }
 .person {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 0;
+  padding: 9px 0;
   border-bottom: 1px solid #475569;
 }
 .person span { flex: 1; white-space: pre-wrap; }
 pre {
   white-space: pre-wrap;
-  max-height: 300px;
+  max-height: 340px;
   overflow: auto;
   font-size: 12px;
 }
 dialog {
   width: min(95vw,1100px);
-  background: #111827;
   color: white;
+  background: #111827;
   border: 1px solid #64748b;
   border-radius: 10px;
 }
@@ -112,6 +113,7 @@ dialog::backdrop { background: #000c; }
 dialog video { width: 100%; max-height: 72vh; }
 @media(max-width:600px) {
   body { padding: 7px; }
+  .panel { padding: 10px; }
   button:not(.tile) { min-height: 44px; }
   .row > label { flex: 1 1 120px; }
 }
@@ -122,23 +124,30 @@ dialog video { width: 100%; max-height: 72vh; }
 <h1>Classroom Screen Monitor</h1>
 
 <section class="panel small">
-  <strong>Teacher:</strong> Create room → copy student link.
+  <strong>Teacher:</strong> Test TURN → Create room → Copy student link.
   <br>
-  <strong>Student:</strong> Open link → click an empty seat →
-  select a screen and approve sharing.
+  <strong>Student:</strong> Open link → Click an empty seat →
+  select a screen and press Share.
   <br>
-  No student names, pairing codes, or answer files.
+  Names, pairing codes, and answer files are not required.
 </section>
 
 <section class="panel">
   <div class="row">
-    <button id="testBtn" class="secondary">Test configured TURN</button>
+    <label>TURN transport for new connections
+      <select id="transport">
+        <option value="both">UDP + TCP</option>
+        <option value="tcp">TCP only</option>
+        <option value="udp">UDP only</option>
+      </select>
+    </label>
+    <button id="testBtn" class="secondary">Test UDP and TCP</button>
     <button id="diagBtn" class="secondary">Connection diagnostics</button>
     <button id="downloadBtn" class="secondary">Download HTML</button>
   </div>
   <p class="small">
-    Configured TURN: <code>20.24.69.131:3489</code>.
-    Video connections are forced through TURN.
+    TURN: <code>20.24.69.131:3489</code>.
+    Trickle ICE enabled. All media connections require TURN relay.
   </p>
   <p id="firebaseState" class="small">Initializing Firebase…</p>
 </section>
@@ -198,22 +207,24 @@ dialog video { width: 100%; max-height: 72vh; }
       <button id="closeRoomBtn" class="danger">Close room</button>
     </div>
     <p class="small">
-      Maximum 64 positions. Failed seats remain grey until explicitly removed.
+      Up to 64 positions. Failed connections stay grey until removed.
     </p>
+
     <div class="row">
-      <input id="roomLink" readonly aria-label="Student link">
+      <input id="roomLink" readonly aria-label="Student room link">
       <button id="copyBtn" class="secondary">Copy student link</button>
     </div>
-    <h2>Lobby and connected students</h2>
+
+    <h2>Lobby and connections</h2>
     <div id="people"></div>
   </div>
 
   <div id="studentPanel" class="hidden">
-    <p>Click an empty tile to start the screen-sharing prompt.</p>
+    <p>Click an empty tile to open the browser's screen-sharing prompt.</p>
     <button id="leaveBtn" class="danger">Stop sharing / leave seat</button>
   </div>
 
-  <label>Local view
+  <label>Local viewing mode
     <select id="view">
       <option value="fit">Fit classroom width</option>
       <option value="scroll">Scroll larger tiles</option>
@@ -229,16 +240,16 @@ dialog video { width: 100%; max-height: 72vh; }
   <summary>Diagnostics and limitations</summary>
   <pre id="log"></pre>
   <ul class="small">
-    <li>A TURN allocation test does not prove that media relay ports are reachable.</li>
-    <li>If no relay candidate is obtained, inspect coturn, its listening port,
-        credentials, and firewalls.</li>
-    <li>Screen capture requires HTTPS and browser permission.</li>
-    <li>One controlling teacher per room; multiple rooms are supported.</li>
-    <li>Keep the teacher browser open. No coordinator failover is included.</li>
-    <li>Firebase anonymous authentication does not verify school identities.</li>
+    <li>The TURN test checks candidate events, not SDP text.</li>
+    <li>UDP and TCP are tested independently.</li>
+    <li>A relay allocation does not prove end-to-end media relay connectivity.</li>
+    <li>Firebase exchanges offers, answers, and ICE candidates automatically.</li>
+    <li>One controlling teacher per room. Keep the teacher browser open.</li>
+    <li>Screen capture requires browser permission and HTTPS.</li>
+    <li>Firebase anonymous authentication is not school-account verification.</li>
     <li>TURN address and test credentials are public in this source.</li>
-    <li>Production requires stronger access control, temporary TURN credentials,
-        abuse protection, and cleanup of old room records.</li>
+    <li>Production needs stronger access control, temporary TURN credentials,
+      abuse protection, and old-room cleanup.</li>
   </ul>
 </details>
 
@@ -255,52 +266,61 @@ dialog video { width: 100%; max-height: 72vh; }
 
 /*
 ============================================================================
-CLASSROOM MONITOR — FIXED USER-SUPPLIED TURN CONFIGURATION
+CLASSROOM MONITOR — TRICKLE ICE REPLACEMENT
 
-TURN
-Uses exactly the supplied ICE server URL and credentials.
-This is a custom coturn endpoint, not a Metered.ca service.
-iceTransportPolicy:"relay" prevents direct browser media connections.
+WHAT CHANGED
+- Explicit TURN UDP and TURN TCP URLs.
+- Candidates collected from onicecandidate events.
+- Candidates exchanged through Firebase immediately.
+- Offers/answers are not delayed while ICE gathering completes.
+- Remote candidates wait until setRemoteDescription has completed.
+- TURN test uses independent UDP/TCP peer connections.
+- Failed seats are retained for diagnostics.
 
-FLOW
-Student tile click -> explicit getDisplayMedia permission -> canvas preview
--> video attached before offer -> Firebase offer -> teacher answer.
-Teacher automatically accepts when enabled.
-
-FIREBASE
-Anonymous Authentication and documented Realtime Database rules are required.
-Database schema:
+FIREBASE SCHEMA
 rooms/{roomId}/owner
 rooms/{roomId}/meta
-rooms/{roomId}/peers/{uid}/{attemptId}
+rooms/{roomId}/peers/{uid}/{attemptId}/
+  protocol, state, seat, offer, answer, studentIce, teacherIce
 
 AUTHORITY
-Teacher owns room metadata.
-Acceptance is represented by a teacher-local peer object.
-Student-written status strings do not themselves authorize a peer.
-Each attempt has a unique database path.
+Teacher owns room metadata under the supplied database rules.
+Teacher-local peer objects represent acceptance.
+A student-written state string cannot itself authorize a teacher peer.
+Every attempt has a unique path and generation ID.
+
+SCREEN CAPTURE
+The tile click calls getDisplayMedia directly, before network awaits.
+The captured video track is attached before the student creates an offer.
+A canvas reduces resolution and frame rate.
+Explicit browser permission cannot be bypassed.
+
+TRANSPORT
+Firebase: discovery, lobby, SDP and ICE candidate signaling.
+TURN-only WebRTC: screen video, heartbeat and connected configuration.
+No direct-media fallback is enabled.
 
 LIFECYCLE
-Session identity and active flags guard asynchronous work.
-Late screen-picker results from cancelled attempts are stopped.
-Cleanup blocks replacement startup until previous cleanup completes.
-Failed media connections remain visible for diagnosis.
+Active flags and identity checks reject stale callbacks.
+Local ICE writes are bounded and tracked.
+Remote candidate application is serialized.
+Timers, tracks, subscriptions and peers are cleaned on leave.
+No automatic ICE restart or coordinator failover.
 
 HEALTH
-Teacher checks ICE/connection state, RTP bytes, decoded frames and playback.
-Local preview is not proof that the teacher receives video.
-Static screens can keep producing frames.
+Track + transport + received bytes + decoded frames + playback.
+Local preview is not proof of delivery to the teacher.
+Static desktop content may continue producing frames.
 
 LIMITATIONS
 One controlling teacher per room.
-No automatic failover, SFU, or ICE restart.
-No production identity verification or server-side abuse prevention.
+Anonymous authentication is not verified real-world identity.
+No SFU, production rate-limiting backend, or room-cleanup worker.
 No 40-device test is claimed.
 
-AI AGENT MODIFICATION GUIDANCE
-Preserve user-gesture capture, unique attempt paths, teacher authorization,
-stale-callback guards, and cleanup.
-Document tests actually performed, rather than assuming connectivity.
+AI AGENT MODIFICATION RULES
+Preserve direct-gesture capture, attempt isolation, teacher authorization,
+candidate ordering, lifecycle cleanup and honest diagnostic messages.
 ============================================================================
 */
 
@@ -308,11 +328,21 @@ import { initializeApp } from
   "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 
 import {
-  getAuth, setPersistence, browserSessionPersistence, signInAnonymously
+  getAuth,
+  setPersistence,
+  browserSessionPersistence,
+  signInAnonymously
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 import {
-  getDatabase, ref, set, get, update, onValue
+  getDatabase,
+  ref,
+  set,
+  get,
+  update,
+  push,
+  onValue,
+  onChildAdded
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 const firebaseConfig = {
@@ -326,18 +356,16 @@ const firebaseConfig = {
   measurementId: "G-H9QM53QYFC"
 };
 
-// Exact configuration requested by the user.
-// These are public testing credentials, not production secrets.
-const ICE_SERVERS = [{
-  urls: "turn:20.24.69.131:3489",
-  username: "username",
-  credential: "password"
-}];
+const TURN_HOST = "20.24.69.131";
+const TURN_PORT = 3489;
+const TURN_USERNAME = "username";
+const TURN_PASSWORD = "password";
 
 const SOURCE = "<!doctype html>\n" + document.documentElement.outerHTML;
 const $ = id => document.getElementById(id);
-const uid = () => crypto.randomUUID();
-const VERSION = "fixed-turn-student-offer-v1";
+const uuid = () => crypto.randomUUID();
+
+const VERSION = "trickle-classroom-v1";
 
 let db = null;
 let user = null;
@@ -347,9 +375,10 @@ let roomId = "";
 let teacher = false;
 let closed = false;
 let meta = null;
+
 let requests = new Map();
 let requestsStop = null;
-let writes = Promise.resolve();
+let metadataQueue = Promise.resolve();
 
 let student = null;
 let captureStarting = false;
@@ -363,23 +392,27 @@ const tiles = new Map();
 function message(text) {
   $("message").textContent = text;
 }
+
 function log(text) {
   $("log").textContent =
     `[${new Date().toLocaleTimeString()}] ${text}\n` +
-    $("log").textContent.slice(0, 24000);
+    $("log").textContent.slice(0, 30000);
 }
+
 function fail(error) {
   const text = error?.message || String(error);
   message(text);
   log(text);
 }
-function action(id, fn) {
+
+function action(id, callback) {
   $(id).addEventListener("click", async () => {
     if ($(id).dataset.busy) return;
     $(id).dataset.busy = "1";
     controls();
+
     try {
-      await fn();
+      await callback();
     } catch (error) {
       fail(error);
     } finally {
@@ -388,17 +421,47 @@ function action(id, fn) {
     }
   });
 }
-function rtcConfig() {
+
+function transportMode() {
+  return ["udp", "tcp", "both"].includes($("transport").value)
+    ? $("transport").value
+    : "both";
+}
+
+function rtcConfig(mode = transportMode()) {
+  const servers = [];
+
+  if (mode !== "tcp") {
+    servers.push({
+      urls: `turn:${TURN_HOST}:${TURN_PORT}?transport=udp`,
+      username: TURN_USERNAME,
+      credential: TURN_PASSWORD
+    });
+  }
+
+  if (mode !== "udp") {
+    servers.push({
+      urls: `turn:${TURN_HOST}:${TURN_PORT}?transport=tcp`,
+      username: TURN_USERNAME,
+      credential: TURN_PASSWORD
+    });
+  }
+
   return {
-    iceServers: ICE_SERVERS,
-    iceTransportPolicy: "relay"
+    iceServers: servers,
+    iceTransportPolicy: "relay",
+    bundlePolicy: "max-bundle",
+    rtcpMuxPolicy: "require"
   };
 }
+
 function requireReady() {
   if (!ready) throw new Error("Firebase is not ready. Check diagnostics.");
 }
+
 function controls() {
   const inside = !!roomId;
+
   $("startPanel").classList.toggle("hidden", inside);
   $("roomPanel").classList.toggle("hidden", !inside);
   $("gridPanel").classList.toggle("hidden", !inside);
@@ -406,33 +469,46 @@ function controls() {
   $("studentPanel").classList.toggle("hidden", teacher);
 
   const disabled = {
-    createBtn: !ready || inside || roomBusy || $("role").value !== "teacher",
+    createBtn: !ready || inside || roomBusy ||
+      $("role").value !== "teacher",
     openBtn: !ready || inside || roomBusy,
     applyBtn: !teacher || closed,
     closeRoomBtn: !teacher || closed,
     copyBtn: !teacher || !roomId,
     leaveBtn: !student
   };
+
   document.querySelectorAll("button:not(.tile)").forEach(button => {
     button.disabled = !!button.dataset.busy || !!disabled[button.id];
   });
+
   $("auto").disabled = !teacher || closed;
 
-  $("state").textContent = !inside ? "Not in a room"
-    : closed ? "Room closed"
-    : teacher ? "Teacher room active"
-    : student ? student.phase
-    : "Click an empty tile to share";
+  // A room link advertises its selected transport to students.
+  $("transport").disabled = inside || roomBusy;
+
+  $("state").textContent = !inside
+    ? "Not in a room"
+    : closed
+      ? "Room closed"
+      : teacher
+        ? "Teacher room active"
+        : student
+          ? student.phase
+          : "Click an empty tile to share";
 }
+
 function layoutOK(value) {
   return value &&
-    Number.isInteger(value.rows) && Number.isInteger(value.cols) &&
+    Number.isInteger(value.rows) &&
+    Number.isInteger(value.cols) &&
     value.rows >= 1 && value.cols >= 1 &&
     value.rows <= 12 && value.cols <= 12 &&
     value.rows * value.cols <= 64 &&
-    [160,256,320].includes(value.width) &&
-    [1,2].includes(value.fps);
+    [160, 256, 320].includes(value.width) &&
+    [1, 2].includes(value.fps);
 }
+
 function metaOK(value) {
   return layoutOK(value) &&
     value.protocol === VERSION &&
@@ -441,26 +517,38 @@ function metaOK(value) {
     Number.isInteger(value.revision) &&
     typeof value.closed === "boolean";
 }
+
 function metaRef() {
   return ref(db, `rooms/${roomId}/meta`);
 }
-function attemptRef(person, attempt) {
-  return ref(db, `rooms/${roomId}/peers/${person}/${attempt}`);
+
+function attemptPath(person, attempt) {
+  return `rooms/${roomId}/peers/${person}/${attempt}`;
 }
+
+function attemptRef(person, attempt) {
+  return ref(db, attemptPath(person, attempt));
+}
+
 function peerKey(person, attempt) {
   return person + "/" + attempt;
 }
+
 function roomLink() {
   const url = new URL(location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("room", roomId);
+  url.searchParams.set("transport", transportMode());
   return url.href;
 }
+
 function send(peer, type, extra = {}) {
   if (!peer?.active || peer.dc?.readyState !== "open") return false;
+
   try {
     if (peer.dc.bufferedAmount > 262144) return false;
+
     peer.dc.send(JSON.stringify({
       protocol: VERSION,
       roomId,
@@ -468,22 +556,31 @@ function send(peer, type, extra = {}) {
       type,
       ...extra
     }));
+
     return true;
   } catch {
     return false;
   }
 }
+
 function commit() {
   if (!teacher || !meta) return Promise.resolve();
+
   meta.revision++;
   const snapshot = structuredClone(meta);
+
   for (const peer of peers.values()) {
     send(peer, "config", { meta: snapshot });
   }
+
   render();
-  writes = writes.catch(() => {}).then(() => set(metaRef(), snapshot));
-  writes.catch(fail);
-  return writes;
+
+  metadataQueue = metadataQueue
+    .catch(() => {})
+    .then(() => set(metaRef(), snapshot));
+
+  metadataQueue.catch(fail);
+  return metadataQueue;
 }
 
 async function createRoom() {
@@ -493,7 +590,7 @@ async function createRoom() {
 
   try {
     teacher = true;
-    roomId = uid();
+    roomId = uuid();
     closed = false;
 
     meta = {
@@ -506,6 +603,7 @@ async function createRoom() {
       auto: true,
       closed: false,
       revision: 1,
+      transport: transportMode(),
       seats: {}
     };
 
@@ -522,6 +620,7 @@ async function createRoom() {
 
           for (const [attempt, request] of Object.entries(attempts)) {
             if (!request || typeof request !== "object") continue;
+
             next.set(peerKey(person, attempt), {
               ...request,
               person,
@@ -538,8 +637,9 @@ async function createRoom() {
 
     $("roomLink").value = roomLink();
     $("auto").value = "true";
+
     render();
-    message("Room created. Auto accept is ON. Copy the student link.");
+    message("Room created. Auto accept is ON. Copy the new student link.");
   } catch (error) {
     teacher = false;
     roomId = "";
@@ -558,23 +658,30 @@ async function openRoom() {
 
   try {
     let id = $("roomInput").value.trim();
+
     if (id.includes("://")) {
       id = new URL(id).searchParams.get("room") || "";
     }
+
     if (!/^[a-zA-Z0-9-]{8,100}$/.test(id)) {
       throw new Error("Invalid room ID.");
     }
 
     const owner = await get(ref(db, `rooms/${id}/owner`));
+
     if (owner.val() === user.uid) {
       throw new Error(
+        "This browser has the teacher's Firebase identity. " +
         "Use another device, browser profile, or private window for the student."
       );
     }
 
     const snapshot = await get(ref(db, `rooms/${id}/meta`));
+
     if (!metaOK(snapshot.val()) || snapshot.val().closed) {
-      throw new Error("Room unavailable, closed, or created by an older page version.");
+      throw new Error(
+        "Room unavailable, closed, or created by an older page version."
+      );
     }
 
     roomId = id;
@@ -582,21 +689,30 @@ async function openRoom() {
     closed = false;
     meta = snapshot.val();
 
-    onValue(metaRef(), snapshot => {
-      const next = snapshot.val();
+    if (["both", "udp", "tcp"].includes(meta.transport)) {
+      $("transport").value = meta.transport;
+    }
+
+    onValue(metaRef(), current => {
+      const next = current.val();
+
       if (!next || next.closed) {
         closed = true;
         if (metaOK(next)) meta = next;
         message("Room closed.");
-        if (student) void stopStudent(student).catch(fail);
+
+        if (student) {
+          void stopStudent(student).catch(fail);
+        }
       } else if (metaOK(next) && next.revision >= meta.revision) {
         meta = next;
       }
+
       render();
     }, fail);
 
     render();
-    message("Click an empty seat, choose a screen, and press Share.");
+    message("Click an empty seat, select a screen, and press Share.");
   } finally {
     roomBusy = false;
     controls();
@@ -604,80 +720,131 @@ async function openRoom() {
 }
 
 /*
- * Non-trickle SDP:
- * return when ICE gathering completes, or after relay candidates settle.
- * No direct connection fallback is allowed.
+ * Candidates are collected from events, not local SDP inspection.
  */
-function relayDescription(pc) {
-  return new Promise((resolve, reject) => {
-    let finished = false;
-    let settleTimer = null;
-    let deadline = null;
-    let previousCount = 0;
+function candidateType(candidate) {
+  return candidate.type ||
+    candidate.candidate?.match(/\btyp\s+(\S+)/)?.[1] ||
+    "unknown";
+}
 
-    function cleanup() {
-      clearTimeout(settleTimer);
-      clearTimeout(deadline);
-      pc.removeEventListener("icecandidate", check);
-      pc.removeEventListener("icegatheringstatechange", check);
-      pc.removeEventListener("connectionstatechange", check);
-    }
+function candidateJSON(candidate) {
+  const value = candidate.toJSON();
 
-    function finish(error) {
-      if (finished) return;
-      finished = true;
-      cleanup();
+  // Firebase rejects undefined values.
+  return {
+    candidate: value.candidate,
+    sdpMid: value.sdpMid ?? null,
+    sdpMLineIndex: value.sdpMLineIndex ?? null,
+    usernameFragment: value.usernameFragment ?? null
+  };
+}
 
-      if (error) {
-        reject(error);
-        return;
-      }
+function publishCandidate(peer, candidate) {
+  if (!peer.active) return;
 
-      const description = pc.localDescription;
-      const count = (description?.sdp?.match(/ typ relay/g) || []).length;
+  peer.localCandidates++;
 
-      if (!count) {
-        reject(new Error(
-          "No TURN relay candidate from 20.24.69.131:3489. " +
-          "Verify server reachability, listening port, credentials and firewall. " +
-          "HTML cannot repair an unreachable TURN service."
-        ));
-        return;
-      }
+  if (peer.localCandidates > 100) {
+    log(`Seat ${peer.seat}: candidate publishing limit reached.`);
+    return;
+  }
 
-      log(`Gathered ${count} relay candidate(s).`);
-      resolve({
-        type: description.type,
-        sdp: description.sdp
-      });
-    }
+  const type = candidateType(candidate);
+  if (type === "relay") peer.localRelayCandidates++;
 
-    function check() {
-      if (finished) return;
+  log(
+    `Seat ${peer.seat || "?"}: local ICE candidate ` +
+    `${type}, ${candidate.protocol || "protocol unknown"}.`
+  );
 
-      if (pc.connectionState === "closed") {
-        finish(new Error("Connection closed."));
-        return;
-      }
+  const direction = peer.teacherSide ? "teacherIce" : "studentIce";
 
-      const count = (pc.localDescription?.sdp?.match(/ typ relay/g) || []).length;
-
-      if (count > previousCount) {
-        previousCount = count;
-        clearTimeout(settleTimer);
-        settleTimer = setTimeout(() => finish(), 3000);
-      }
-
-      if (pc.iceGatheringState === "complete") finish();
-    }
-
-    pc.addEventListener("icecandidate", check);
-    pc.addEventListener("icegatheringstatechange", check);
-    pc.addEventListener("connectionstatechange", check);
-
-    deadline = setTimeout(() => finish(), 25000);
-    check();
+  const write = push(
+    ref(db, `${peer.path}/${direction}`),
+    candidateJSON(candidate)
+  ).then(() => {
+    peer.candidatesPublished++;
+  }).catch(error => {
+    peer.error = "ICE signaling write failed: " + error.message;
+    log(peer.error);
+    render();
   });
+
+  peer.pendingWrites.add(write);
+  write.finally(() => peer.pendingWrites.delete(write));
+}
+
+/*
+ * Remote candidates can arrive before the SDP.
+ * Keep them in a bounded queue, then serialize addIceCandidate calls.
+ */
+function subscribeCandidates(peer) {
+  const direction = peer.teacherSide ? "studentIce" : "teacherIce";
+
+  peer.stopCandidates = onChildAdded(
+    ref(db, `${peer.path}/${direction}`),
+    snapshot => {
+      if (!peer.active || peer.seenCandidates.has(snapshot.key)) return;
+
+      peer.seenCandidates.add(snapshot.key);
+
+      if (peer.seenCandidates.size > 100) {
+        log(`Seat ${peer.seat}: remote candidate limit reached.`);
+        return;
+      }
+
+      const value = snapshot.val();
+
+      if (!value ||
+          typeof value.candidate !== "string" ||
+          value.candidate.length > 8192) return;
+
+      peer.remoteCandidates++;
+      peer.remoteQueue.push(value);
+      flushCandidates(peer);
+    },
+    error => {
+      peer.error = "ICE signaling read failed: " + error.message;
+      log(peer.error);
+      render();
+    }
+  );
+}
+
+function flushCandidates(peer) {
+  if (!peer.active || !peer.remoteReady) return;
+
+  while (peer.remoteQueue.length) {
+    const candidate = peer.remoteQueue.shift();
+
+    peer.candidateChain = peer.candidateChain
+      .then(async () => {
+        if (!peer.active) return;
+        await peer.pc.addIceCandidate(candidate);
+        peer.candidatesApplied++;
+      })
+      .catch(error => {
+        if (!peer.active) return;
+        peer.error = "Remote ICE candidate rejected: " + error.message;
+        log(`Seat ${peer.seat}: ${peer.error}`);
+      });
+  }
+}
+
+async function setRemote(peer, description) {
+  await peer.pc.setRemoteDescription(description);
+  if (!peer.active) return;
+
+  peer.remoteReady = true;
+  flushCandidates(peer);
+}
+
+function localDescriptionJSON(pc) {
+  return {
+    type: pc.localDescription.type,
+    sdp: pc.localDescription.sdp
+  };
 }
 
 function newPeer(person, attempt, teacherSide) {
@@ -687,6 +854,7 @@ function newPeer(person, attempt, teacherSide) {
     person,
     id: attempt,
     key: peerKey(person, attempt),
+    path: attemptPath(person, attempt),
     teacherSide,
     pc,
     active: true,
@@ -699,23 +867,58 @@ function newPeer(person, attempt, teacherSide) {
     error: "",
     answered: false,
     answering: false,
+    remoteReady: false,
+    remoteQueue: [],
+    seenCandidates: new Set(),
+    candidateChain: Promise.resolve(),
+    pendingWrites: new Set(),
+    stopCandidates: null,
+    localCandidates: 0,
+    localRelayCandidates: 0,
+    remoteCandidates: 0,
+    candidatesPublished: 0,
+    candidatesApplied: 0,
     bytes: 0,
     frames: null,
     lastFrame: 0,
     lastBeat: Date.now(),
-    version: uid()
+    version: uuid()
+  };
+
+  pc.onicecandidate = event => {
+    if (!peer.active) return;
+
+    if (event.candidate) {
+      publishCandidate(peer, event.candidate);
+    } else {
+      log(
+        `Seat ${peer.seat}: ICE gathering ended; ` +
+        `${peer.localRelayCandidates} local relay candidate(s).`
+      );
+
+      if (!peer.localRelayCandidates) {
+        peer.error = "No relay candidates from configured TURN transports";
+        render();
+        renderPeople();
+      }
+    }
   };
 
   pc.onicecandidateerror = event => {
-    log(`ICE server error ${event.errorCode || "unknown"} for configured TURN.`);
+    log(
+      `Seat ${peer.seat || "?"}: ICE server error ` +
+      `${event.errorCode || "unknown"}; ` +
+      `${event.url || "server URL unavailable"}.`
+    );
   };
 
   pc.oniceconnectionstatechange = () => {
     if (!peer.active) return;
-    log(`Seat ${peer.seat || "?"}: ICE ${pc.iceConnectionState}`);
+
+    log(`Seat ${peer.seat}: ICE ${pc.iceConnectionState}`);
 
     if (pc.iceConnectionState === "failed") {
-      peer.error = "ICE failed — check TURN relay/firewall";
+      peer.error = "ICE failed — inspect candidate counts and relay connectivity";
     }
 
     render();
@@ -726,6 +929,7 @@ function newPeer(person, attempt, teacherSide) {
     if (!peer.active) return;
 
     peer.status = pc.connectionState;
+
     if (pc.connectionState === "connected") {
       peer.error = "";
 
@@ -744,16 +948,19 @@ function newPeer(person, attempt, teacherSide) {
 
     peer.receiver = event.receiver;
     peer.stream = new MediaStream([event.track]);
-    peer.version = uid();
+    peer.version = uuid();
     peer.frames = null;
     peer.lastFrame = 0;
 
     event.track.addEventListener("ended", render, { once: true });
+
     log(`Seat ${peer.seat}: incoming video track received.`);
     render();
   };
 
   pc.ondatachannel = event => attachChannel(peer, event.channel);
+  subscribeCandidates(peer);
+
   return peer;
 }
 
@@ -773,6 +980,7 @@ function attachChannel(peer, channel) {
   channel.onmessage = event => {
     try {
       if (typeof event.data !== "string" || event.data.length > 50000) return;
+
       const value = JSON.parse(event.data);
 
       if (!peer.active ||
@@ -790,7 +998,9 @@ function attachChannel(peer, channel) {
 
         if (meta.closed) {
           closed = true;
-          if (student?.peer === peer) void stopStudent(student).catch(fail);
+          if (student?.peer === peer) {
+            void stopStudent(student).catch(fail);
+          }
         }
 
         render();
@@ -810,9 +1020,15 @@ function attachChannel(peer, channel) {
 
 function destroyPeer(peer) {
   if (!peer) return;
+
   peer.active = false;
+  peer.stopCandidates?.();
+  peer.stopCandidates = null;
+  peer.remoteQueue = [];
+
   try { peer.dc?.close(); } catch {}
   try { peer.pc.close(); } catch {}
+
   peer.stream = null;
 }
 
@@ -820,11 +1036,13 @@ async function capSender(sender) {
   try {
     const parameters = sender.getParameters();
     if (!parameters.encodings?.length) return;
-    parameters.encodings[0].maxBitrate = 120000;
+
+    parameters.encodings[0].maxBitrate = 150000;
     parameters.encodings[0].maxFramerate = 2;
+
     await sender.setParameters(parameters);
   } catch {
-    // Browser-dependent targets, not guaranteed total bandwidth.
+    // Requested encoder targets, not guaranteed total bandwidth.
   }
 }
 
@@ -845,6 +1063,7 @@ function processRequests() {
 
   for (const [key, peer] of peers) {
     const request = requests.get(key);
+
     if (!request || request.state === "stopped") {
       void removePeer(key, "", false).catch(fail);
     }
@@ -861,6 +1080,7 @@ function processRequests() {
 
 async function accept(key) {
   if (!teacher || closed || peers.has(key)) return;
+
   const request = requests.get(key);
   if (!validRequest(request)) return;
 
@@ -879,7 +1099,6 @@ async function accept(key) {
   peer.status = "Applying student offer";
   peers.set(key, peer);
 
-  // Reserve synchronously before awaiting network work.
   meta.seats[String(request.seat)] = {
     person: request.person,
     attempt: request.attempt
@@ -889,21 +1108,21 @@ async function accept(key) {
     await commit();
     if (!peer.active) return;
 
-    await peer.pc.setRemoteDescription(request.offer);
+    await setRemote(peer, request.offer);
     if (!peer.active) return;
 
     await peer.pc.setLocalDescription(await peer.pc.createAnswer());
-    const answer = await relayDescription(peer.pc);
     if (!peer.active) return;
 
-    peer.status = "Answer published — connecting";
-
+    // Publish immediately. ICE candidates are signaled separately.
     await update(attemptRef(request.person, request.attempt), {
       state: "accepted",
-      answer
+      answer: localDescriptionJSON(peer.pc)
     });
 
-    log(`Seat ${peer.seat}: teacher answer published.`);
+    peer.status = "Answer published — trickling ICE";
+    log(`Seat ${peer.seat}: teacher answer published immediately.`);
+
   } catch (error) {
     if (peer.active) {
       peer.error = error.message;
@@ -914,7 +1133,9 @@ async function accept(key) {
         reason: error.message
       }).catch(databaseError => log(databaseError.message));
     }
+
     throw error;
+
   } finally {
     render();
     renderPeople();
@@ -924,6 +1145,7 @@ async function accept(key) {
 async function reject(key) {
   const request = requests.get(key);
   if (!request) return;
+
   await update(attemptRef(request.person, request.attempt), {
     state: "rejected",
     reason: "Teacher declined the request."
@@ -961,10 +1183,12 @@ async function removePeer(
 
 function renderPeople() {
   if (!teacher) return;
+
   $("people").replaceChildren();
 
   for (const [key, request] of requests) {
     const peer = peers.get(key);
+
     if (!peer && request.state !== "requested") continue;
 
     const row = document.createElement("div");
@@ -974,7 +1198,9 @@ function renderPeople() {
     text.textContent =
       `Student ${request.seat} — seat ${request.seat}\n` +
       (peer
-        ? `${peer.status}; ICE ${peer.pc.iceConnectionState}` +
+        ? `${peer.status}; ICE ${peer.pc.iceConnectionState}\n` +
+          `Relay candidates: ${peer.localRelayCandidates}; ` +
+          `remote candidates applied: ${peer.candidatesApplied}` +
           (peer.error ? `\n${peer.error}` : "")
         : "Waiting in lobby");
 
@@ -994,6 +1220,7 @@ function renderPeople() {
       no.onclick = () => reject(key).catch(fail);
 
       row.append(yes, no);
+
     } else {
       const diagnostic = document.createElement("button");
       diagnostic.textContent = "Diagnose";
@@ -1017,8 +1244,8 @@ function renderPeople() {
 }
 
 /*
- * Called directly from the tile click.
- * The screen picker is opened before network awaits.
+ * This function is called directly by a grid-tile click.
+ * Do not move network awaits before getDisplayMedia().
  */
 async function startSeat(seat) {
   if (teacher || closed || !roomId || student ||
@@ -1030,12 +1257,14 @@ async function startSeat(seat) {
   }
 
   if (!navigator.mediaDevices?.getDisplayMedia) {
-    throw new Error("Use HTTPS and a desktop browser supporting screen capture.");
+    throw new Error(
+      "Use HTTPS and a desktop browser supporting screen capture."
+    );
   }
 
   const current = {
     person: user.uid,
-    id: uid(),
+    id: uuid(),
     seat,
     active: true,
     phase: "Choose a screen in the browser prompt",
@@ -1046,8 +1275,9 @@ async function startSeat(seat) {
     track: null,
     timer: null,
     peer: null,
-    stopWatch: null,
-    write: null,
+    subscriptions: [],
+    initialWrite: null,
+    offerWrite: null,
     cleanup: null,
     draws: 0
   };
@@ -1082,6 +1312,7 @@ async function startSeat(seat) {
     current.video.srcObject = desktop;
 
     await current.video.play();
+
     if (!current.active || student !== current || closed) return;
 
     current.canvas = document.createElement("canvas");
@@ -1089,6 +1320,7 @@ async function startSeat(seat) {
     current.canvas.height = Math.round(meta.width * 9 / 16);
 
     const context = current.canvas.getContext("2d", { alpha: false });
+
     if (!context || !current.canvas.captureStream) {
       throw new Error("Canvas capture is unsupported.");
     }
@@ -1100,7 +1332,8 @@ async function startSeat(seat) {
         const width = meta.width;
         const height = Math.round(width * 9 / 16);
 
-        if (current.canvas.width !== width || current.canvas.height !== height) {
+        if (current.canvas.width !== width ||
+            current.canvas.height !== height) {
           current.canvas.width = width;
           current.canvas.height = height;
         }
@@ -1129,6 +1362,7 @@ async function startSeat(seat) {
         }
 
         current.timer = setTimeout(draw, 1000 / meta.fps);
+
       } catch (error) {
         fail(error);
         void stopStudent(current).catch(fail);
@@ -1139,7 +1373,26 @@ async function startSeat(seat) {
 
     current.output = current.canvas.captureStream(2);
     current.track = current.output.getVideoTracks()[0];
+
     if (!current.track) throw new Error("No canvas video track.");
+
+    /*
+     * Create the unique record before candidates start writing beneath it.
+     * Later writes use update(), so they do not erase ICE children.
+     */
+    current.initialWrite = set(
+      attemptRef(current.person, current.id),
+      {
+        protocol: VERSION,
+        state: "preparing",
+        seat,
+        createdAt: Date.now()
+      }
+    );
+
+    await current.initialWrite;
+
+    if (!current.active || student !== current) return;
 
     const peer = newPeer(current.person, current.id, false);
     peer.seat = seat;
@@ -1156,96 +1409,109 @@ async function startSeat(seat) {
       peer.pc.createDataChannel("classroom", { ordered: true })
     );
 
-    current.phase = "Gathering TURN relay candidates";
+    const base = attemptPath(current.person, current.id);
+
+    current.subscriptions.push(
+      onValue(ref(db, `${base}/answer`), snapshot => {
+        if (!current.active || student !== current) return;
+
+        const answer = snapshot.val();
+
+        if (!answer ||
+            answer.type !== "answer" ||
+            typeof answer.sdp !== "string" ||
+            answer.sdp.length > 1000000 ||
+            peer.answered ||
+            peer.answering ||
+            peer.pc.signalingState !== "have-local-offer") return;
+
+        peer.answering = true;
+
+        setRemote(peer, answer)
+          .then(async () => {
+            if (!peer.active || !current.active) return;
+
+            peer.answered = true;
+            await capSender(peer.sender);
+
+            current.phase = peer.pc.connectionState === "connected"
+              ? "Connected — screen streaming"
+              : "Answer applied — exchanging ICE candidates";
+
+            log(`Seat ${seat}: teacher answer applied.`);
+            render();
+          })
+          .catch(error => {
+            peer.error = error.message;
+            current.phase = "Answer failed — see diagnostics";
+            fail(error);
+            render();
+          })
+          .finally(() => {
+            peer.answering = false;
+          });
+      }, fail)
+    );
+
+    current.subscriptions.push(
+      onValue(ref(db, `${base}/state`), async snapshot => {
+        if (!current.active || student !== current) return;
+
+        const state = snapshot.val();
+
+        if (state === "rejected") {
+          const reason = await get(ref(db, `${base}/reason`))
+            .catch(() => null);
+
+          if (!current.active || student !== current) return;
+
+          message(reason?.val() || "Request rejected.");
+          void stopStudent(current).catch(fail);
+        }
+
+        if (state === "setup-error") {
+          const reason = await get(ref(db, `${base}/reason`))
+            .catch(() => null);
+
+          if (!current.active || student !== current) return;
+
+          peer.error = reason?.val() || "Teacher setup failed.";
+          current.phase = "Setup failed — see diagnostics";
+          message(peer.error);
+          render();
+        }
+      }, fail)
+    );
+
+    current.phase = "Creating offer — ICE candidates will be sent automatically";
     render();
 
     await peer.pc.setLocalDescription(await peer.pc.createOffer());
-    const offer = await relayDescription(peer.pc);
 
     if (!current.active || student !== current) return;
 
-    current.write = set(attemptRef(current.person, current.id), {
-      protocol: VERSION,
-      state: "requested",
-      seat,
-      offer,
-      createdAt: Date.now()
-    });
+    /*
+     * Publish SDP immediately. Do not wait for ICE gathering.
+     * onicecandidate separately publishes candidates.
+     */
+    current.offerWrite = update(
+      attemptRef(current.person, current.id),
+      {
+        state: "requested",
+        offer: localDescriptionJSON(peer.pc)
+      }
+    );
 
-    await current.write;
+    await current.offerWrite;
+
     if (!current.active || student !== current) return;
 
     current.phase = meta.auto
       ? "Waiting for automatic teacher acceptance"
       : "Waiting in teacher lobby";
 
-    current.stopWatch = onValue(
-      attemptRef(current.person, current.id),
-      snapshot => {
-        if (!current.active || student !== current) return;
-        const request = snapshot.val();
-
-        if (!request) {
-          message("Request is missing. Stop sharing and retry.");
-          return;
-        }
-
-        if (request.state === "rejected") {
-          message(request.reason || "Request rejected.");
-          void stopStudent(current).catch(fail);
-          return;
-        }
-
-        if (request.state === "setup-error") {
-          peer.error = request.reason || "Teacher setup failed.";
-          current.phase = "Setup failed — see diagnostics";
-          message(peer.error);
-          render();
-          return;
-        }
-
-        if (request.state === "accepted" &&
-            request.answer?.type === "answer" &&
-            typeof request.answer.sdp === "string" &&
-            request.answer.sdp.length < 1000000 &&
-            !peer.answered && !peer.answering &&
-            peer.pc.signalingState === "have-local-offer") {
-
-          peer.answering = true;
-
-          peer.pc.setRemoteDescription(request.answer)
-            .then(async () => {
-              if (!peer.active || !current.active) return;
-
-              peer.answered = true;
-              await capSender(peer.sender);
-
-              current.phase = peer.pc.connectionState === "connected"
-                ? "Connected — screen streaming"
-                : "Answer applied — establishing connection";
-
-              log(`Seat ${seat}: teacher answer applied.`);
-              render();
-            })
-            .catch(error => {
-              peer.error = error.message;
-              current.phase = "Answer failed — see diagnostics";
-              fail(error);
-              render();
-            })
-            .finally(() => {
-              peer.answering = false;
-            });
-        }
-      },
-      error => {
-        fail(error);
-        current.phase = "Signaling error";
-        render();
-      }
-    );
-
-    message("Screen captured. Waiting for automatic connection setup.");
+    message("Screen captured. Offer and ICE candidates are being exchanged.");
+    log(`Seat ${seat}: student offer published without waiting for ICE gathering.`);
     render();
 
   } catch (error) {
@@ -1275,8 +1541,11 @@ async function stopStudent(current) {
   current.active = false;
   if (student === current) student = null;
 
-  current.stopWatch?.();
-  current.stopWatch = null;
+  for (const unsubscribe of current.subscriptions) {
+    unsubscribe();
+  }
+  current.subscriptions = [];
+
   clearTimeout(current.timer);
 
   current.desktop?.getTracks().forEach(track => track.stop());
@@ -1288,8 +1557,10 @@ async function stopStudent(current) {
 
   current.cleanup = (async () => {
     try {
-      if (current.write) {
-        await current.write.catch(() => {});
+      await current.initialWrite?.catch(() => {});
+      await current.offerWrite?.catch(() => {});
+
+      if (current.initialWrite) {
         await update(attemptRef(current.person, current.id), {
           state: "stopped",
           stoppedAt: Date.now()
@@ -1313,7 +1584,9 @@ async function applyGrid() {
     fps: Number($("fps").value)
   };
 
-  if (!layoutOK(value)) throw new Error("Use 1–64 seats and supported preview settings.");
+  if (!layoutOK(value)) {
+    throw new Error("Use 1–64 seats and supported preview settings.");
+  }
 
   if (Object.keys(meta.seats || {}).some(
     seat => Number(seat) > value.rows * value.cols
@@ -1334,7 +1607,7 @@ async function changeAuto() {
 }
 
 async function closeRoom() {
-  if (!confirm("Close the room and disconnect students?")) return;
+  if (!confirm("Close this room and disconnect students?")) return;
 
   closed = true;
   meta.closed = true;
@@ -1347,8 +1620,8 @@ async function closeRoom() {
   peers.clear();
   meta.seats = {};
   requestsStop?.();
-  render();
 
+  render();
   await commit();
   message("Room closed. Reload to create another room.");
 }
@@ -1372,12 +1645,15 @@ function newTile(seat) {
   element.append(video, title, health);
 
   const tile = {
-    seat, element, video, title, health,
+    seat,
+    element,
+    video,
+    title,
+    health,
     stream: null,
     binding: 0
   };
 
-  // Direct user gesture is required for screen capture.
   element.onclick = () => {
     if (!teacher) {
       void startSeat(seat).catch(fail);
@@ -1511,10 +1787,12 @@ async function checkHealth() {
 
       try {
         const stats = await peer.receiver.getStats();
+
         stats.forEach(report => {
           if (report.type === "inbound-rtp" &&
               (report.kind === "video" || report.mediaType === "video")) {
             bytes += report.bytesReceived || 0;
+
             if (typeof report.framesDecoded === "number") {
               frames = (frames ?? 0) + report.framesDecoded;
             }
@@ -1531,9 +1809,11 @@ async function checkHealth() {
       const now = performance.now();
 
       peer.bytes = bytes;
+
       if (frames !== null && frames > 0 && frames !== peer.frames) {
         peer.lastFrame = now;
       }
+
       peer.frames = frames;
 
       if (closed || peer.pc.connectionState !== "connected") {
@@ -1562,18 +1842,27 @@ async function checkHealth() {
 
 async function diagnose(peer) {
   $("diagnostics").open = true;
+
   if (!peer?.active) {
     log("No active peer.");
     return;
   }
 
   const stats = await peer.pc.getStats();
+
   const lines = [
     `--- Seat ${peer.seat} ---`,
+    `Transport setting: ${transportMode()}`,
     `Signaling: ${peer.pc.signalingState}`,
     `ICE: ${peer.pc.iceConnectionState}`,
+    `ICE gathering: ${peer.pc.iceGatheringState}`,
     `Connection: ${peer.pc.connectionState}`,
-    `DataChannel: ${peer.dc?.readyState || "none"}`
+    `DataChannel: ${peer.dc?.readyState || "none"}`,
+    `Local relay candidates: ${peer.localRelayCandidates}`,
+    `Candidates published to Firebase: ${peer.candidatesPublished}`,
+    `Remote candidates received: ${peer.remoteCandidates}`,
+    `Remote candidates applied: ${peer.candidatesApplied}`,
+    `Remote candidates waiting for SDP: ${peer.remoteQueue.length}`
   ];
 
   let selected = null;
@@ -1592,8 +1881,9 @@ async function diagnose(peer) {
 
       lines.push(
         `Pair: ${report.state}`,
-        `Local candidate: ${local?.candidateType || "?"}, ${local?.protocol || "?"}`,
-        `Remote candidate: ${remote?.candidateType || "?"}`,
+        `Local: ${local?.candidateType || "?"}, ` +
+          `${local?.protocol || "?"}, relay transport ${local?.relayProtocol || "?"}`,
+        `Remote: ${remote?.candidateType || "?"}`,
         `Pair bytes sent/received: ${report.bytesSent || 0}/${report.bytesReceived || 0}`
       );
     }
@@ -1623,6 +1913,7 @@ async function diagnose(peer) {
   }
 
   if (peer.error) lines.push("Error: " + peer.error);
+
   log(lines.join("\n"));
 }
 
@@ -1639,26 +1930,111 @@ async function diagnoseAll() {
   }
 }
 
+/*
+ * Independent per-transport allocation test.
+ * Success is based on actual onicecandidate relay events.
+ * No local SDP string inspection is used.
+ */
+async function testTransport(mode) {
+  const pc = new RTCPeerConnection(rtcConfig(mode));
+
+  return new Promise(resolve => {
+    let finished = false;
+    let relayCount = 0;
+    let timer;
+
+    function finish(success, reason) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      pc.close();
+
+      const result = {
+        mode,
+        success,
+        relayCount,
+        reason
+      };
+
+      log(
+        `TURN ${mode.toUpperCase()}: ` +
+        `${success ? "PASS" : "FAIL"} — ${reason}`
+      );
+
+      resolve(result);
+    }
+
+    pc.onicecandidate = event => {
+      if (finished) return;
+
+      if (event.candidate) {
+        const type = candidateType(event.candidate);
+
+        log(
+          `TURN ${mode.toUpperCase()} event candidate: ` +
+          `${type}, ${event.candidate.protocol || "unknown protocol"}`
+        );
+
+        if (type === "relay") {
+          relayCount++;
+          finish(true, "Relay candidate received from browser event.");
+        }
+      } else {
+        finish(false, "Gathering completed without a relay candidate.");
+      }
+    };
+
+    pc.onicecandidateerror = event => {
+      log(
+        `TURN ${mode.toUpperCase()} error ${event.errorCode || "unknown"}: ` +
+        `${event.errorText || "no error text"}`
+      );
+    };
+
+    timer = setTimeout(() => {
+      finish(false, "No relay event received within 30 seconds.");
+    }, 30000);
+
+    (async () => {
+      try {
+        pc.createDataChannel("turn-test");
+        await pc.setLocalDescription(await pc.createOffer());
+      } catch (error) {
+        finish(false, error.message);
+      }
+    })();
+  });
+}
+
 async function testTurn() {
   $("diagnostics").open = true;
-  message("Testing turn:20.24.69.131:3489…");
+  message("Testing TURN/UDP and TURN/TCP separately. Please wait up to 30 seconds.");
 
-  const pc = new RTCPeerConnection(rtcConfig());
-  pc.onicecandidateerror = event => {
-    log(`TURN test ICE server error ${event.errorCode || "unknown"}.`);
-  };
+  const results = await Promise.all([
+    testTransport("udp"),
+    testTransport("tcp")
+  ]);
 
-  try {
-    pc.createDataChannel("allocation-test");
-    await pc.setLocalDescription(await pc.createOffer());
-    await relayDescription(pc);
+  const udp = results.find(result => result.mode === "udp");
+  const tcp = results.find(result => result.mode === "tcp");
 
+  if (udp.success || tcp.success) {
     message(
-      "TURN allocation succeeded. This verifies allocation/authentication, " +
-      "not end-to-end media relay-port reachability."
+      `TURN test: UDP ${udp.success ? "PASS" : "FAIL"}, ` +
+      `TCP ${tcp.success ? "PASS" : "FAIL"}.\n` +
+      (tcp.success && !udp.success
+        ? "Select TCP only before creating a new room."
+        : "At least one transport allocates a relay. Create a new room.") +
+      "\nAllocation success does not yet prove end-to-end media connectivity."
     );
-  } finally {
-    pc.close();
+  } else {
+    message(
+      "Both browser TURN tests failed to produce relay candidates.\n" +
+      "Compare these exact URLs and credentials with the tool where your TURN test succeeds:\n" +
+      `turn:${TURN_HOST}:${TURN_PORT}?transport=udp\n` +
+      `turn:${TURN_HOST}:${TURN_PORT}?transport=tcp\n` +
+      "A TLS-only service would require a turns: URL and a valid hostname/certificate."
+    );
   }
 }
 
@@ -1707,7 +2083,7 @@ action("downloadBtn", () => {
 
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "classroom-fixed-turn.html";
+  anchor.download = "classroom-trickle-ice.html";
   anchor.click();
 
   setTimeout(() => URL.revokeObjectURL(url), 1500);
@@ -1726,7 +2102,14 @@ window.addEventListener("beforeunload", () => {
   for (const peer of peers.values()) destroyPeer(peer);
 });
 
-const incomingRoom = new URL(location.href).searchParams.get("room");
+const incomingURL = new URL(location.href);
+const incomingRoom = incomingURL.searchParams.get("room");
+const incomingTransport = incomingURL.searchParams.get("transport");
+
+if (["both", "udp", "tcp"].includes(incomingTransport)) {
+  $("transport").value = incomingTransport;
+}
+
 if (incomingRoom) {
   $("role").value = "student";
   $("roomInput").value = incomingRoom;
@@ -1759,8 +2142,9 @@ try {
   if (incomingRoom) {
     await openRoom();
   } else {
-    message("TURN is preconfigured. Test it, then create a room.");
+    message("Click Test UDP and TCP, then create a new room.");
   }
+
 } catch (error) {
   if (!ready) $("firebaseState").textContent = "Firebase initialization failed";
   fail(error);
