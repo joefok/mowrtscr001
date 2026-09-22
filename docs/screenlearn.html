@@ -16,11 +16,14 @@ body{margin:0}
 main{max-width:1600px;margin:auto;padding:16px}
 h1{font-size:1.5rem;margin:0 0 10px}
 h2{font-size:1.1rem;margin:0 0 12px}
-section{background:#192333;border:1px solid #42536d;border-radius:12px;padding:16px;margin:14px 0}
+section{
+ background:#192333;border:1px solid #42536d;
+ border-radius:12px;padding:16px;margin:14px 0
+}
 p{line-height:1.5}
 small,.muted{color:#bdc9da}
 .row{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
-label{display:flex;align-items:center;gap:6px}
+label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 button,input,select{
  font:inherit;color:inherit;background:#111d2b;
  border:1px solid #596e8c;border-radius:7px;padding:9px 11px
@@ -30,32 +33,56 @@ button:hover:not(:disabled){background:#294361}
 button:disabled{opacity:.5;cursor:not-allowed}
 .primary{background:#185184}
 .danger{border-color:#c18080}
-input[type=number]{width:72px}
+input[type=number]{width:78px}
 input[type=checkbox]{width:18px;height:18px}
 .link{flex:1;min-width:180px}
 [hidden]{display:none!important}
-.badge{border:1px solid #5b6d85;border-radius:18px;padding:4px 8px;font-size:.8rem}
-#notice{white-space:pre-wrap;background:#213a52;border-left:4px solid #83c3ff;padding:12px;border-radius:7px;margin:14px 0}
+.badge{
+ border:1px solid #5b6d85;border-radius:18px;
+ padding:4px 8px;font-size:.8rem
+}
+#notice{
+ white-space:pre-wrap;background:#213a52;border-left:4px solid #83c3ff;
+ padding:12px;border-radius:7px;margin:14px 0
+}
 #notice.error{background:#452d34;border-color:#ff9b9b}
 #viewport{overflow:auto}
 #grid{display:grid;gap:8px}
-.tile{min-width:0;text-align:left;padding:0;overflow:hidden;background:#3b414b;border:1px solid #5e6d82;border-radius:9px}
+.tile{
+ min-width:0;text-align:left;padding:0;overflow:hidden;
+ background:#3b414b;border:1px solid #5e6d82;border-radius:9px
+}
 .head{padding:7px;font-size:.8rem}
 .picture{position:relative;aspect-ratio:16/9;background:#464c56}
 .picture video{width:100%;height:100%;display:block;object-fit:contain}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:6px;font-size:.75rem}
+.overlay{
+ position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+ text-align:center;padding:6px;font-size:.75rem
+}
 .tile:not(.live) video{opacity:.15;filter:grayscale(1)}
 .tile.live{border-color:#58ba96}
 .tile.live .overlay{display:none}
 .tile.mine{outline:2px solid #e7c367}
-.foot{padding:5px;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot{
+ padding:5px;font-size:.68rem;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis
+}
 #people{display:grid;gap:8px;margin-top:12px}
-.person{padding:9px;border:1px solid #42536d;border-radius:7px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.person{
+ padding:9px;border:1px solid #42536d;border-radius:7px;
+ display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap
+}
 .personText{flex:1;min-width:180px}
 .errorText{color:#ffb0b0}
-pre{background:#0c1521;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:500px;overflow:auto;font-size:12px}
+pre{
+ background:#0c1521;padding:12px;white-space:pre-wrap;
+ overflow-wrap:anywhere;max-height:500px;overflow:auto;font-size:12px
+}
 summary{cursor:pointer}
-dialog{width:min(1000px,95vw);background:#192538;color:inherit;border:1px solid #75849d;border-radius:12px}
+dialog{
+ width:min(1000px,95vw);background:#192538;color:inherit;
+ border:1px solid #75849d;border-radius:12px
+}
 dialog::backdrop{background:#000b}
 #zoomVideo{width:100%;max-height:72vh;background:#424852}
 @media(max-width:650px){
@@ -72,14 +99,14 @@ dialog::backdrop{background:#000b}
 <div class="row">
  <span id="firebaseState" class="badge">Firebase: connecting…</span>
  <span class="badge">TURN relay only</span>
- <span class="badge">Delegated teachers · v11</span>
+ <span class="badge">Seat timeout recovery · v12</span>
 </div>
 <div id="notice">Loading…</div>
 
 <section id="startPanel">
  <h2>Create or reopen a classroom</h2>
  <div class="row">
-  <label>TURN
+  <label>TURN transport
    <select id="transport">
     <option value="tcp">TCP only</option>
     <option value="udp">UDP only</option>
@@ -89,8 +116,8 @@ dialog::backdrop{background:#000b}
   <button id="createBtn" class="primary" disabled>Create teacher room</button>
  </div>
  <div class="row" style="margin-top:12px">
-  <input id="roomInput" class="link" placeholder="Room link, teacher invitation link, or room ID">
-  <button id="openBtn" disabled>Open</button>
+  <input id="roomInput" class="link" placeholder="Room link, teacher invitation, or room ID">
+  <button id="openBtn" disabled>Open room</button>
   <button id="lastBtn" disabled>Last room</button>
  </div>
 </section>
@@ -108,20 +135,16 @@ dialog::backdrop{background:#000b}
  </div>
 
  <div id="teacherAccess" hidden>
-  <p><strong>Private teacher access</strong> — never share this link with students.</p>
+  <p><strong>Private teacher access:</strong> do not share this link with students.</p>
   <div class="row">
-   <input id="teacherLink" class="link" readonly aria-label="Private teacher invitation link">
+   <input id="teacherLink" class="link" readonly aria-label="Private teacher link">
    <button id="copyTeacherBtn">Copy teacher takeover link</button>
    <button id="rotateBtn" class="danger" hidden>Revoke delegated access</button>
   </div>
-  <p class="muted">
-   This link grants teacher control to another browser. Opening it moves control
-   to that browser. Only one controlling teacher receives streams at a time.
-  </p>
  </div>
 
  <div id="standbyPanel" hidden>
-  <p>This browser is authorized as a teacher, but another tab may control the room.</p>
+  <p>Another teacher tab may control the room.</p>
   <button id="takeoverBtn" class="primary">Take control here</button>
  </div>
 
@@ -138,15 +161,27 @@ dialog::backdrop{background:#000b}
     </select>
    </label>
    <label>FPS <select id="fps"><option>1</option><option>2</option></select></label>
-   <button id="applyBtn">Save settings</button>
   </div>
   <div class="row" style="margin-top:12px">
+   <label><input id="autoRelease" type="checkbox" checked>Release inactive seats</label>
+   <label>After
+    <input id="seatTimeout" type="number" min="1" max="1440" value="5">
+    minutes
+   </label>
+   <button id="applyBtn">Save settings</button>
    <button id="reconnectAllBtn">Reconnect all</button>
    <button id="closeRoomBtn" class="danger">Close room permanently</button>
   </div>
-  <div class="row" style="margin-top:12px">
-   <label>Student seat link <input id="linkSeat" type="number" min="1" max="64" value="1"></label>
-   <button id="copySeatBtn">Copy preselected-seat link</button>
+  <p class="muted">
+   A recent student capture presence or a working connection protects a seat.
+   Inactive seats expire after the configured grace period.
+   Automatic release requires this controlling teacher to be online.
+  </p>
+  <div class="row">
+   <label>Student seat link
+    <input id="linkSeat" type="number" min="1" max="64" value="1">
+   </label>
+   <button id="copySeatBtn">Copy seat-specific link</button>
   </div>
   <div id="people"></div>
  </div>
@@ -155,14 +190,14 @@ dialog::backdrop{background:#000b}
   <p id="studentHelp"></p>
   <div class="row">
    <button id="startShareBtn" class="primary">Start sharing selected seat</button>
-   <button id="stopBtn" disabled>Stop sharing — keep seat</button>
+   <button id="stopBtn" disabled>Stop sharing — retain temporarily</button>
    <button id="retryBtn" disabled>Reconnect</button>
-   <button id="releaseBtn" class="danger" disabled>Release seat</button>
+   <button id="releaseBtn" class="danger" disabled>Release seat now</button>
   </div>
   <p class="muted">
-   Screen selection and permission are controlled by your browser.
-   A URL cannot bypass them. After capture starts, network reconnection does
-   not require another prompt unless capture has ended.
+   If your link selects an occupied seat, you may approve capture and wait.
+   The current active student is not evicted. Your connection starts when the seat
+   is released and the teacher accepts you.
   </p>
  </div>
 </section>
@@ -189,14 +224,15 @@ dialog::backdrop{background:#000b}
 </section>
 
 <p class="muted">
- Keep one sharing tab per student browser profile. Browser restart or student
- refresh ends screen capture; the seat persists but capture needs approval again.
- Persistent identity depends on retained site storage.
+ Screen sharing needs a real student click and browser approval.
+ Refreshing/restarting the student browser ends capture; it cannot resume silently.
+ Teacher authorization and student identity persist only while browser storage is retained.
 </p>
 <p class="muted">
- Test deployment: TURN credentials are public in this file. Teacher invitation
- links are sensitive bearer credentials. Use institutional authentication and
- temporary TURN credentials for production. No 40-device load test is claimed.
+ One controlling teacher and one sharing tab per student browser profile.
+ Public TURN credentials and teacher bearer links are for this test deployment.
+ Use institutional authentication, reviewed permissions and temporary TURN
+ credentials for production. No 40-device load test is claimed.
 </p>
 </main>
 
@@ -219,27 +255,38 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 /*
- V11 ARCHITECTURE / REVIEW NOTES
- ------------------------------
- - Existing persistent v8 room metadata remains compatible.
- - Teacher delegation requires the supplied NEW Firebase rules.
- - A teacherKey is a bearer invitation. A recipient writes it to their own
-   teachers/{uid} grant; database rules verify it against the room key.
- - Rotating teacherKey invalidates previous grants for future database access.
-   It does not erase information previously viewed or downloaded.
- - Generated teacher links place teacherKey in the URL fragment, not GET.
- - GET parameters configure UI and authorized actions; role=teacher alone
-   never grants authority.
- - Screen capture is never requested automatically during page load.
-   start=1 preselects the Start sharing action; the real click remains required.
- - Source capture survives replacing a peer connection, but not page refresh.
- - All WebRTC peers are relay-only and use complete gathered SDP unchanged.
- - One controlling teacher is supported, not simultaneous multi-teacher viewing.
- - Metadata writes are serialized and read-checked, not an atomic distributed
-   controller lease. Avoid simultaneous teacher takeover.
+ V12: INACTIVE SEAT EXPIRY / REVIEW NOTES
+ --------------------------------------
+ Existing v8+ room schema remains compatible.
+ Requires the delegated-teacher Firebase rules supplied with v11.
+
+ New teacher metadata:
+   autoRelease: boolean (default true)
+   seatTimeoutSec: 60..86400 (default 300)
+   seats/{number}/inactiveSince: server-adjusted timestamp
+
+ Important expiry rules:
+ - A requesting replacement browser never evicts a currently active student.
+ - Fresh CAPTURE presence or fresh connected DataChannel heartbeat protects seat.
+ - A page open without capture does not indefinitely protect a reservation.
+ - Temporary absence starts a persistent grace period, not immediate release.
+ - Expiry operates only while teacher is controlling, online, and peer data loaded.
+ - Before expiry, fresh metadata and student presence are re-read.
+ - Automatic expiry removes reservation; it does NOT stop the old capture.
+   If the old student later returns, normal seat arbitration applies.
+ - Teacher release is authoritative but is not an atomic multi-controller lease.
+   Use only one controlling teacher; avoid simultaneous takeover.
+
+ A seat-specific new browser may capture while waiting, but creates no WebRTC
+ offer until the seat is free. Its presence explains "waiting for occupied seat".
+
+ Raw capture and canvas survive peer replacement, not page reload.
+ Each connection uses a cloned canvas track.
+ All WebRTC connections remain relay-only. No candidate rewriting.
+ Complete gathered SDP is exchanged unchanged.
 */
 
-const APP="classroom-delegated-v11";
+const APP="classroom-seat-expiry-v12";
 const PROTOCOL="classroom-persistent-v8";
 const TURN={host:"20.24.69.131",port:3478,username:"testuser",password:"testpass"};
 const FIREBASE={
@@ -256,22 +303,29 @@ const $=id=>document.getElementById(id);
 const uid=()=>crypto.randomUUID();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const logs=[],peers=new Map(),tiles=new Map(),accepting=new Set(),statuses=new Map();
+const releasing=new Set();
 let db,user,ready=false,online=false,offset=0;
-let room="",meta=null,requests={},isOwner=false,isTeacher=false,controlling=false;
-let epoch="",teacherSecret="",claiming=false,busy=false,queue=Promise.resolve();
+let room="",meta=null,requests={},peersLoaded=false;
+let isOwner=false,isTeacher=false,controlling=false,epoch="",teacherSecret="";
+let claiming=false,busy=false,queue=Promise.resolve();
 let student=null,capturing=false,retrySerial=0,retryAt=0;
 let beatBusy=false,lastBeat=0,presenceBusy=false,presenceAt=0;
-let statsBusy=false,studentLoopBusy=false,scanQueued=false,zoomSeat=null;
+let statsBusy=false,studentLoopBusy=false,scanQueued=false;
+let expiryBusy=false,lastExpiryScan=0,zoomSeat=null;
 let idlePhase="Screen permission required",lastNetwork=0;
 let pageConfig=new URLSearchParams(location.search);
-const pageFragment=new URLSearchParams(location.hash.slice(1));
-let incomingKey=pageFragment.get("teacherKey")||pageConfig.get("teacherKey")||"";
+let incomingKey=new URLSearchParams(location.hash.slice(1)).get("teacherKey")||
+ pageConfig.get("teacherKey")||"";
 let tab;
 try{
  tab=sessionStorage.getItem("classroom-v8-tab")||uid();
  sessionStorage.setItem("classroom-v8-tab",tab);
 }catch{tab=uid();}
+
 const now=()=>Date.now()+offset;
+const timeoutSec=()=>Math.max(60,Math.min(86400,Number(meta?.seatTimeoutSec)||300));
+const autoRelease=()=>meta?.autoRelease!==false;
+
 function log(s){
  logs.push(`[${new Date().toISOString()}] ${s}`);
  if(logs.length>600)logs.shift();
@@ -283,7 +337,9 @@ function notice(s,error=false){
 function fail(e){log("ERROR: "+e.message);notice(e.message,true);}
 function action(fn){return(...a)=>Promise.resolve().then(()=>fn(...a)).catch(fail);}
 function saved(k){try{return localStorage.getItem(k);}catch{return null;}}
-function save(k,v){try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch{}}
+function save(k,v){
+ try{v===null?localStorage.removeItem(k):localStorage.setItem(k,String(v));}catch{}
+}
 function rr(path){return ref(db,`rooms/${room}/${path}`);}
 function ar(person,id){return ref(db,`rooms/${room}/peers/${person}/${id}`);}
 function valid(m){
@@ -292,7 +348,8 @@ function valid(m){
  [1,2].includes(m.fps)&&["tcp","udp","both"].includes(m.transport);
 }
 function mySeat(){
- for(const [s,r]of Object.entries(meta?.seats||{}))if(r.person===user?.uid)return +s;
+ for(const [s,r]of Object.entries(meta?.seats||{}))
+  if(r.person===user?.uid)return +s;
  return null;
 }
 function selectedSeat(){
@@ -303,8 +360,8 @@ function selectedSeat(){
  return null;
 }
 function baseLink(){
- const u=new URL(location.href);u.search="";u.hash="";u.searchParams.set("room",room);
- return u;
+ const u=new URL(location.href);u.search="";u.hash="";
+ u.searchParams.set("room",room);return u;
 }
 function studentURL(seat){
  const u=baseLink();u.searchParams.set("role","student");
@@ -312,66 +369,73 @@ function studentURL(seat){
  return u.href;
 }
 function teacherURL(){
- const u=baseLink();u.searchParams.set("role","teacher");
- u.searchParams.set("takeover","1");u.searchParams.set("start","1");
+ const u=baseLink();
+ u.searchParams.set("role","teacher");u.searchParams.set("takeover","1");
  u.hash=new URLSearchParams({teacherKey:teacherSecret}).toString();
  return u.href;
 }
-function sanitizeAddress(){
+function sanitize(){
  const u=new URL(location.href);
- u.searchParams.delete("teacherKey");u.searchParams.delete("create");
- u.searchParams.delete("takeover");u.hash="";
- u.searchParams.set("room",room);
+ for(const k of ["teacherKey","create","takeover"])u.searchParams.delete(k);
+ u.hash="";u.searchParams.set("room",room);
  history.replaceState(null,"",u.href);
 }
 function bind(video,stream){
- stream||=null;if(video.srcObject===stream)return;video.srcObject=stream;
+ stream||=null;if(video.srcObject===stream)return;
+ video.srcObject=stream;
  if(stream)video.play().catch(e=>{
   if(e.name!=="AbortError"&&video.srcObject===stream)log("Playback: "+e.message);
  });
 }
 function send(p,m){
- if(p?.active&&p.dc?.readyState==="open")try{p.dc.send(JSON.stringify(m));}catch{}
+ if(p?.active&&p.dc?.readyState==="open")
+  try{p.dc.send(JSON.stringify(m));}catch{}
 }
 function rtc(){
  const mode=meta?.transport||$("transport").value;
- return{
-  iceServers:[{urls:(mode==="both"?["udp","tcp"]:[mode]).map(t=>
-   `turn:${TURN.host}:${TURN.port}?transport=${t}`),
-   username:TURN.username,credential:TURN.password}],
-  iceTransportPolicy:"relay",bundlePolicy:"max-bundle",rtcpMuxPolicy:"require",
-  iceCandidatePoolSize:0
+ return {
+  iceServers:[{
+   urls:(mode==="both"?["udp","tcp"]:[mode]).map(t=>
+    `turn:${TURN.host}:${TURN.port}?transport=${t}`),
+   username:TURN.username,credential:TURN.password
+  }],
+  iceTransportPolicy:"relay",bundlePolicy:"max-bundle",
+  rtcpMuxPolicy:"require",iceCandidatePoolSize:0
  };
 }
+
+/* Serialized, controller-checked metadata edits. */
 function edit(make){
  const expected=epoch;
  const job=queue.then(async()=>{
-  if(!online||!controlling||epoch!==expected)throw Error("Not connected as controlling teacher.");
+  if(!online||!controlling||epoch!==expected)
+   throw Error("Not connected as controlling teacher.");
   const m=(await get(rr("meta"))).val();
-  if(!valid(m)||m.closed||m.controller!==expected)throw Error("Room/controller changed.");
-  const patch=make(m);patch.revision=(m.revision||0)+1;
+  if(!valid(m)||m.closed||m.controller!==expected)
+   throw Error("Room/controller changed.");
+  const patch=make(m);
+  if(!patch)return false;
+  patch.revision=(m.revision||0)+1;
   await update(rr("meta"),patch);
+  return true;
  });
  queue=job.catch(()=>{});return job;
 }
-function settingsFromURL(defaults=false){
+function settingsFromURL(){
  const out={};
- const number=(k,allowed)=>{
-  if(pageConfig.has(k)){
-   const v=Number(pageConfig.get(k));
-   if(!Number.isInteger(v)||(allowed&&!allowed.includes(v)))throw Error("Invalid URL parameter: "+k);
-   out[k]=v;
-  }
- };
- number("rows");number("cols");number("width",[160,256,320]);number("fps",[1,2]);
- if(pageConfig.has("auto")){
-  if(!["0","1"].includes(pageConfig.get("auto")))throw Error("auto must be 0 or 1.");
-  out.auto=pageConfig.get("auto")==="1";
+ for(const k of ["rows","cols","width","fps","seatTimeoutSec"]){
+  if(!pageConfig.has(k))continue;
+  const v=Number(pageConfig.get(k));
+  if(!Number.isInteger(v))throw Error("Invalid URL parameter: "+k);
+  if(k==="width"&&![160,256,320].includes(v))throw Error("Invalid width.");
+  if(k==="fps"&&![1,2].includes(v))throw Error("Invalid FPS.");
+  if(k==="seatTimeoutSec"&&(v<60||v>86400))throw Error("seatTimeoutSec must be 60–86400.");
+  out[k]=v;
  }
- if(defaults&&pageConfig.has("transport")){
-  const t=pageConfig.get("transport");
-  if(!["tcp","udp","both"].includes(t))throw Error("Invalid transport.");
-  out.transport=t;
+ for(const k of ["auto","autoRelease"]){
+  if(!pageConfig.has(k))continue;
+  if(!["0","1"].includes(pageConfig.get(k)))throw Error(k+" must be 0 or 1.");
+  out[k]=pageConfig.get(k)==="1";
  }
  return out;
 }
@@ -390,26 +454,26 @@ function show(){
 function sync(){
  for(const k of ["rows","cols","width","fps"])$(k).value=meta[k];
  $("auto").checked=meta.auto;
+ $("autoRelease").checked=autoRelease();
+ $("seatTimeout").value=timeoutSec()/60;
 }
 function lose(reason){
  controlling=false;epoch="";
- for(const p of peers.values())destroy(p);peers.clear();show();notice(reason,true);
+ for(const p of peers.values())destroy(p);
+ peers.clear();show();notice(reason,true);
 }
 function receiveMeta(m){
  if(!valid(m))return;
  const changed=meta?.width!==m.width||meta?.fps!==m.fps;
  meta=m;
- if(controlling&&!claiming&&m.controller!==epoch)lose("Teacher control moved to another tab.");
+ if(controlling&&!claiming&&m.controller!==epoch)
+  lose("Teacher control moved to another tab.");
  if(m.closed){
   if(student)void stop("Room closed.");
   if(controlling)lose("Room closed.");
   notice("This room is closed.",true);
  }
- if(!isTeacher&&student){
-  const r=m.seats?.[student.seat];
-  if(r&&r.person!==user.uid)void stop("Seat assigned to another browser.");
-  if(changed)void cap(student.p);
- }
+ if(!isTeacher&&student&&changed)void cap(student.p);
  show();scheduleScan();void studentLoop();
 }
 async function claim(force=false,ask=false){
@@ -420,17 +484,20 @@ async function claim(force=false,ask=false){
   await queue.catch(()=>{});
   const m=(await get(rr("meta"))).val();
   if(!valid(m)||m.closed)throw Error("Room unavailable.");
-  if(!force&&m.controlTab&&m.controlTab!==tab&&now()-(m.heartbeat||0)<25000&&m.controller!==epoch){
+  if(!force&&m.controlTab&&m.controlTab!==tab&&
+   now()-(m.heartbeat||0)<25000&&m.controller!==epoch){
    notice("Another teacher is active. Use Take control here.");return;
   }
   const next=uid();
-  await update(rr("meta"),{controller:next,controlTab:tab,heartbeat:now(),revision:(m.revision||0)+1});
+  await update(rr("meta"),{
+   controller:next,controlTab:tab,heartbeat:now(),revision:(m.revision||0)+1
+  });
   const verified=(await get(rr("meta"))).val();
-  if(verified.controller!==next)throw Error("Another teacher acquired control simultaneously.");
-  for(const p of peers.values())destroy(p);peers.clear();
-  epoch=next;controlling=true;meta=verified;lastBeat=Date.now();
+  if(verified.controller!==next)throw Error("Another teacher acquired control.");
+  for(const p of peers.values())destroy(p);
+  peers.clear();epoch=next;controlling=true;meta=verified;lastBeat=Date.now();
   sync();show();log("Teacher control acquired.");
-  notice("Teacher ready. Active student captures will reconnect.");
+  notice("Teacher ready. Active captures reconnect; inactive seat expiry is enabled according to room settings.");
   scheduleScan();
  }finally{claiming=false;}
 }
@@ -447,69 +514,69 @@ function parseInput(value){
 }
 async function openRoom(value=$("roomInput").value,internal=false){
  if(!ready||room||(!internal&&busy))return;
- if(!online)throw Error("Wait for Firebase to connect.");
+ if(!online)throw Error("Wait for Firebase.");
  const id=parseInput(value);if(!internal)busy=true;
  try{
   const root=`rooms/${id}`;
-  const ownerSnap=await get(ref(db,root+"/owner"));
-  if(!ownerSnap.exists())throw Error("Room not found.");
+  const own=await get(ref(db,root+"/owner"));
+  if(!own.exists())throw Error("Room not found.");
   const m=(await get(ref(db,root+"/meta"))).val();
   if(!valid(m))throw Error("Unsupported room. Use a persistent v8 or newer room.");
-
+  const invitationUsed=!!incomingKey;
   if(incomingKey){
    if(incomingKey.length<32)throw Error("Invalid teacher invitation.");
    await set(ref(db,root+"/teachers/"+user.uid),incomingKey);
   }
-  isOwner=ownerSnap.val()===user.uid;
-  let grant=null;
+  isOwner=own.val()===user.uid;
+  let grant=null,key="";
   try{grant=(await get(ref(db,root+"/teachers/"+user.uid))).val();}catch{}
-  let key="";
   if(isOwner||grant){
    try{key=(await get(ref(db,root+"/teacherKey"))).val()||"";}catch{}
   }
   if(isOwner&&!key){
-   key=uid()+uid();
-   await set(ref(db,root+"/teacherKey"),key);
+   key=uid()+uid();await set(ref(db,root+"/teacherKey"),key);
   }
   const authorized=isOwner||!!(grant&&key&&grant===key);
-  const requestedRole=pageConfig.get("role");
-  if(requestedRole==="teacher"&&!authorized)
-   throw Error("Teacher authorization required. Use the private teacher invitation link.");
-  if(requestedRole==="student"&&authorized)
-   throw Error("This browser identity has teacher access. Use another browser profile/device for students.");
+  if(pageConfig.get("role")==="teacher"&&!authorized)
+   throw Error("Use the private teacher invitation link.");
+  if(pageConfig.get("role")==="student"&&authorized)
+   throw Error("This browser has teacher identity. Use another profile/device for students.");
 
   room=id;meta=m;isTeacher=authorized;teacherSecret=authorized?key:"";
-  incomingKey="";save("classroom-v8-last-room",id);sanitizeAddress();
+  incomingKey="";save("classroom-v8-last-room",id);sanitize();
   if(pageConfig.get("view")==="large")$("view").value="large";
   sync();show();
 
   onValue(rr("meta"),s=>{
-   if(!s.exists()){notice("Room removed.",true);if(student)void stop("Room removed.");return;}
+   if(!s.exists()){
+    notice("Room removed.",true);if(student)void stop("Room removed.");return;
+   }
    receiveMeta(s.val());
   },fail);
 
   if(isTeacher){
-   onValue(rr("peers"),s=>{requests=s.val()||{};scheduleScan();renderPeople();},e=>{
-    lose("Teacher data access failed: "+e.message);
+   onValue(rr("peers"),s=>{
+    requests=s.val()||{};peersLoaded=true;scheduleScan();renderPeople();
+   },e=>{
+    peersLoaded=false;lose("Teacher access failed: "+e.message);
    });
    if(!m.closed){
-    await claim(pageConfig.get("takeover")==="1"||!!pageConfig.get("teacherKey"),false);
+    await claim(pageConfig.get("takeover")==="1"||invitationUsed,false);
     if(controlling){
      const patch=settingsFromURL();
-     if(Object.keys(patch).length){
-      await edit(current=>{
-       const rows=patch.rows??current.rows,cols=patch.cols??current.cols;
-       if(rows<1||cols<1||rows*cols>64)throw Error("URL grid must contain 1–64 seats.");
-       if(Math.max(0,...Object.keys(current.seats||{}).map(Number))>rows*cols)
-        throw Error("URL grid would remove reserved seats.");
-       return patch;
-      });
-     }
+     if(Object.keys(patch).length)await edit(current=>{
+      const rows=patch.rows??current.rows,cols=patch.cols??current.cols;
+      if(rows<1||cols<1||rows*cols>64)throw Error("Invalid URL grid.");
+      if(Math.max(0,...Object.keys(current.seats||{}).map(Number))>rows*cols)
+       throw Error("URL grid would remove reserved seats.");
+      return patch;
+     });
+     sync();
     }
    }
   }else{
    void presence(true);
-   notice("Room ready. Click Start sharing or your grid seat to approve screen capture.");
+   notice("Click Start sharing. If your specified seat is occupied, capture can wait for its release.");
   }
  }finally{if(!internal)busy=false;}
 }
@@ -523,9 +590,10 @@ async function createRoom(){
    protocol:PROTOCOL,rows:5,cols:8,width:256,fps:1,auto:true,
    transport:$("transport").value,closed:false,revision:1,
    controller:"",controlTab:"",heartbeat:0,createdAt:now(),seats:{},
-   ...settingsFromURL(true)
+   autoRelease:true,seatTimeoutSec:300,...settingsFromURL()
   };
-  if(initial.rows<1||initial.cols<1||initial.rows*initial.cols>64)throw Error("Invalid grid size.");
+  if(initial.rows<1||initial.cols<1||initial.rows*initial.cols>64)
+   throw Error("Invalid grid.");
   await set(ref(db,`rooms/${id}/owner`),user.uid);
   await set(ref(db,`rooms/${id}/teacherKey`),key);
   await set(ref(db,`rooms/${id}/meta`),initial);
@@ -533,29 +601,32 @@ async function createRoom(){
  }finally{busy=false;}
 }
 async function rotateAccess(){
- if(!isOwner||!confirm("Revoke all delegated teacher grants and old invitation links?"))return;
- teacherSecret=uid()+uid();
- await set(rr("teacherKey"),teacherSecret);
- // Move the epoch as well so existing cooperative teacher tabs stand down.
- await claim(true,false);
- show();notice("Old teacher links/grants revoked. Share the newly generated teacher link.");
+ if(!isOwner||!confirm("Revoke delegated teacher grants and old teacher links?"))return;
+ teacherSecret=uid()+uid();await set(rr("teacherKey"),teacherSecret);
+ await claim(true,false);show();notice("Old teacher links revoked. Share the new teacher link.");
 }
 
-/* WebRTC and complete SDP. */
+/* WebRTC: source capture is not owned by the connection. */
 function relayCount(d){
- return(d?.sdp||"").split(/\r?\n/).filter(l=>l.startsWith("a=candidate:")&&/\styp relay(?:\s|$)/.test(l)).length;
+ return(d?.sdp||"").split(/\r?\n/).filter(l=>
+  l.startsWith("a=candidate:")&&/\styp relay(?:\s|$)/.test(l)).length;
 }
 function checkSDP(d){
  if(!d||!["offer","answer"].includes(d.type)||typeof d.sdp!=="string"||
- d.sdp.length>200000||!relayCount(d))throw Error("Invalid relay SDP.");
+  d.sdp.length>200000||!relayCount(d))throw Error("Invalid relay SDP.");
 }
 function peer(label,teacher=false){
  const pc=new RTCPeerConnection(rtc());
- const p={pc,label,teacher,active:true,created:Date.now(),connected:0,bad:0,
+ const p={
+  pc,label,teacher,active:true,created:Date.now(),connected:0,bad:0,
   dc:null,stream:null,track:null,sender:null,stops:[],events:[],phase:"Preparing",
   error:"",answered:false,applying:false,bytes:0,frames:0,lastFrame:0,lastBeat:0,
-  remote:null,lastStats:"",restartAt:0};
- p.event=t=>{p.events.push(t);if(p.events.length>45)p.events.shift();log(label+": "+t);render();};
+  remote:null,lastStats:"",restartAt:0
+ };
+ p.event=t=>{
+  p.events.push(t);if(p.events.length>45)p.events.shift();
+  log(label+": "+t);render();
+ };
  pc.onicecandidateerror=e=>p.event(`ICE attempt ${e.errorCode}: ${e.errorText||""}`);
  pc.onconnectionstatechange=()=>{
   const s=pc.connectionState;p.phase=s;
@@ -566,9 +637,12 @@ function peer(label,teacher=false){
  return p;
 }
 function destroy(p){
- if(!p?.active)return;p.active=false;
+ if(!p?.active)return;
+ p.active=false;
  for(const stop of p.stops.splice(0))try{stop();}catch{}
- try{p.dc?.close();p.pc.close();p.track?.stop();}catch{}
+ try{p.dc?.close();}catch{}
+ try{p.pc.close();}catch{}
+ try{p.track?.stop();}catch{}
 }
 async function gather(p,d){
  await p.pc.setLocalDescription(d);p.phase="Gathering relay candidates";
@@ -590,70 +664,184 @@ async function cap(p){
  try{
   const v=p.sender.getParameters();if(!v.encodings?.length)v.encodings=[{}];
   for(const e of v.encodings){e.maxBitrate=150000;e.maxFramerate=meta.fps;}
-  v.degradationPreference="maintain-resolution";await p.sender.setParameters(v);
+  v.degradationPreference="maintain-resolution";
+  await p.sender.setParameters(v);
  }catch(e){log("Encoder target: "+e.message);}
 }
 function channel(p,ch){
  if(p.dc&&p.dc!==ch){ch.close();return;}p.dc=ch;
- ch.onopen=()=>{p.lastBeat=Date.now();p.event("DataChannel open");heartbeat();};
+ ch.onopen=()=>{
+  p.lastBeat=Date.now();p.event("DataChannel open");heartbeat();
+ };
  ch.onmessage=e=>{
   if(typeof e.data!=="string"||e.data.length>20000)return;
   try{
    const m=JSON.parse(e.data);
-   if(m.type==="beat"){p.lastBeat=Date.now();p.remote=m;send(p,{type:"ack"});}
-   else if(m.type==="ack")p.lastBeat=Date.now();
+   if(m.type==="beat"){
+    p.lastBeat=Date.now();p.remote=m;send(p,{type:"ack"});
+   }else if(m.type==="ack")p.lastBeat=Date.now();
   }catch{}
  };
 }
 function heartbeat(){
  const s=student;if(!s?.active)return;
  const t=s.raw?.getVideoTracks()[0];
- send(s.p,{type:"beat",draws:s.draws,captureState:t?.readyState||"none",muted:!!t?.muted});
+ send(s.p,{
+  type:"beat",draws:s.draws,captureState:t?.readyState||"none",
+  muted:!!t?.muted,seat:s.seat
+ });
 }
 function presenceData(){
- return{appVersion:APP,updatedAt:now(),tab,captureActive:!!student?.active,
+ return {
+  appVersion:APP,updatedAt:now(),tab,
+  captureActive:!!student?.active,
+  captureState:student?.raw?.getVideoTracks()[0]?.readyState||"none",
   seat:student?.seat||mySeat()||0,attempt:student?.published||"",
-  phase:student?.phase||idlePhase,connection:student?.p?.pc.connectionState||"none",
-  epoch:student?.p?.epoch||"",draws:student?.draws||0};
+  phase:student?.phase||idlePhase,
+  connection:student?.p?.pc.connectionState||"none",
+  epoch:student?.p?.epoch||"",draws:student?.draws||0
+ };
 }
 async function presence(force=false){
- if(isTeacher||!room||!online||presenceBusy||(!force&&Date.now()-presenceAt<7000))return;
+ if(isTeacher||!room||!online||presenceBusy||
+  (!force&&Date.now()-presenceAt<7000))return;
  presenceBusy=true;
- try{await update(ar(user.uid,"_presence"),presenceData());presenceAt=Date.now();}
- catch(e){log("Presence: "+e.message);}finally{presenceBusy=false;}
+ try{
+  await update(ar(user.uid,"_presence"),presenceData());
+  presenceAt=Date.now();
+ }catch(e){log("Presence: "+e.message);}
+ finally{presenceBusy=false;}
 }
 function presenceText(person){
  const p=requests[person]?._presence;
  if(!p)return "No student presence";
- const age=Math.round((now()-(p.updatedAt||0))/1000);
+ const age=Math.max(0,Math.round((now()-(p.updatedAt||0))/1000));
  return age>35?`Offline/suspended (${age}s)`:
- p.captureActive?`Capture active — ${p.phase}`:"Page open — sharing needs a student click";
+  p.captureActive?`Capture active — ${p.phase}`:"Capture stopped / page idle";
 }
+
+/* Inactive seat expiry. */
+function freshCapture(p,seat){
+ const age=now()-(Number(p?.updatedAt)||0);
+ return !!p?.captureActive&&Number(p.seat)===Number(seat)&&
+  p.captureState!=="ended"&&age>=-10000&&age<35000;
+}
+function livePeer(person,seat){
+ const p=peers.get(person);
+ return !!(p?.active&&p.seat===Number(seat)&&
+  p.pc.connectionState==="connected"&&p.dc?.readyState==="open"&&
+  p.lastBeat&&Date.now()-p.lastBeat<25000&&
+  p.remote?.captureState!=="ended");
+}
+function activity(person,seat,presenceValue){
+ return freshCapture(presenceValue??requests[person]?._presence,seat)||
+  livePeer(person,seat);
+}
+function expiryText(seat,r){
+ if(!autoRelease())return "Automatic expiry disabled";
+ if(activity(r.person,seat))return "Active — reservation protected";
+ if(!r.inactiveSince)return "Inactivity grace period will start";
+ const remaining=Math.max(0,Math.ceil(
+  timeoutSec()-(now()-Number(r.inactiveSince))/1000
+ ));
+ return remaining?`Inactive — release in ${remaining}s`:"Inactive — release pending";
+}
+async function expiryScan(){
+ if(expiryBusy||!controlling||claiming||!online||!peersLoaded||
+  !meta||meta.closed||!autoRelease()||Date.now()-lastExpiryScan<5000)return;
+ expiryBusy=true;lastExpiryScan=Date.now();
+ try{
+  for(const [seatText,r]of Object.entries(meta.seats||{})){
+   if(!controlling||!online)break;
+   const seat=Number(seatText);
+   if(activity(r.person,seat)){
+    if(r.inactiveSince)await edit(m=>{
+     const current=m.seats?.[seat];
+     if(current?.person!==r.person)return null;
+     return{[`seats/${seat}/inactiveSince`]:null};
+    });
+    continue;
+   }
+
+   if(!r.inactiveSince){
+    await edit(m=>{
+     if(m.autoRelease===false)return null;
+     const current=m.seats?.[seat];
+     if(current?.person!==r.person||current.inactiveSince||
+      activity(r.person,seat))return null;
+     return{[`seats/${seat}/inactiveSince`]:now()};
+    });
+    continue;
+   }
+
+   if(now()-Number(r.inactiveSince)<timeoutSec()*1000)continue;
+
+   // Re-read student presence before expiring an old cached reservation.
+   const fresh=(await get(ar(r.person,"_presence"))).val();
+   if(activity(r.person,seat,fresh)){
+    await edit(m=>{
+     if(m.seats?.[seat]?.person!==r.person)return null;
+     return{[`seats/${seat}/inactiveSince`]:null};
+    });
+    continue;
+   }
+
+   const removed=await edit(m=>{
+    if(m.autoRelease===false)return null;
+    const current=m.seats?.[seat];
+    const limit=Math.max(60,Math.min(86400,Number(m.seatTimeoutSec)||300));
+    if(!current||current.person!==r.person||
+      current.attempt!==r.attempt||!current.inactiveSince||
+      now()-Number(current.inactiveSince)<limit*1000||
+      activity(r.person,seat,fresh))return null;
+    return{[`seats/${seat}`]:null};
+   });
+
+   if(removed){
+    destroy(peers.get(r.person));peers.delete(r.person);
+    // Expiration is not a rejection of future capture by the old browser.
+    if(r.attempt)void update(ar(r.person,r.attempt),{
+     state:"expired",expiredAt:now()
+    }).catch(e=>log("Expiry record: "+e.message));
+    log(`Seat ${seat}: inactive reservation released after ${timeoutSec()}s grace.`);
+   }
+  }
+ }catch(e){log("Seat expiry: "+e.message);}
+ finally{expiryBusy=false;}
+}
+
+/* Teacher admission. */
 function compatible(r){
  return r&&r.protocol===PROTOCOL&&r.epoch===epoch&&
- Number.isInteger(r.seat)&&r.seat>0&&r.seat<=meta.rows*meta.cols&&
- r.offer?.type==="offer"&&typeof r.offer.sdp==="string"&&r.offer.sdp.length<200000&&relayCount(r.offer);
+  Number.isInteger(r.seat)&&r.seat>0&&r.seat<=meta.rows*meta.cols&&
+  r.offer?.type==="offer"&&typeof r.offer.sdp==="string"&&
+  r.offer.sdp.length<200000&&relayCount(r.offer);
 }
 function requestFor(person){
  const candidates=[];
  for(const [id,r]of Object.entries(requests[person]||{})){
   if(id==="_presence"||!compatible(r)||!["requested","accepted"].includes(r.state))continue;
   if(String(r.restartToken||"")!==String(meta.seats?.[r.seat]?.restartToken||""))continue;
+  const presenceValue=requests[person]?._presence;
+  if(!freshCapture(presenceValue,r.seat))continue;
   candidates.push({person,id,r});
  }
- candidates.sort((a,b)=>(b.r.publishedAt||b.r.createdAt||0)-(a.r.publishedAt||a.r.createdAt||0));
+ candidates.sort((a,b)=>
+  (b.r.publishedAt||b.r.createdAt||0)-(a.r.publishedAt||a.r.createdAt||0));
  return candidates[0]||null;
 }
 function status(person,id,phase,error=""){
  statuses.set(person+"/"+id,{phase,error,retryAt:Date.now()+(error?6000:0)});
- log(`Seat attempt ${id.slice(0,8)}: ${phase}${error?" — "+error:""}`);renderPeople();
+ log(`Attempt ${id.slice(0,8)}: ${phase}${error?" — "+error:""}`);
+ renderPeople();
 }
 function scheduleScan(){
- if(scanQueued)return;scanQueued=true;
- setTimeout(()=>{scanQueued=false;scan();},0);
+ if(scanQueued)return;
+ scanQueued=true;setTimeout(()=>{scanQueued=false;scan();},0);
 }
 function scan(){
- if(!isTeacher||!controlling||claiming||!online||meta.closed)return;
+ if(!isTeacher||!controlling||claiming||!online||!peersLoaded||meta.closed)return;
+
  for(const [seat,r]of Object.entries(meta.seats||{})){
   const state=requests[r.person]?.[r.attempt]?.state;
   if(state==="released")void releaseSeat(+seat,false).catch(e=>log(e.message));
@@ -662,9 +850,12 @@ function scan(){
    if(p?.id===r.attempt){destroy(p);peers.delete(r.person);}
   }
  }
+
  for(const person of Object.keys(requests)){
   const item=requestFor(person);if(!item||accepting.has(person))continue;
-  if(!meta.auto&&meta.seats?.[item.r.seat]?.person!==person)continue;
+  const reservation=meta.seats?.[item.r.seat];
+  if(reservation&&reservation.person!==person)continue;
+  if(!meta.auto&&reservation?.person!==person)continue;
   if(peers.get(person)?.id===item.id&&peers.get(person).active)continue;
   if(Date.now()<(statuses.get(person+"/"+item.id)?.retryAt||0))continue;
   void accept(item);
@@ -678,17 +869,25 @@ async function accept(item){
  try{
   status(person,id,stage);
   const r=(await get(ar(person,id))).val();
-  if(!compatible(r)||!["requested","accepted"].includes(r.state))throw Error("Offer outdated.");
+  if(!compatible(r)||!["requested","accepted"].includes(r.state))
+   throw Error("Offer outdated.");
   stage="Restoring seat";status(person,id,stage);
   await edit(m=>{
    const old=m.seats?.[r.seat];
-   if(old&&old.person!==person)throw Error("Seat belongs to another student.");
-   if(String(old?.restartToken||"")!==String(r.restartToken||""))throw Error("Reconnect token changed.");
+   if(old&&old.person!==person)throw Error("Seat still belongs to another student.");
+   if(String(old?.restartToken||"")!==String(r.restartToken||""))
+    throw Error("Reconnect token changed.");
    for(const [s,v]of Object.entries(m.seats||{}))
     if(v.person===person&&+s!==r.seat)throw Error("Student already has another seat.");
-   return{[`seats/${r.seat}`]:{...old,person,attempt:id,assignedAt:old?.assignedAt||now()}};
+   return{
+    [`seats/${r.seat}`]:{
+     ...old,person,attempt:id,assignedAt:old?.assignedAt||now(),
+     inactiveSince:null
+    }
+   };
   });
   if(epoch!==expected||requestFor(person)?.id!==id)throw Error("Offer superseded.");
+
   destroy(peers.get(person));
   p=peer(`Seat ${r.seat} teacher`,true);
   Object.assign(p,{person,id,seat:r.seat,epoch:expected});
@@ -698,77 +897,101 @@ async function accept(item){
    if(!p.active||e.track.kind!=="video")return;
    p.stream=new MediaStream([e.track]);p.event("Video track received");
   };
+
   stage="Creating answer";status(person,id,stage);
   await remote(p,r.offer);
   const answer=await gather(p,await p.pc.createAnswer());
-  if(!p.active||epoch!==expected||requestFor(person)?.id!==id)throw Error("Answer superseded.");
+  if(!p.active||epoch!==expected||requestFor(person)?.id!==id)
+   throw Error("Answer superseded.");
   stage="Publishing answer";status(person,id,stage);
-  if((await get(rr("meta"))).val()?.controller!==expected)throw Error("Teacher changed.");
-  await update(ar(person,id),{state:"accepted",answer,answerEpoch:expected,acceptedAt:now()});
+  if((await get(rr("meta"))).val()?.controller!==expected)
+   throw Error("Teacher changed.");
+  await update(ar(person,id),{
+   state:"accepted",answer,answerEpoch:expected,acceptedAt:now()
+  });
   p.answered=true;status(person,id,"Answer published");
  }catch(e){
   status(person,id,"Acceptance failed",stage+": "+e.message);
-  if(p){p.error=e.message;destroy(p);if(peers.get(person)===p)peers.delete(person);}
+  if(p){
+   p.error=e.message;destroy(p);
+   if(peers.get(person)===p)peers.delete(person);
+  }
  }finally{accepting.delete(person);render();}
 }
 async function reject(person,id){
  await update(ar(person,id),{state:"rejected",reason:"Teacher declined the request."});
 }
-const releasing=new Set();
 async function releaseSeat(seat,notify=true){
  if(!controlling||releasing.has(seat))return;
- const r=meta.seats?.[seat];if(!r)return;releasing.add(seat);
+ const r=meta.seats?.[seat];if(!r)return;
+ releasing.add(seat);
  try{
   destroy(peers.get(r.person));peers.delete(r.person);
   await edit(m=>{
-   if(m.seats?.[seat]?.person!==r.person)throw Error("Seat changed.");
+   if(m.seats?.[seat]?.person!==r.person)return null;
    return{[`seats/${seat}`]:null};
   });
-  if(notify&&r.attempt)await update(ar(r.person,r.attempt),{state:"rejected",reason:"Teacher released seat."});
+  if(notify&&r.attempt)await update(ar(r.person,r.attempt),{
+   state:"rejected",reason:"Teacher released this seat."
+  });
  }finally{releasing.delete(seat);}
 }
 async function reconnectSeat(seat){
  await edit(m=>{
   if(!m.seats?.[seat])throw Error("Seat not reserved.");
-  return{[`seats/${seat}/restartToken`]:uid(),[`seats/${seat}/restartAt`]:now()};
+  return {
+   [`seats/${seat}/restartToken`]:uid(),
+   [`seats/${seat}/restartAt`]:now()
+  };
  });
- const r=meta.seats?.[seat];if(r){destroy(peers.get(r.person));peers.delete(r.person);}
+ const r=meta.seats?.[seat];
+ if(r){destroy(peers.get(r.person));peers.delete(r.person);}
 }
 
-/* Student capture: permission call is directly inside the real click handler. */
+/* Student capture: occupied seat-specific links may wait without evicting. */
 async function startSeat(seat){
  if(isTeacher||!seat||student||capturing||meta.closed)return;
- const r=meta.seats?.[seat],mine=mySeat();
- if((r&&r.person!==user.uid)||(mine&&mine!==seat)){notice("Seat unavailable.",true);return;}
+ const mine=mySeat();
+ if(mine&&mine!==seat){notice(`Use your existing seat ${mine}.`,true);return;}
  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
   notice("Use HTTPS and a supported desktop browser for screen sharing.",true);return;
  }
- const s={active:true,seat,raw:null,video:null,canvas:null,output:null,p:null,
+
+ const s={
+  active:true,seat,raw:null,video:null,canvas:null,output:null,p:null,
   draws:0,timer:null,phase:"Requesting permission",building:false,lastAttempt:0,
-  published:"",write:Promise.resolve(),generation:0};
+  published:"",write:Promise.resolve(),generation:0
+ };
  student=s;capturing=true;
  let permission;
  try{
+  // Must remain directly inside the click gesture, before any await.
   permission=navigator.mediaDevices.getDisplayMedia({
    video:{frameRate:{ideal:2,max:5}},audio:false
   });
  }catch(e){student=null;capturing=false;fail(e);return;}
+
  try{
   s.raw=await permission;
   if(!s.active){s.raw.getTracks().forEach(t=>t.stop());return;}
   s.raw.getVideoTracks()[0].addEventListener("ended",()=>{
    if(student===s)void stop("Capture stopped. Click Start sharing to resume.");
   },{once:true});
-  s.video=document.createElement("video");s.video.muted=true;
-  s.video.autoplay=true;s.video.playsInline=true;s.video.srcObject=s.raw;
-  await s.video.play();if(!s.active)return;
+
+  s.video=document.createElement("video");
+  s.video.muted=true;s.video.autoplay=true;s.video.playsInline=true;
+  s.video.srcObject=s.raw;await s.video.play();
+  if(!s.active)return;
+
   s.canvas=document.createElement("canvas");
   const ctx=s.canvas.getContext("2d",{alpha:false});
   if(!ctx)throw Error("Canvas unavailable.");
   function draw(){
    if(!s.active)return;
    const w=meta.width,h=Math.round(w*9/16);
-   if(s.canvas.width!==w||s.canvas.height!==h){s.canvas.width=w;s.canvas.height=h;}
+   if(s.canvas.width!==w||s.canvas.height!==h){
+    s.canvas.width=w;s.canvas.height=h;
+   }
    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
    const vw=s.video.videoWidth,vh=s.video.videoHeight;
    if(vw&&vh&&s.video.readyState>=2){
@@ -780,49 +1003,72 @@ async function startSeat(seat){
   draw();s.output=s.canvas.captureStream(2);
   if(!s.output.getVideoTracks()[0])throw Error("Canvas capture unavailable.");
   s.phase="Capture active";retrySerial++;retryAt=0;
-  notice(`Seat ${seat}: capture active; connecting automatically.`);
+  notice(`Seat ${seat}: capture active. If occupied, waiting for safe release.`);
   void presence(true);
  }catch(e){if(s.active)await stop(e.message);}
  finally{capturing=false;render();void studentLoop();}
 }
 function target(s){
- return `${meta.controller}|${meta.seats?.[s.seat]?.restartToken||""}|${retrySerial}`;
+ const r=meta.seats?.[s.seat];
+ return `${meta.controller}|${r?.person||""}|${r?.restartToken||""}|${retrySerial}`;
 }
 function current(s,p){
- return student===s&&s.active&&s.p===p&&p.active&&p.target===target(s)&&!meta.closed;
+ if(student!==s||!s.active||s.p!==p||!p.active||meta.closed)return false;
+ const r=meta.seats?.[s.seat];
+ // Assignment of our new offer to us must not invalidate that offer.
+ return p.epoch===meta.controller&&p.serial===retrySerial&&
+  (!r||r.person===user.uid)&&
+  String(r?.restartToken||"")===p.restartToken;
 }
 async function studentLoop(){
- if(studentLoopBusy||isTeacher)return;studentLoopBusy=true;
+ if(studentLoopBusy||isTeacher)return;
+ studentLoopBusy=true;
  try{
   const s=student;if(!s?.active||!s.output||meta.closed)return;
-  if(s.raw.getVideoTracks()[0]?.readyState!=="live"){void stop("Capture ended.");return;}
-  if(s.p?.active&&s.p.target!==target(s))destroy(s.p);
+  if(s.raw.getVideoTracks()[0]?.readyState!=="live"){
+   void stop("Capture ended.");return;
+  }
+  const reservation=meta.seats?.[s.seat];
+
+  if(reservation&&reservation.person!==user.uid){
+   destroy(s.p);
+   s.phase=`Waiting for occupied seat ${s.seat}. `+
+    (autoRelease()?expiryText(s.seat,reservation):"Teacher must release it.");
+   return;
+  }
+  if(s.p?.active&&!current(s,s.p))destroy(s.p);
   if(!online){s.phase="Capture retained — network offline";return;}
   if(!meta.controller||now()-(meta.heartbeat||0)>45000){
    s.phase="Capture retained — waiting for teacher";return;
   }
   if(s.building)return;
+
   const p=s.p;let need=!p||!p.active;
   if(p?.active){
    const age=Date.now()-p.created,state=p.pc.connectionState;
    need=state==="failed"||
     (state==="disconnected"&&Date.now()-(p.bad||Date.now())>8000)||
     (p.lastBeat&&Date.now()-p.lastBeat>25000)||
-    (state==="connected"&&p.dc?.readyState!=="open"&&Date.now()-(p.connected||Date.now())>22000)||
+    (state==="connected"&&p.dc?.readyState!=="open"&&
+      Date.now()-(p.connected||Date.now())>22000)||
     (p.answered&&state!=="connected"&&age>45000)||
     (!p.answered&&(meta.auto||mySeat()===s.seat)&&age>90000);
    if(need)destroy(p);
   }
-  if(need&&Date.now()>=retryAt&&Date.now()-s.lastAttempt>=4000)void build(s);
+  if(need&&Date.now()>=retryAt&&Date.now()-s.lastAttempt>=4000)
+   void build(s);
  }finally{studentLoopBusy=false;}
 }
 async function build(s){
  if(s.building||!s.active)return;
- s.building=true;s.lastAttempt=Date.now();const gen=++s.generation;
- const old=s.p;destroy(old);
+ s.building=true;s.lastAttempt=Date.now();
+ const gen=++s.generation,old=s.p;destroy(old);
  const p=peer(`Seat ${s.seat} student`);
- Object.assign(p,{id:uid(),seat:s.seat,person:user.uid,epoch:meta.controller,
-  restartToken:String(meta.seats?.[s.seat]?.restartToken||""),target:target(s)});
+ Object.assign(p,{
+  id:uid(),seat:s.seat,person:user.uid,epoch:meta.controller,
+  restartToken:String(meta.seats?.[s.seat]?.restartToken||""),
+  serial:retrySerial
+ });
  s.p=p;s.published="";s.phase="Creating connection";
  try{
   await s.write.catch(()=>{});if(!current(s,p))return;
@@ -832,69 +1078,97 @@ async function build(s){
    seat:s.seat,state:"preparing",createdAt:now(),tab
   });
   await s.write;if(!current(s,p))return;
+
   p.track=s.output.getVideoTracks()[0].clone();
   try{p.track.contentHint="detail";}catch{}
   p.sender=p.pc.addTransceiver(p.track,{
    direction:"sendonly",streams:[new MediaStream([p.track])]
   }).sender;
   channel(p,p.pc.createDataChannel("classroom",{ordered:true}));
+
   p.stops.push(onValue(ar(user.uid,p.id),snap=>{
    const r=snap.val();if(!r||!current(s,p))return;
    if(r.state==="rejected"){void stop(r.reason||"Request declined.");return;}
+   if(r.state==="expired"){
+    destroy(p);retryAt=Date.now()+1000;return;
+   }
    if(r.answer&&!p.answered&&!p.applying&&r.answerEpoch===p.epoch){
     p.applying=true;s.phase="Applying teacher answer";
     remote(p,r.answer).then(async()=>{
-     if(!current(s,p))return;p.answered=true;await cap(p);
-     s.phase="Connecting video";void presence(true);
-    }).catch(e=>{if(current(s,p)){p.error=e.message;destroy(p);retryAt=Date.now()+4000;}});
+     if(!current(s,p))return;
+     p.answered=true;await cap(p);s.phase="Connecting video";
+     void presence(true);
+    }).catch(e=>{
+     if(current(s,p)){p.error=e.message;destroy(p);retryAt=Date.now()+4000;}
+    });
    }
   },e=>log("Student signaling: "+e.message)));
+
   const offer=await gather(p,await p.pc.createOffer());
-  if(!current(s,p))return;await cap(p);if(!current(s,p))return;
-  s.write=update(ar(user.uid,p.id),{state:"requested",offer,publishedAt:now()});
+  if(!current(s,p))return;
+  await cap(p);if(!current(s,p))return;
+
+  s.write=update(ar(user.uid,p.id),{
+   state:"requested",offer,publishedAt:now()
+  });
   await s.write;if(!current(s,p))return;
   s.published=p.id;s.phase="Offer published — waiting for teacher";
   void presence(true);
  }catch(e){
-  if(s.active&&s.p===p){p.error=e.message;s.phase="Retry pending: "+e.message;destroy(p);retryAt=Date.now()+5000;}
+  if(s.active&&s.p===p){
+   p.error=e.message;s.phase="Retry pending: "+e.message;
+   destroy(p);retryAt=Date.now()+5000;
+  }
  }finally{
   if(s.generation===gen)s.building=false;
-  if(!current(s,p))destroy(p);render();
+  if(!current(s,p))destroy(p);
+  render();
  }
 }
-async function stop(reason="Sharing stopped. Seat remains reserved.",release=false){
+async function stop(reason="Sharing stopped. Seat may expire after the inactivity timeout.",release=false){
  const s=student;if(!s?.active)return;
  s.active=false;s.generation++;clearTimeout(s.timer);
- s.raw?.getTracks().forEach(t=>t.stop());s.output?.getTracks().forEach(t=>t.stop());
+ s.raw?.getTracks().forEach(t=>t.stop());
+ s.output?.getTracks().forEach(t=>t.stop());
  if(s.video){s.video.pause();s.video.srcObject=null;}
  destroy(s.p);student=null;idlePhase=reason;notice(reason);render();
  try{
   await s.write.catch(()=>{});
-  if(s.p?.id)await update(ar(user.uid,s.p.id),{state:release?"released":"paused",changedAt:now()});
+  if(s.p?.id)await update(ar(user.uid,s.p.id),{
+   state:release?"released":"paused",changedAt:now()
+  });
   await update(ar(user.uid,"_presence"),presenceData());
  }catch(e){log("Stop persistence: "+e.message);}
 }
 async function releaseMine(){
  const seat=mySeat()||student?.seat;
- if(!seat||!confirm(`Release seat ${seat}?`))return;
+ if(!seat||!confirm(`Stop sharing and release seat ${seat}, if assigned to you?`))return;
  if(student)return stop("Seat release requested.",true);
  const r=meta.seats?.[seat];
- if(r?.person===user.uid&&r.attempt)await update(ar(user.uid,r.attempt),{state:"released"});
+ if(r?.person===user.uid&&r.attempt)
+  await update(ar(user.uid,r.attempt),{state:"released"});
 }
 async function teacherBeat(){
- if(!controlling||!online||claiming||beatBusy||meta.closed||Date.now()-lastBeat<7000)return;
+ if(!controlling||!online||claiming||beatBusy||meta.closed||
+  Date.now()-lastBeat<7000)return;
  beatBusy=true;
  try{
   const expected=epoch,m=(await get(rr("meta"))).val();
   if(m.controller!==expected){lose("Teacher control moved.");return;}
-  if(controlling&&epoch===expected){await update(rr("meta"),{heartbeat:now()});lastBeat=Date.now();}
- }catch(e){log("Teacher heartbeat: "+e.message);}finally{beatBusy=false;}
+  if(controlling&&epoch===expected){
+   await update(rr("meta"),{heartbeat:now()});lastBeat=Date.now();
+  }
+ }catch(e){log("Teacher heartbeat: "+e.message);}
+ finally{beatBusy=false;}
 }
 function maintenance(){
  if(!meta)return;
- heartbeat();void studentLoop();scheduleScan();void teacherBeat();void presence();
- if(student?.p?.pc.connectionState==="connected"&&student.p.dc?.readyState==="open")
-  student.phase="Connected — sharing";
+ heartbeat();void studentLoop();scheduleScan();
+ void teacherBeat();void presence();void expiryScan();
+
+ if(student?.p?.active&&student.p.pc.connectionState==="connected"&&
+  student.p.dc?.readyState==="open")student.phase="Connected — sharing";
+
  if(controlling&&online)for(const p of peers.values()){
   if(!p.active||Date.now()-p.created<35000)continue;
   const state=p.pc.connectionState;
@@ -902,130 +1176,195 @@ function maintenance(){
    (state==="disconnected"&&Date.now()-(p.bad||Date.now())>12000)||
    (p.lastBeat&&Date.now()-p.lastBeat>30000);
   if(bad&&Date.now()-p.restartAt>30000){
-   p.restartAt=Date.now();void reconnectSeat(p.seat).catch(e=>log(e.message));
+   p.restartAt=Date.now();
+   void reconnectSeat(p.seat).catch(e=>log(e.message));
   }
  }
  render();renderPeople();
 }
 function network(reason){
  log("Network: "+reason);
- if(Date.now()-lastNetwork<1500)return;lastNetwork=Date.now();
- if(student){retrySerial++;retryAt=Date.now()+1500;destroy(student.p);}
+ if(Date.now()-lastNetwork<1500)return;
+ lastNetwork=Date.now();
+ if(student){
+  retrySerial++;retryAt=Date.now()+1500;destroy(student.p);
+ }
  if(controlling&&online){
   const expected=epoch;
-  setTimeout(()=>{if(controlling&&epoch===expected&&online)void claim(false,false).catch(fail);},2000);
+  setTimeout(()=>{
+   if(controlling&&epoch===expected&&online)
+    void claim(false,false).catch(fail);
+  },2000);
  }
 }
 window.addEventListener("online",()=>network("online"));
 window.addEventListener("offline",()=>notice("Offline. Active capture is retained for reconnection."));
 navigator.connection?.addEventListener?.("change",()=>network("interface changed"));
 
-/* UI and diagnostics. */
+/* Rendering and diagnostics. */
 function health(p){
  if(!p)return{live:false,label:"Waiting",detail:""};
  if(!p.active)return{live:false,label:"Reconnecting",detail:p.error||""};
- if(p.pc.connectionState!=="connected")return{live:false,label:p.phase,detail:p.error||p.pc.iceConnectionState};
- if(p.dc?.readyState!=="open")return{live:false,label:"Control channel pending",detail:""};
- if(p.lastBeat&&Date.now()-p.lastBeat>22000)return{live:false,label:"Heartbeat delayed",detail:"Recovery pending"};
+ if(p.pc.connectionState!=="connected")
+  return{live:false,label:p.phase,detail:p.error||p.pc.iceConnectionState};
+ if(p.dc?.readyState!=="open")
+  return{live:false,label:"Control channel pending",detail:""};
+ if(p.lastBeat&&Date.now()-p.lastBeat>22000)
+  return{live:false,label:"Heartbeat delayed",detail:"Recovery pending"};
  if(p.teacher){
-  if(p.remote?.captureState==="ended"||p.remote?.muted)return{live:false,label:"Capture unavailable",detail:""};
-  if(!p.lastFrame)return{live:false,label:"Waiting for decoded video",detail:`${p.bytes} bytes`};
-  if(Date.now()-p.lastFrame>25000)return{live:false,label:"No recent frames",detail:"Static source or stalled capture"};
+  if(p.remote?.captureState==="ended"||p.remote?.muted)
+   return{live:false,label:"Capture unavailable",detail:""};
+  if(!p.lastFrame)
+   return{live:false,label:"Waiting for decoded video",detail:`${p.bytes} bytes`};
+  if(Date.now()-p.lastFrame>25000)
+   return{live:false,label:"No recent frames",detail:"Static source or stalled capture"};
  }
- return{live:true,label:p.teacher?"Live":"Sharing",detail:`${p.frames} frames · ${Math.round(p.bytes/1024)} KiB`};
+ return{live:true,label:p.teacher?"Live":"Sharing",
+  detail:`${p.frames} frames · ${Math.round(p.bytes/1024)} KiB`};
 }
 function seatPeer(seat){
  if(!isTeacher)return student?.seat===seat?student.p:null;
  const r=meta.seats?.[seat];return r?peers.get(r.person):null;
 }
 function makeTile(seat){
- const tile=document.createElement("button");tile.type="button";tile.className="tile";
+ const tile=document.createElement("button");
+ tile.type="button";tile.className="tile";
  const head=document.createElement("div");head.className="head";head.textContent="Seat "+seat;
  const picture=document.createElement("div");picture.className="picture";
- const video=document.createElement("video");video.autoplay=true;video.muted=true;video.playsInline=true;
+ const video=document.createElement("video");
+ video.autoplay=true;video.muted=true;video.playsInline=true;
  const overlay=document.createElement("div");overlay.className="overlay";
  const foot=document.createElement("div");foot.className="foot";
  picture.append(video,overlay);tile.append(head,picture,foot);
  tile.onclick=()=>{
-  if(isTeacher){zoomSeat=seat;updateZoom();if(!$("zoom").open)$("zoom").showModal();}
-  else void startSeat(seat);
+  if(isTeacher){
+   zoomSeat=seat;updateZoom();
+   if(!$("zoom").open)$("zoom").showModal();
+  }else void startSeat(seat);
  };
- const t={tile,video,overlay,foot};tiles.set(seat,t);$("grid").append(tile);return t;
+ const t={tile,video,overlay,foot};
+ tiles.set(seat,t);$("grid").append(tile);return t;
 }
 function render(){
  if(!meta||!room)return;
  const count=meta.rows*meta.cols,large=$("view").value==="large";
- $("grid").style.gridTemplateColumns=large?`repeat(${meta.cols},minmax(200px,1fr))`:`repeat(${meta.cols},minmax(0,1fr))`;
+ $("grid").style.gridTemplateColumns=large
+  ?`repeat(${meta.cols},minmax(200px,1fr))`:`repeat(${meta.cols},minmax(0,1fr))`;
  $("grid").style.minWidth=large?meta.cols*210+"px":"0";
- for(const [seat,t]of tiles)if(seat>count){bind(t.video,null);t.tile.remove();tiles.delete(seat);}
+ for(const [seat,t]of tiles)if(seat>count){
+  bind(t.video,null);t.tile.remove();tiles.delete(seat);
+ }
  const mine=!isTeacher?mySeat():null;let live=0;
  for(let seat=1;seat<=count;seat++){
   const t=tiles.get(seat)||makeTile(seat),p=seatPeer(seat),r=meta.seats?.[seat];
-  const ownCapture=!isTeacher&&student?.seat===seat,mineReserved=!isTeacher&&r?.person===user.uid;
+  const ownCapture=!isTeacher&&student?.seat===seat;
+  const mineReserved=!isTeacher&&r?.person===user.uid;
   let h;
   if(meta.closed)h={live:false,label:"Room closed",detail:""};
+  else if(ownCapture&&r&&r.person!==user.uid)
+   h={live:false,label:"Waiting for occupied seat",detail:student.phase};
   else if(p)h=health(p);
   else if(ownCapture)h={live:false,label:"Capture active",detail:student.phase};
   else if(mineReserved)h={live:false,label:"Your reserved seat",detail:"Click to resume"};
-  else if(r)h={live:false,label:"Reserved",detail:isTeacher?presenceText(r.person):"Assigned"};
+  else if(r)h={
+   live:false,label:isTeacher?"Reserved / waiting":"Occupied — click to wait",
+   detail:expiryText(seat,r)
+  };
   else h={live:false,label:isTeacher?"Empty":"Click to share",detail:"Available"};
+
   if(h.live)live++;
-  t.tile.classList.toggle("live",h.live);t.tile.classList.toggle("mine",mineReserved);
-  t.overlay.textContent=h.label;t.foot.textContent=h.detail;t.tile.title=h.label+": "+h.detail;
+  t.tile.classList.toggle("live",h.live);
+  t.tile.classList.toggle("mine",mineReserved);
+  t.overlay.textContent=h.label;t.foot.textContent=h.detail;
+  t.tile.title=h.label+": "+h.detail;
   bind(t.video,isTeacher?p?.stream:ownCapture?student.output:null);
-  t.tile.disabled=!isTeacher&&(meta.closed||!!student||capturing||(!!r&&!mineReserved)||(!!mine&&mine!==seat));
+  // Occupied seats may be selected for waiting; existing own seat stays exclusive.
+  t.tile.disabled=!isTeacher&&(meta.closed||!!student||capturing||(!!mine&&mine!==seat));
  }
  $("roomHealth").textContent=meta.closed?"Closed":isTeacher?
   (controlling?`${Object.keys(meta.seats||{}).length} reserved · ${live} live`:"Standby"):
   student?.phase||"Ready to share";
+
  const selected=!isTeacher?selectedSeat():null;
- $("startShareBtn").textContent=selected?`Start sharing seat ${selected}`:"Choose an available seat";
+ const occupied=selected&&meta.seats?.[selected]&&
+  meta.seats[selected].person!==user.uid;
+ $("startShareBtn").textContent=selected?
+  (occupied?`Share and wait for seat ${selected}`:`Start sharing seat ${selected}`):
+  "Choose a seat";
  $("startShareBtn").disabled=!!student||capturing||!selected||meta.closed;
  $("stopBtn").disabled=!student;$("retryBtn").disabled=!student;
  $("releaseBtn").disabled=!student&&!mySeat();
+
  if(!isTeacher)$("studentHelp").textContent=student?student.phase:
-  `Room configured${selected?"; seat "+selected+" selected":""}. Click Start sharing and approve browser screen capture.`;
+  selected?`Seat ${selected} selected. `+
+   (occupied?"It is occupied. You can approve capture and wait for release.":
+    "Click Start sharing and approve browser screen capture."):
+   "Choose a seat in the grid.";
  updateZoom();
 }
 function updateZoom(){
  if(zoomSeat===null)return;
  const p=seatPeer(zoomSeat),h=health(p);
  $("zoomTitle").textContent=`Seat ${zoomSeat} — existing tiny preview`;
- $("zoomStatus").textContent=h.label+". "+h.detail;bind($("zoomVideo"),p?.stream);
+ $("zoomStatus").textContent=h.label+". "+h.detail;
+ bind($("zoomVideo"),p?.stream);
 }
 function renderPeople(){
  if(!controlling||!meta)return;
  const box=$("people");box.replaceChildren();
  function row(text,error,buttons){
   const el=document.createElement("div");el.className="person";
-  const words=document.createElement("div");words.className="personText";words.textContent=text;
-  if(error){const err=document.createElement("div");err.className="errorText";err.textContent=error;words.append(err);}
+  const words=document.createElement("div");words.className="personText";
+  words.textContent=text;
+  if(error){
+   const err=document.createElement("div");
+   err.className="errorText";err.textContent=error;words.append(err);
+  }
   const controls=document.createElement("div");controls.className="row";
   for(const [name,fn]of buttons){
-   const b=document.createElement("button");b.textContent=name;b.onclick=action(fn);controls.append(b);
+   const b=document.createElement("button");b.textContent=name;
+   b.onclick=action(fn);controls.append(b);
   }
   el.append(words,controls);box.append(el);
  }
  for(const [seat,r]of Object.entries(meta.seats||{})){
-  const p=peers.get(r.person),item=requestFor(r.person),st=item?statuses.get(r.person+"/"+item.id):null;
-  row(`Seat ${seat}: ${p?health(p).label:st?.phase||"Waiting"} — ${presenceText(r.person)}`,st?.error,[
-   ["Reconnect",()=>reconnectSeat(+seat)],["Release",()=>releaseSeat(+seat)]
-  ]);
+  const p=peers.get(r.person),item=requestFor(r.person);
+  const st=item?statuses.get(r.person+"/"+item.id):null;
+  row(
+   `Seat ${seat}: ${p?health(p).label:st?.phase||"Waiting"} — `+
+   `${presenceText(r.person)}. ${expiryText(seat,r)}`,
+   st?.error,
+   [["Reconnect",()=>reconnectSeat(+seat)],["Release now",()=>releaseSeat(+seat)]]
+  );
  }
  for(const person of Object.keys(requests)){
-  const item=requestFor(person);if(!item||peers.get(person)?.id===item.id)continue;
-  const st=statuses.get(person+"/"+item.id);
-  row(`Lobby/recovery: seat ${item.r.seat}`,st?.error,[
-   ["Accept / retry",()=>{statuses.delete(person+"/"+item.id);return accept(item);}],
-   ["Reject",()=>reject(person,item.id)]
-  ]);
+  const item=requestFor(person);
+  if(item&&peers.get(person)?.id!==item.id){
+   const st=statuses.get(person+"/"+item.id);
+   row(`Lobby/recovery: seat ${item.r.seat}`,st?.error,[
+    ["Accept / retry",()=>{
+     statuses.delete(person+"/"+item.id);return accept(item);
+    }],
+    ["Reject",()=>reject(person,item.id)]
+   ]);
+  }
+  const pr=requests[person]?._presence;
+  if(pr&&freshCapture(pr,pr.seat)){
+   const r=meta.seats?.[pr.seat];
+   if(r&&r.person!==person)
+    row(`Waiting browser for seat ${pr.seat}: capture ready. ${expiryText(pr.seat,r)}`,
+     "",[]);
+  }
  }
 }
 async function readStats(p){
  const stats=await p.pc.getStats();let bytes=0,frames=0;
- const lines=[`${p.label}: ${p.pc.connectionState}; ICE=${p.pc.iceConnectionState}; DC=${p.dc?.readyState||"none"}`];
+ const lines=[
+  `${p.label}: ${p.pc.connectionState}; ICE=${p.pc.iceConnectionState}; DC=${p.dc?.readyState||"none"}`
+ ];
  stats.forEach(r=>{
-  if(r.type==="candidate-pair"&&r.nominated)lines.push(`Selected pair ${r.state}; bytes=${r.bytesSent||0}/${r.bytesReceived||0}`);
+  if(r.type==="candidate-pair"&&r.nominated)
+   lines.push(`Selected pair ${r.state}; bytes=${r.bytesSent||0}/${r.bytesReceived||0}`);
   if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
   if(r.type==="inbound-rtp"){
    lines.push(`Inbound bytes=${r.bytesReceived||0}; decoded=${r.framesDecoded||0}`);
@@ -1036,7 +1375,8 @@ async function readStats(p){
    if(!p.teacher){bytes+=r.bytesSent||0;frames+=r.framesEncoded||0;}
   }
  });
- if(frames>p.frames)p.lastFrame=Date.now();p.frames=frames;p.bytes=bytes;p.lastStats=lines.join("\n");
+ if(frames>p.frames)p.lastFrame=Date.now();
+ p.frames=frames;p.bytes=bytes;p.lastStats=lines.join("\n");
 }
 async function statsWorker(){
  if(statsBusy||!meta)return;statsBusy=true;
@@ -1046,25 +1386,36 @@ async function statsWorker(){
  }finally{statsBusy=false;render();}
 }
 async function report(){
- const lines=[APP,new Date().toISOString(),navigator.userAgent,
+ const lines=[
+  APP,new Date().toISOString(),navigator.userAgent,
   `Room=${room}; teacher=${isTeacher}; controlling=${controlling}; online=${online}`,
   `Controller=${meta?.controller||""}; local=${epoch}`,
-  `Capture=${!!student}; draws=${student?.draws||0}; phase=${student?.phase||idlePhase}`];
+  `Auto release=${autoRelease()}; timeout=${timeoutSec()} seconds; peersLoaded=${peersLoaded}`,
+  `Capture=${!!student}; draws=${student?.draws||0}; phase=${student?.phase||idlePhase}`
+ ];
  if(isTeacher)for(const [seat,r]of Object.entries(meta?.seats||{})){
   const item=requestFor(r.person),st=item?statuses.get(r.person+"/"+item.id):null;
-  lines.push(`Seat ${seat}: ${presenceText(r.person)}`,
-   "Reservation: "+JSON.stringify(r),"Presence: "+JSON.stringify(requests[r.person]?._presence),
-   "Acceptance: "+JSON.stringify(st));
+  lines.push(
+   `Seat ${seat}: ${presenceText(r.person)}. ${expiryText(seat,r)}`,
+   "Reservation: "+JSON.stringify(r),
+   "Presence: "+JSON.stringify(requests[r.person]?._presence),
+   "Acceptance: "+JSON.stringify(st)
+  );
  }
  const list=isTeacher?[...peers.values()]:student?.p?[student.p]:[];
  for(const p of list){
   if(p.active)try{await readStats(p);}catch{}
-  lines.push(`Attempt=${p.id}; phase=${p.phase}; error=${p.error}`,p.lastStats,p.events.join("\n"));
+  lines.push(`Attempt=${p.id}; phase=${p.phase}; error=${p.error}`,
+   p.lastStats,p.events.join("\n"));
  }
- // Do not include teacherKey or invitation URLs in exported diagnostics.
+ // Never include private teacher invitation credentials in diagnostics.
  return lines.join("\n\n");
 }
-async function copyText(text){await navigator.clipboard.writeText(text);notice("Link copied.");}
+async function copyText(text){
+ await navigator.clipboard.writeText(text);notice("Link copied.");
+}
+
+/* UI */
 $("createBtn").onclick=action(createRoom);
 $("openBtn").onclick=action(()=>openRoom());
 $("lastBtn").onclick=action(()=>openRoom(saved("classroom-v8-last-room")||""));
@@ -1075,49 +1426,72 @@ $("copyStudentBtn").onclick=action(()=>copyText(studentURL()));
 $("copyTeacherBtn").onclick=action(()=>copyText(teacherURL()));
 $("copySeatBtn").onclick=action(()=>{
  const seat=Number($("linkSeat").value);
- if(!Number.isInteger(seat)||seat<1||seat>meta.rows*meta.cols)throw Error("Invalid seat.");
+ if(!Number.isInteger(seat)||seat<1||seat>meta.rows*meta.cols)
+  throw Error("Invalid seat.");
  return copyText(studentURL(seat));
 });
 $("startShareBtn").onclick=()=>void startSeat(selectedSeat());
 $("stopBtn").onclick=action(()=>stop());
 $("retryBtn").onclick=()=>{
- if(student){retrySerial++;retryAt=0;student.lastAttempt=0;destroy(student.p);void studentLoop();}
+ if(student){
+  retrySerial++;retryAt=0;student.lastAttempt=0;
+  destroy(student.p);void studentLoop();
+ }
 };
 $("releaseBtn").onclick=action(releaseMine);
 $("view").onchange=render;
 $("applyBtn").onclick=action(async()=>{
- const rows=+$("rows").value,cols=+$("cols").value,width=+$("width").value,fps=+$("fps").value;
- if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<1||cols<1||rows*cols>64)throw Error("Invalid grid.");
+ const rows=+$("rows").value,cols=+$("cols").value;
+ const width=+$("width").value,fps=+$("fps").value;
+ const minutes=Number($("seatTimeout").value);
+ if(!Number.isInteger(rows)||!Number.isInteger(cols)||
+  rows<1||cols<1||rows*cols>64)throw Error("Invalid grid.");
+ if(!Number.isFinite(minutes)||minutes<1||minutes>1440)
+  throw Error("Seat timeout must be 1–1440 minutes.");
  await edit(m=>{
-  if(Math.max(0,...Object.keys(m.seats||{}).map(Number))>rows*cols)throw Error("Release seats outside the new grid first.");
-  return{rows,cols,width,fps,auto:$("auto").checked};
+  if(Math.max(0,...Object.keys(m.seats||{}).map(Number))>rows*cols)
+   throw Error("Release seats outside the new grid first.");
+  return {
+   rows,cols,width,fps,auto:$("auto").checked,
+   autoRelease:$("autoRelease").checked,
+   seatTimeoutSec:Math.round(minutes*60)
+  };
  });
- notice("Settings saved.");
+ notice("Settings saved. Inactive seat timeout is "+Math.round(minutes*60)+" seconds.");
 });
 $("auto").onchange=action(()=>edit(()=>({auto:$("auto").checked})));
 $("closeRoomBtn").onclick=action(async()=>{
  if(confirm("Permanently close this room?"))await edit(()=>({closed:true}));
 });
 $("closeZoomBtn").onclick=()=>$("zoom").close();
-$("zoom").addEventListener("close",()=>{zoomSeat=null;bind($("zoomVideo"),null);});
+$("zoom").addEventListener("close",()=>{
+ zoomSeat=null;bind($("zoomVideo"),null);
+});
 $("homeBtn").onclick=()=>{
  if(student&&!confirm("Stop capture and return home?"))return;
  const u=new URL(location.href);u.search="";u.hash="";location.href=u.href;
 };
-$("diagnoseBtn").onclick=action(async()=>{$("diagnostics").textContent=await report();});
+$("diagnoseBtn").onclick=action(async()=>{
+ $("diagnostics").textContent=await report();
+});
 $("downloadBtn").onclick=action(async()=>{
  const text=await report()+"\n\nEVENT LOG\n"+logs.join("\n");
- const u=URL.createObjectURL(new Blob(["\uFEFF",text],{type:"text/plain;charset=utf-8"}));
- const a=document.createElement("a");a.href=u;a.download="classroom-v11-diagnostics.txt";a.click();
+ const u=URL.createObjectURL(new Blob(["\uFEFF",text],{
+  type:"text/plain;charset=utf-8"
+ }));
+ const a=document.createElement("a");
+ a.href=u;a.download="classroom-v12-diagnostics.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(u),2000);
 });
 window.addEventListener("pagehide",()=>{
  if(student){
   student.active=false;clearTimeout(student.timer);
-  student.raw?.getTracks().forEach(t=>t.stop());student.output?.getTracks().forEach(t=>t.stop());
+  student.raw?.getTracks().forEach(t=>t.stop());
+  student.output?.getTracks().forEach(t=>t.stop());
   destroy(student.p);
  }
  for(const p of peers.values())destroy(p);
+ // No immediate seat release on unload. Presence expires and teacher applies grace.
 });
 window.addEventListener("pageshow",e=>{if(e.persisted)location.reload();});
 setInterval(maintenance,2000);
@@ -1127,30 +1501,40 @@ setInterval(scheduleScan,1500);
 async function boot(){
  log("Loaded "+APP);
  const app=initializeApp(FIREBASE),auth=getAuth(app);
- await auth.authStateReady();await setPersistence(auth,browserLocalPersistence);
+ await auth.authStateReady();
+ await setPersistence(auth,browserLocalPersistence);
  user=auth.currentUser||(await signInAnonymously(auth)).user;
  db=getDatabase(app);ready=true;
  $("createBtn").disabled=false;$("openBtn").disabled=false;
  $("lastBtn").disabled=!saved("classroom-v8-last-room");
- if(["tcp","udp","both"].includes(pageConfig.get("transport")))$("transport").value=pageConfig.get("transport");
+ if(["tcp","udp","both"].includes(pageConfig.get("transport")))
+  $("transport").value=pageConfig.get("transport");
  onValue(ref(db,".info/serverTimeOffset"),s=>{offset=s.val()||0;});
  let previous=false,ever=false;
  onValue(ref(db,".info/connected"),s=>{
-  online=!!s.val();$("firebaseState").textContent=online?"Firebase: connected":"Firebase: reconnecting";
-  if(online&&!previous){if(ever)network("signaling reconnected");ever=true;void presence(true);}
+  online=!!s.val();
+  $("firebaseState").textContent=online?"Firebase: connected":"Firebase: reconnecting";
+  if(online&&!previous){
+   if(ever)network("signaling reconnected");
+   ever=true;void presence(true);
+  }
   previous=online;
  });
- const deadline=Date.now()+20000;while(!online&&Date.now()<deadline)await sleep(100);
- if(!online){notice("Waiting for Firebase. Open/create a room once connected.",true);return;}
+ const deadline=Date.now()+20000;
+ while(!online&&Date.now()<deadline)await sleep(100);
+ if(!online){
+  notice("Waiting for Firebase. Open/create a room once connected.",true);return;
+ }
  const requested=pageConfig.get("room");
  if(requested){
-  $("roomInput").value=requested;
-  await openRoom(requested);
+  $("roomInput").value=requested;await openRoom(requested);
  }else if(pageConfig.get("create")==="1"){
   await createRoom();
  }else notice("Create a room or open a student/teacher invitation link.");
 }
-boot().catch(e=>{$("firebaseState").textContent="Setup error";fail(e);});
+boot().catch(e=>{
+ $("firebaseState").textContent="Setup error";fail(e);
+});
 </script>
 </body>
 </html>
