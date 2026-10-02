@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark">
-<title>Classroom Live Grid</title>
+<title>Classroom Live Grid — Permanent Auto Accept</title>
 <style>
 :root{
+ color-scheme:dark;
  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
  background:#101722;color:#edf3ff;
  --panel:#192333;--border:#42536d
@@ -25,18 +26,18 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .danger{border-color:#c18080}
 .help{background:#765113;border-color:#e4bb63}
 input[type=number]{width:80px}
-input[type=checkbox]{width:18px;height:18px}
 .link{flex:1;min-width:170px}
 label,.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-h1{font-size:1.2rem;margin:0}
+h1{font-size:1.15rem;margin:0}
 h2{font-size:1.05rem;margin:0 0 12px}
-p{line-height:1.5}
+p,li{line-height:1.5}
 small,.muted{color:#bcc9da}
 [hidden]{display:none!important}
 .badge{
  padding:4px 8px;border:1px solid #566a83;
- border-radius:18px;font-size:.77rem
+ border-radius:18px;font-size:.76rem
 }
+.good{color:#a4efc9}
 header{
  position:sticky;top:0;z-index:20;background:#101722f5;
  border-bottom:1px solid var(--border);padding:12px 16px;
@@ -45,8 +46,7 @@ header{
 }
 main{max-width:1800px;margin:auto;padding:12px}
 .panel{
- padding:15px;background:var(--panel);
- border:1px solid var(--border);
+ padding:15px;background:var(--panel);border:1px solid var(--border);
  border-radius:11px;margin-bottom:12px
 }
 #notice{
@@ -119,16 +119,11 @@ dialog::backdrop{background:#000b}
  #desktopTabs{display:none}
  #menuBtn{display:inline-block}
  #admin{
-  position:fixed;top:0;right:0;bottom:0;
-  width:min(95vw,470px);overflow:auto;z-index:60;
-  margin:0;background:#182333;border-radius:0
+  position:fixed;top:0;right:0;bottom:0;width:min(95vw,470px);
+  overflow:auto;z-index:60;margin:0;background:#182333;border-radius:0
  }
- #drawerHeader{
-  display:flex;justify-content:space-between;padding:12px
- }
- #mobileTabs{
-  display:flex;flex-wrap:wrap;gap:6px;padding:0 12px
- }
+ #drawerHeader{display:flex;justify-content:space-between;padding:12px}
+ #mobileTabs{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px}
  #shade.open{
   display:block;position:fixed;inset:0;background:#0009;z-index:50
  }
@@ -146,6 +141,7 @@ dialog::backdrop{background:#000b}
   <h1>Classroom Live Grid</h1>
   <span id="backendBadge" class="badge">Starting…</span>
   <span id="roleBadge" class="badge">No client authentication</span>
+  <span class="badge good">Always auto-accept · No seat expiry</span>
  </div>
  <nav id="desktopTabs">
   <button class="tab" data-page="room">Room & layout</button>
@@ -163,19 +159,24 @@ dialog::backdrop{background:#000b}
   <h2>Create or open a classroom</h2>
   <div class="row">
    <button id="createBtn" class="primary" disabled>Create teacher room</button>
-   <input id="roomInput" class="link"
-    placeholder="Room ID or classroom link">
+   <input id="roomInput" class="link" placeholder="Room ID or classroom link">
    <button id="openBtn" disabled>Open</button>
    <button id="lastBtn" disabled>Last room</button>
   </div>
   <p class="muted">
    Endpoint: <span id="endpointText"></span><br>
-   Authentication: none. No login, authentication token, or cookies are sent.
+   No login, authentication token, or cookies are sent to the database.
+  </p>
+  <p>
+   <strong>Auto-accept is always on.</strong>
+   Seats stay reserved until explicitly released.
+   Keep an authorized teacher controller open to process new admissions
+   and release requests.
   </p>
  </section>
 
  <section id="studentPanel" class="panel reminder" hidden>
-  <h2>Keep this tab open so staff can help you</h2>
+  <h2>Keep this tab open while sharing</h2>
   <p id="studentStatus"></p>
   <div class="row">
    <button id="shareBtn" class="primary">Start sharing</button>
@@ -186,16 +187,15 @@ dialog::backdrop{background:#000b}
   </div>
   <p id="helpStatus" class="muted"></p>
   <small>
-   Do not close or refresh this tab. Prevent computer sleep.
-   You may work in another application while sharing.
-   After restarting the browser, reopen your link and approve sharing again.
+   Prevent computer sleep. You may work in another application.
+   Your seat does not expire when you disconnect.
+   After refreshing or restarting the browser, approve capture again.
    Browser “Stop sharing” always stops capture.
   </small>
  </section>
 
  <section id="gridSection" hidden>
-  <div class="row"
-   style="justify-content:space-between;margin:10px 0">
+  <div class="row" style="justify-content:space-between;margin:10px 0">
    <div class="row">
     <strong>Live classroom</strong>
     <span id="gridStatus" class="badge"></span>
@@ -217,8 +217,7 @@ dialog::backdrop{background:#000b}
 
 <aside id="admin" class="panel" hidden>
  <div id="drawerHeader">
-  <strong>Classroom menu</strong>
-  <button id="closeMenuBtn">✕</button>
+  <strong>Classroom menu</strong><button id="closeMenuBtn">✕</button>
  </div>
  <div id="mobileTabs">
   <button class="tab" data-page="room">Room</button>
@@ -230,22 +229,19 @@ dialog::backdrop{background:#000b}
  <section id="page-room" class="page">
   <h2>Room links</h2>
   <div class="row">
-   <input id="studentLink" class="link" readonly
-    placeholder="Open a room first">
+   <input id="studentLink" class="link" readonly placeholder="Open a room first">
    <button id="copyStudentBtn">Copy student link</button>
    <button id="copySeat1Btn">Copy Seat 1 link</button>
    <button id="homeBtn">Home</button>
   </div>
 
   <div id="staffAccess" hidden>
-   <p><strong>Private staff links — do not give these to students.</strong></p>
+   <p><strong>Private staff links — do not distribute to students.</strong></p>
    <div class="row">
     <button id="copyAssistantBtn">Copy assistant viewer link</button>
     <button id="copyTeacherBtn">Copy teacher takeover link</button>
     <button id="takeoverBtn">Take controller role</button>
-    <button id="rotateBtn" class="danger" hidden>
-     Rotate staff invitation key
-    </button>
+    <button id="rotateBtn" class="danger" hidden>Rotate staff invitation key</button>
    </div>
    <div class="row" style="margin-top:12px">
     <label>Staff label
@@ -259,7 +255,17 @@ dialog::backdrop{background:#000b}
 
   <div id="controllerSettings" hidden>
    <hr>
-   <h2>Layout and classroom settings</h2>
+   <h2>Layout and permanent admission policy</h2>
+   <p class="good">
+    <strong>Automatic acceptance: always ON</strong><br>
+    <strong>Automatic seat release: always OFF</strong><br>
+    No five-minute timeout. No inactivity countdown.
+   </p>
+   <p class="muted">
+    Occupied seats are not taken over automatically.
+    Release a seat explicitly under Students & help when another
+    student needs to use it.
+   </p>
    <div class="row">
     <label>Rows
      <input id="rows" type="number" min="1" max="64" value="5">
@@ -285,79 +291,59 @@ dialog::backdrop{background:#000b}
     <label>FPS
      <select id="fps"><option>1</option><option>2</option></select>
     </label>
+    <button id="settingsBtn">Save layout</button>
    </div>
-
-   <div class="row" style="margin-top:12px">
-    <label><input id="auto" type="checkbox" checked>Auto accept</label>
-    <label>
-     <input id="autoRelease" type="checkbox" checked>Expire inactive seats
-    </label>
-    <label>After
-     <input id="timeout" type="number" min="1" max="1440" value="5">
-     minutes
-    </label>
-    <button id="settingsBtn">Save settings</button>
-   </div>
-
    <div class="row" style="margin-top:12px">
     <label>Seat link
      <input id="linkSeat" type="number" min="1" max="64" value="1">
     </label>
     <button id="copySeatBtn">Copy seat-specific link</button>
     <button id="reconnectAllBtn">Reconnect all streams</button>
-    <button id="closeRoomBtn" class="danger">
-     Close room permanently
-    </button>
+    <button id="closeRoomBtn" class="danger">Close room permanently</button>
    </div>
   </div>
 
   <div id="studentAdmin" hidden>
-   <p>Your seat remains reserved temporarily after capture stops.</p>
+   <p>Your seat stays reserved indefinitely unless explicitly released.</p>
    <button id="releaseMineBtn" class="danger">Release my seat</button>
   </div>
  </section>
 
  <section id="page-people" class="page" hidden>
   <h2>Students and help requests</h2>
+  <p class="muted">
+   Inactive seats remain reserved. Only explicit release makes them available.
+  </p>
   <div id="people">Open a staff room to view students.</div>
  </section>
 
  <section id="page-connection" class="page" hidden>
   <h2>Database REST connection</h2>
-
-  <label>Endpoint
-   <input id="dbEndpoint" class="link">
-  </label>
-
-  <p><strong>Authentication: No client authentication</strong></p>
+  <label>Endpoint <input id="dbEndpoint" class="link"></label>
+  <p><strong>No client authentication</strong></p>
   <ul>
    <li>No Firebase SDK or Firebase login.</li>
-   <li>No auth query parameter.</li>
-   <li>No Authorization header.</li>
+   <li>No auth query parameter or Authorization header.</li>
    <li>No cookies sent with database requests.</li>
   </ul>
-
   <div class="row">
    <button id="saveConnectionBtn">Save endpoint and reload</button>
    <button id="resetConnectionBtn">Restore default endpoint</button>
    <button id="testConnectionBtn">Test REST endpoint</button>
   </div>
-
   <p class="muted">
-   The server must support GET, PUT, PATCH and DELETE on .json paths,
-   including multi-location PATCH updates and null deletion.
-   CORS must allow this website's origin and these HTTP methods.
+   Requires GET, PUT, PATCH and DELETE on .json paths,
+   multi-location PATCH with null deletion, JSON responses, and browser CORS.
    Polling is used instead of Firebase WebSockets.
   </p>
-
   <p class="err">
-   A local browser ID is not authentication. If the server allows public
-   database access, classroom records and invitation keys are not protected.
-   Teacher/assistant controls in this page are not a security boundary.
+   Local browser IDs and private-link checks are not server authentication.
+   An openly accessible database exposes records and invitation keys.
+   Restrict access on the server/network as appropriate.
   </p>
 
   <hr>
-  <h2>TURN configuration</h2>
+  <h2>TURN configuration — relay only</h2>
   <div class="row">
    <label>Mode
     <select id="transport">
@@ -373,40 +359,32 @@ dialog::backdrop{background:#000b}
    </label>
    <button id="networkBtn" disabled>Save room TURN settings</button>
   </div>
-
   <p class="muted">
-   TURN credentials are still required for the media relay.
-   “No client authentication” here refers to database requests.
-   TLS 443 requires a real TURN TLS listener and trusted certificate;
-   this hostname field does not configure the server.
+   TURN relay credentials remain required. No client authentication refers
+   only to database requests. TLS 443 needs a real TURN TLS listener and
+   trusted certificate. The hostname field does not configure the server.
   </p>
-
   <div class="row">
    <button id="diagnoseBtn">Collect diagnostics</button>
    <button id="downloadBtn">Download diagnostics</button>
   </div>
   <pre id="diagnostics">No report yet.</pre>
-  <details>
-   <summary>Event log</summary>
-   <pre id="log"></pre>
-  </details>
+  <details><summary>Event log</summary><pre id="log"></pre></details>
  </section>
 
  <section id="page-guide" class="page" hidden>
-  <h2>Student guide</h2>
-  <ol>
-   <li>Open your classroom or seat-specific link.</li>
-   <li>Click Start sharing and approve browser screen capture.</li>
-   <li>Keep this tab open and prevent computer sleep.</li>
-   <li>Click Request help when assistance is needed.</li>
-   <li>After browser restart, reopen your link and approve capture again.</li>
-  </ol>
-
+  <h2>Permanent auto-accept</h2>
+  <ul>
+   <li>New active sharing requests are accepted automatically into free seats.</li>
+   <li>A controlling teacher must be online to process new reservations.</li>
+   <li>Reserved seats never expire automatically.</li>
+   <li>Same-browser students reuse their reserved seats.</li>
+   <li>Changing browser or clearing site storage creates a different identity.</li>
+   <li>Occupied seats require explicit release before replacement.</li>
+   <li>Screen capture permission is still required after every page restart.</li>
+  </ul>
   <h2>Preconfigured links</h2>
-  <button id="copyCreateBtn">
-   Copy fully configured create-room link
-  </button>
-
+  <button id="copyCreateBtn">Copy configured create-room link</button>
   <pre>create=1
 role=teacher | assistant | student
 room=ROOM_ID
@@ -418,39 +396,35 @@ cols=8
 corner=bottom-right | bottom-left | top-right | top-left
 width=160 | 256 | 320
 fps=1 | 2
-auto=1 | 0
-autoRelease=1 | 0
-seatTimeoutSec=60..86400
 transport=tcp | udp | both | tls | all
 tlsHost=turn.example.org
 view=fit | large
 label=Teacher
 
+Fixed policy:
+auto=1
+autoRelease=0
+
+Old auto=0, autoRelease=1, and seatTimeoutSec
+parameters cannot override the fixed policy.
+
 Private staff invitation:
 #teacherKey=SECRET</pre>
-
   <p class="muted">
-   Room URL settings apply through the controlling teacher.
-   start=1 prepares the sharing button but never bypasses a real click
-   or browser capture permission.
-  </p>
-  <p class="muted">
-   Up to four active staff viewers receive separate student streams.
+   Up to four staff viewers receive separate tiny streams.
    Additional viewers multiply upload and TURN traffic.
-   This is a polling-based prototype, not a capacity-tested 40-device deployment.
-   For larger installations, consider server subscriptions and an SFU.
+   This polling-based application has not been load-tested here for 40 devices.
   </p>
   <p class="muted">
-   Do not open the same student identity in multiple active tabs.
-   Use a separate browser profile or device to test a student while
-   acting as teacher.
+   Use one active student tab per browser identity. Use a separate profile
+   or device to test a student while acting as teacher.
+   Avoid simultaneous controller takeovers.
   </p>
  </section>
 </aside>
 
 <dialog id="zoom">
- <div class="row"
-  style="justify-content:space-between;margin-bottom:10px">
+ <div class="row" style="justify-content:space-between;margin-bottom:10px">
   <strong id="zoomTitle"></strong>
   <button id="closeZoomBtn">Close</button>
  </div>
@@ -464,47 +438,35 @@ Private staff invitation:
 
 <script type="module">
 /*
- Classroom REST / no client authentication.
+ Permanent auto-accept / no seat expiry.
 
- No Firebase SDK.
- No Firebase authentication.
- No Authorization header.
- No auth query parameter.
- fetch credentials:"omit" prevents sending cookies.
+ Existing REST room schema retained.
+ No Firebase SDK, client auth token, Authorization header, or cookies.
 
- IMPORTANT:
- Local identity and UI staff invitations are workflow conveniences.
- They do NOT provide server-side authorization on an open database.
- This file cannot configure the backend's security policy.
+ POLICY:
+ - auto always true
+ - autoRelease always false
+ - seatTimeoutSec removed from room metadata
+ - no expiry worker exists
+ - inactivity never releases a seat
+ - manual teacher/student release still supported
+ - an online controller processes admissions and release requests
 
- REST requirements:
- GET /path.json
- PUT /path.json
- PATCH /path.json
- DELETE /path.json
- JSON responses
- Multi-location PATCH and null deletion
- Browser CORS
+ Local identities and UI invitation checks are NOT a security boundary.
+ Server/network access control must be provided independently.
 
- Existing v15 REST room structure retained.
- All media participants should update to this version.
+ WebRTC remains relay-only, using complete gathered browser SDP.
 */
 
-const APP="classroom-rest-noauth-v16";
+const APP="classroom-permanent-auto-v17";
 const PROTOCOL="classroom-rest-v15";
-const DEFAULT_ENDPOINT=
- "https://default--default.ubcoturneastasia.duckdns.org";
-
+const DEFAULT_ENDPOINT="https://default--default.ubcoturneastasia.duckdns.org";
 const MAX_VIEWERS=4;
 const VIEWER_TTL=45000;
-const CORNERS=[
- "bottom-right","bottom-left","top-right","top-left"
-];
+const CORNERS=["bottom-right","bottom-left","top-right","top-left"];
 const TURN={
- host:"20.24.69.131",
- port:3478,
- username:"testuser",
- password:"testpass"
+ host:"20.24.69.131",port:3478,
+ username:"testuser",password:"testpass"
 };
 
 const $=id=>document.getElementById(id);
@@ -513,93 +475,49 @@ const now=()=>Date.now();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 function load(key,fallback=""){
- try{return localStorage.getItem(key)??fallback;}
- catch{return fallback;}
+ try{return localStorage.getItem(key)??fallback;}catch{return fallback;}
 }
 function save(key,value){
- try{localStorage.setItem(key,String(value));}
- catch{}
+ try{localStorage.setItem(key,String(value));}catch{}
 }
 function sessionLoad(key){
- try{return sessionStorage.getItem(key)||"";}
- catch{return "";}
+ try{return sessionStorage.getItem(key)||"";}catch{return "";}
 }
 function sessionSave(key,value){
- try{sessionStorage.setItem(key,String(value));}
- catch{}
+ try{sessionStorage.setItem(key,String(value));}catch{}
+}
+function validID(value){
+ return typeof value==="string"&&/^[A-Za-z0-9_-]{6,128}$/.test(value);
 }
 
-let endpoint=load(
- "classroom-noauth-v16-endpoint",DEFAULT_ENDPOINT
-);
+let endpoint=load("classroom-noauth-v16-endpoint",DEFAULT_ENDPOINT);
 let identity=load("classroom-rest-local-uid");
-if(!/^[A-Za-z0-9_-]{6,128}$/.test(identity)){
+if(!validID(identity)){
  identity=uuid();
  save("classroom-rest-local-uid",identity);
 }
-
-/* Old authentication settings are deliberately ignored. */
-try{
- sessionStorage.removeItem("classroom-rest-token");
-}catch{}
 
 const tab=sessionLoad("classroom-rest-tab")||uuid();
 sessionSave("classroom-rest-tab",tab);
 
 let params=new URLSearchParams(location.search);
-let inviteKey=
- new URLSearchParams(location.hash.slice(1)).get("teacherKey")||
+let inviteKey=new URLSearchParams(location.hash.slice(1)).get("teacherKey")||
  params.get("teacherKey")||"";
 
-let ready=false;
-let room="";
-let meta=null;
-let records={};
-let ownRecords={};
-let recordsReady=false;
-let isOwner=false;
-let isStaff=false;
-let controller=false;
-let epoch="";
-let staffKey="";
-let viewerID="";
-let viewerLabel="Teacher";
-let viewerReady=false;
-let registering=false;
-let renewing=false;
-let busy=false;
-let claiming=false;
-let metaQueue=Promise.resolve();
-let dbHealthy=false;
-let student=null;
-let captureStarting=false;
-let menuPage="";
-let zoomSeat=null;
-
-let pollBusy=false;
-let lastDetailPoll=0;
-let heartbeatBusy=false;
-let lastHeartbeat=0;
-let presenceBusy=false;
-let lastPresence=0;
-let presenceAgain=false;
-let releaseRequested=false;
-let studentLoopBusy=false;
-let expiryBusy=false;
-let lastExpiry=0;
-let statsBusy=false;
-let lastNetwork=0;
-let lastViewerRetry=0;
-let staffRevoked=false;
+let ready=false,room="",meta=null,records={},ownRecords={};
+let isOwner=false,isStaff=false,controller=false,epoch="",staffKey="";
+let viewerID="",viewerLabel="Teacher",viewerReady=false;
+let registering=false,renewing=false,staffRevoked=false;
+let busy=false,claiming=false,metaQueue=Promise.resolve(),dbHealthy=false;
+let student=null,captureStarting=false,menuPage="",zoomSeat=null;
+let pollBusy=false,lastDetailPoll=0,heartbeatBusy=false,lastHeartbeat=0;
+let presenceBusy=false,lastPresence=0,presenceAgain=false;
+let releaseRequested=false,studentLoopBusy=false,statsBusy=false;
+let lastNetwork=0,lastViewerRetry=0,policyBusy=false;
 let idlePhase="Screen permission required";
 
-const viewers=new Map();
-const tiles=new Map();
-const answering=new Set();
-const admitting=new Set();
-const releasing=new Set();
-const errors=new Map();
-const logs=[];
+const viewers=new Map(),tiles=new Map(),answering=new Set();
+const admitting=new Set(),releasing=new Set(),errors=new Map(),logs=[];
 
 const roomPath=part=>`rooms/${room}/${part}`;
 const personPath=(person,part="")=>
@@ -620,46 +538,30 @@ function fail(error){
  notice(message,true);
 }
 function action(fn){
- return (...args)=>
-  Promise.resolve().then(()=>fn(...args)).catch(fail);
-}
-function validID(value){
- return typeof value==="string"&&
-  /^[A-Za-z0-9_-]{6,128}$/.test(value);
+ return(...args)=>Promise.resolve().then(()=>fn(...args)).catch(fail);
 }
 function normalizeEndpoint(value){
- const url=new URL(value);
- if(url.protocol!=="https:")
-  throw Error("Use an HTTPS database endpoint.");
- if(url.username||url.password||url.search||url.hash)
-  throw Error("Endpoint must not contain credentials, query, or fragment.");
- return url.href.replace(/\/+$/,"");
+ const u=new URL(value);
+ if(u.protocol!=="https:")throw Error("Use an HTTPS endpoint.");
+ if(u.username||u.password||u.search||u.hash)
+  throw Error("Endpoint cannot contain credentials, query, or fragment.");
+ return u.href.replace(/\/+$/,"");
 }
 function setDBHealth(ok){
  dbHealthy=ok;
- $("backendBadge").textContent=
-  ok?"Database online":"Database reconnecting";
+ $("backendBadge").textContent=ok?"Database online":"Database reconnecting";
 }
 
-/* No client authentication is performed anywhere in this transport. */
 async function dbRequest(method,path,body){
  if(!ready)throw Error("Connection is not initialized.");
-
- const safePath=path.split("/")
-  .filter(Boolean).map(encodeURIComponent).join("/");
-
- const url=endpoint+"/"+safePath+".json";
+ const safe=path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
  const headers={Accept:"application/json"};
-
  if(body!==undefined)headers["Content-Type"]="application/json";
-
  const abort=new AbortController();
  const timer=setTimeout(()=>abort.abort(),20000);
-
  try{
-  const response=await fetch(url,{
-   method,
-   headers,
+  const response=await fetch(endpoint+"/"+safe+".json",{
+   method,headers,
    body:body===undefined?undefined:JSON.stringify(body),
    signal:abort.signal,
    cache:"no-store",
@@ -667,66 +569,45 @@ async function dbRequest(method,path,body){
    redirect:"error",
    referrerPolicy:"no-referrer"
   });
-
   const text=await response.text();
   let value=null;
-
   if(text){
    try{value=JSON.parse(text);}
-   catch{
-    throw Error(
-     `REST ${method}: non-JSON response (HTTP ${response.status}).`
-    );
-   }
+   catch{throw Error(`REST ${method}: non-JSON response (HTTP ${response.status}).`);}
   }
-
-  if(!response.ok){
-   const detail=typeof value?.error==="string"?
-    value.error:"Request rejected";
-   throw Error(`REST ${method} HTTP ${response.status}: ${detail}`);
-  }
-
-  if(typeof value?.error==="string")
-   throw Error("Database: "+value.error);
-
+  if(!response.ok)
+   throw Error(`REST ${method} HTTP ${response.status}: ${
+    typeof value?.error==="string"?value.error:"Request rejected"
+   }`);
+  if(typeof value?.error==="string")throw Error("Database: "+value.error);
   setDBHealth(true);
   return value;
  }catch(error){
   setDBHealth(false);
-  if(error.name==="AbortError")
-   throw Error(`REST ${method} timed out after 20 seconds.`);
+  if(error.name==="AbortError")throw Error(`REST ${method} timed out.`);
   if(error instanceof TypeError)
-   throw Error(
-    "Database fetch failed. Check endpoint, TLS, CORS, " +
-    "network access, and redirects."
-   );
+   throw Error("Database fetch failed. Check endpoint, TLS, CORS, network access, and redirects.");
   throw error;
- }finally{
-  clearTimeout(timer);
- }
+ }finally{clearTimeout(timer);}
 }
-
 const getDB=path=>dbRequest("GET",path);
 const putDB=(path,value)=>dbRequest("PUT",path,value);
 const patchDB=(path,value)=>dbRequest("PATCH",path,value);
 const deleteDB=path=>dbRequest("DELETE",path);
 
-/* Room and URL configuration */
+/* Fixed policy; no timeout default. */
 function defaults(){
  return {
   protocol:PROTOCOL,
-  rows:5,cols:8,corner:"bottom-right",
-  width:256,fps:1,auto:true,
-  autoRelease:true,seatTimeoutSec:300,
+  rows:5,cols:8,corner:"bottom-right",width:256,fps:1,
+  auto:true,autoRelease:false,permanentAutoAccept:true,
   transport:"tcp",tlsHost:"",
   closed:false,revision:1,
-  controller:"",controlTab:"",heartbeat:0,
-  streamRevision:1
+  controller:"",controlTab:"",heartbeat:0,streamRevision:1
  };
 }
 function corner(){
- return CORNERS.includes(meta?.corner)?
-  meta.corner:"bottom-right";
+ return CORNERS.includes(meta?.corner)?meta.corner:"bottom-right";
 }
 function tlsHostValid(host){
  return typeof host==="string"&&host.length<254&&
@@ -736,66 +617,42 @@ function checkSettings(m){
  if(!Number.isInteger(m.rows)||!Number.isInteger(m.cols)||
   m.rows<1||m.cols<1||m.rows*m.cols>64)
   throw Error("Grid must contain 1–64 seats.");
-
- if(!CORNERS.includes(m.corner)||
-  ![160,256,320].includes(m.width)||![1,2].includes(m.fps))
+ if(!CORNERS.includes(m.corner)||![160,256,320].includes(m.width)||
+  ![1,2].includes(m.fps))
   throw Error("Invalid corner, preview size, or FPS.");
-
  if(!["tcp","udp","both","tls","all"].includes(m.transport))
   throw Error("Invalid TURN mode.");
-
  if(["tls","all"].includes(m.transport)&&!tlsHostValid(m.tlsHost))
   throw Error("TLS mode requires a configured TURN TLS hostname.");
-
- if(!Number.isInteger(m.seatTimeoutSec)||
-  m.seatTimeoutSec<60||m.seatTimeoutSec>86400)
-  throw Error("Seat timeout must be 60–86400 seconds.");
 }
 function validMeta(m){
  if(!m||m.protocol!==PROTOCOL)return false;
  try{
-  checkSettings({
-   ...defaults(),...m,
-   corner:CORNERS.includes(m.corner)?m.corner:"bottom-right"
-  });
+  checkSettings({...defaults(),...m,
+   corner:CORNERS.includes(m.corner)?m.corner:"bottom-right"});
   return true;
  }catch{return false;}
 }
 function normalizeMeta(m){
- return {...defaults(),...m,corner:
-  CORNERS.includes(m.corner)?m.corner:"bottom-right"};
+ return {...defaults(),...m,
+  corner:CORNERS.includes(m.corner)?m.corner:"bottom-right"};
 }
 function settingsURL(){
  const result={};
-
- for(const key of ["rows","cols","width","fps","seatTimeoutSec"]){
+ for(const key of ["rows","cols","width","fps"]){
   if(params.has(key)){
    const value=Number(params.get(key));
-   if(!Number.isInteger(value))
-    throw Error("Invalid URL number: "+key);
+   if(!Number.isInteger(value))throw Error("Invalid URL number: "+key);
    result[key]=value;
   }
  }
-
- for(const key of ["auto","autoRelease"]){
-  if(params.has(key)){
-   const value=params.get(key);
-   if(!["0","1"].includes(value))
-    throw Error(key+" must be 0 or 1.");
-   result[key]=value==="1";
-  }
- }
-
  for(const key of ["corner","transport","tlsHost"])
   if(params.has(key))result[key]=params.get(key);
-
+ // auto, autoRelease and seatTimeoutSec deliberately cannot override policy.
  return result;
 }
 function baseURL(){
- const url=new URL(location.href);
- url.search="";
- url.hash="";
- return url;
+ const url=new URL(location.href);url.search="";url.hash="";return url;
 }
 function studentURL(seat){
  const url=baseURL();
@@ -819,22 +676,14 @@ function staffURL(assistant){
  return url.href;
 }
 function createURL(){
- const m=meta||defaults();
- const url=baseURL();
+ const m=meta||defaults(),url=baseURL();
  const values={
-  create:1,role:"teacher",
-  rows:m.rows,cols:m.cols,corner:corner(),
-  width:m.width,fps:m.fps,
-  auto:m.auto?1:0,
-  autoRelease:m.autoRelease!==false?1:0,
-  seatTimeoutSec:m.seatTimeoutSec,
-  transport:m.transport,
-  view:$("view").value,label:viewerLabel,start:1
+  create:1,role:"teacher",rows:m.rows,cols:m.cols,corner:corner(),
+  width:m.width,fps:m.fps,auto:1,autoRelease:0,
+  transport:m.transport,view:$("view").value,label:viewerLabel,start:1
  };
- for(const [key,value]of Object.entries(values))
-  url.searchParams.set(key,value);
- if(["tls","all"].includes(m.transport))
-  url.searchParams.set("tlsHost",m.tlsHost);
+ for(const [k,v]of Object.entries(values))url.searchParams.set(k,v);
+ if(["tls","all"].includes(m.transport))url.searchParams.set("tlsHost",m.tlsHost);
  return url.href;
 }
 function parseInput(value){
@@ -842,8 +691,7 @@ function parseInput(value){
  if(value.includes("://")){
   const url=new URL(value);
   params=new URLSearchParams(url.search);
-  inviteKey=
-   new URLSearchParams(url.hash.slice(1)).get("teacherKey")||
+  inviteKey=new URLSearchParams(url.hash.slice(1)).get("teacherKey")||
    params.get("teacherKey")||"";
   value=params.get("room")||"";
  }
@@ -858,22 +706,18 @@ function cleanAddress(){
  history.replaceState(null,"",url.href);
 }
 function mySeat(){
- for(const [seat,reservation]of Object.entries(meta?.seats||{}))
-  if(reservation?.person===identity)return Number(seat);
+ for(const [seat,r]of Object.entries(meta?.seats||{}))
+  if(r?.person===identity)return Number(seat);
  return null;
 }
 function selectedSeat(){
  const mine=mySeat();
  if(mine)return mine;
  if(!meta)return null;
-
  const requested=Number(params.get("seat"));
- if(Number.isInteger(requested)&&requested>=1&&
-  requested<=meta.rows*meta.cols)return requested;
-
- for(let seat=1;seat<=meta.rows*meta.cols;seat++)
-  if(!meta.seats?.[seat])return seat;
-
+ if(Number.isInteger(requested)&&requested>=1&&requested<=meta.rows*meta.cols)
+  return requested;
+ for(let s=1;s<=meta.rows*meta.cols;s++)if(!meta.seats?.[s])return s;
  return null;
 }
 function activeViewers(){
@@ -887,476 +731,337 @@ function freshCapture(p,seat){
  return !!p?.captureActive&&Number(p.seat)===Number(seat)&&
   p.captureState!=="ended"&&age>=-10000&&age<45000;
 }
-function rejected(record,presence){
- const decision=record?.decision;
- return decision?.state==="rejected"&&
-  decision.captureID===presence?.captureID&&
-  decision.requestID===presence?.requestID;
+function rejected(record,p){
+ const d=record?.decision;
+ return d?.state==="rejected"&&d.captureID===p?.captureID&&
+  d.requestID===p?.requestID;
 }
 function helpInfo(person){
- const record=records[person]||{};
- const at=Number(record._presence?.helpAt)||0;
+ const r=records[person]||{},at=Number(r._presence?.helpAt)||0;
  if(!at)return null;
- if(record.assistance?.requestId===at){
-  if(record.assistance.state==="resolved")return null;
-  return {
-   at,state:"helping",label:record.assistance.label||"Staff"
-  };
+ if(r.assistance?.requestId===at){
+  if(r.assistance.state==="resolved")return null;
+  return {at,state:"helping",label:r.assistance.label||"Staff"};
  }
  return {at,state:"requested",label:"Help requested"};
 }
 
-/* Administrative panels */
+/* Menu */
 function openMenu(page="room"){
- if(menuPage===page&&!$("admin").hidden){
-  closeMenu();return;
- }
- menuPage=page;
- $("admin").hidden=false;
+ if(menuPage===page&&!$("admin").hidden){closeMenu();return;}
+ menuPage=page;$("admin").hidden=false;
  for(const key of ["room","people","connection","guide"])
   $("page-"+key).hidden=key!==page;
-
- document.querySelectorAll("[data-page]").forEach(button=>{
-  button.classList.toggle("active",button.dataset.page===page);
- });
+ document.querySelectorAll("[data-page]").forEach(b=>
+  b.classList.toggle("active",b.dataset.page===page));
  $("shade").classList.add("open");
 }
 function closeMenu(){
- menuPage="";
- $("admin").hidden=true;
- $("shade").classList.remove("open");
- document.querySelectorAll("[data-page]").forEach(button=>{
-  button.classList.remove("active");
- });
+ menuPage="";$("admin").hidden=true;$("shade").classList.remove("open");
+ document.querySelectorAll("[data-page]").forEach(b=>b.classList.remove("active"));
 }
-document.querySelectorAll("[data-page]").forEach(button=>{
- button.onclick=()=>openMenu(button.dataset.page);
-});
+document.querySelectorAll("[data-page]").forEach(b=>
+ b.onclick=()=>openMenu(b.dataset.page));
 $("menuBtn").onclick=()=>openMenu(menuPage||"room");
 $("closeMenuBtn").onclick=closeMenu;
 $("shade").onclick=closeMenu;
 
 function showRoom(){
- $("startPanel").hidden=true;
- $("gridSection").hidden=false;
- $("studentPanel").hidden=isStaff;
- $("staffAccess").hidden=!isStaff;
+ $("startPanel").hidden=true;$("gridSection").hidden=false;
+ $("studentPanel").hidden=isStaff;$("staffAccess").hidden=!isStaff;
  $("controllerSettings").hidden=!controller||!!meta.closed;
- $("studentAdmin").hidden=isStaff;
- $("rotateBtn").hidden=!isOwner;
+ $("studentAdmin").hidden=isStaff;$("rotateBtn").hidden=!isOwner;
  $("networkBtn").disabled=!controller||!!meta.closed;
  $("studentLink").value=studentURL();
  $("roleBadge").textContent=isStaff?
-  (controller?"Teacher controller":"Assistant viewer"):
-  "Student";
+  controller?"Teacher controller":"Assistant viewer":"Student";
  $("viewerInfo").textContent=
-  `${activeViewers().length}/${MAX_VIEWERS} staff viewers; `+
-  "each receives a separate tiny stream.";
+  `${activeViewers().length}/${MAX_VIEWERS} viewers. `+
+  "Always auto-accept; seats never expire.";
  render();
 }
 function syncControls(){
- for(const key of ["rows","cols","width","fps"])
-  $(key).value=meta[key];
+ for(const key of ["rows","cols","width","fps"])$(key).value=meta[key];
  $("corner").value=corner();
- $("auto").checked=meta.auto;
- $("autoRelease").checked=meta.autoRelease!==false;
- $("timeout").value=meta.seatTimeoutSec/60;
- $("transport").value=meta.transport;
- $("tlsHost").value=meta.tlsHost||"";
+ $("transport").value=meta.transport;$("tlsHost").value=meta.tlsHost||"";
 }
 function receiveMeta(value){
- if(!validMeta(value))
-  throw Error("Room protocol mismatch. Use a v15/v16 REST room.");
-
- const oldWidth=meta?.width;
- const oldFPS=meta?.fps;
+ if(!validMeta(value))throw Error("Room protocol mismatch. Use a REST classroom.");
+ const oldWidth=meta?.width,oldFPS=meta?.fps;
  meta=normalizeMeta(value);
-
  if(controller&&!claiming&&meta.controller!==epoch){
-  controller=false;
-  epoch="";
+  controller=false;epoch="";
   notice("Controller moved. This tab remains a staff viewer.");
  }
-
  if(meta.closed){
   if(student)void stopSharing("Room closed.");
-  for(const peer of viewers.values())destroyPeer(peer);
-  viewers.clear();
-  controller=false;
+  for(const p of viewers.values())destroyPeer(p);
+  viewers.clear();controller=false;
   notice("Room permanently closed.",true);
  }
-
  if(student&&(oldWidth!==meta.width||oldFPS!==meta.fps))
-  for(const peer of student.links.values())void cap(peer);
-
+  for(const p of student.links.values())void cap(p);
  showRoom();
 }
 
-/*
- Serialized local updates, not a distributed atomic controller lease.
- Avoid simultaneous controller takeover.
-*/
+/* Serialized local writes, not distributed atomic controller consensus. */
 function editMeta(makePatch){
  const expected=epoch;
  const work=metaQueue.then(async()=>{
-  if(!controller||epoch!==expected)
-   throw Error("Not the controlling teacher.");
-
-  const current=await getDB(roomPath("meta"));
-  if(!validMeta(current)||current.closed||
-   current.controller!==expected)
+  if(!controller||epoch!==expected)throw Error("Not the controlling teacher.");
+  const raw=await getDB(roomPath("meta"));
+  if(!validMeta(raw)||raw.closed||raw.controller!==expected)
    throw Error("Room/controller changed.");
-
-  const patch=makePatch(normalizeMeta(current));
+  const patch=makePatch(normalizeMeta(raw));
   if(!patch)return false;
-
-  patch.revision=(current.revision||0)+1;
+  // Every controller update reinforces permanent policy.
+  patch.auto=true;
+  patch.autoRelease=false;
+  patch.permanentAutoAccept=true;
+  patch.seatTimeoutSec=null;
+  patch.revision=(raw.revision||0)+1;
   await patchDB(roomPath("meta"),patch);
   return true;
  });
  metaQueue=work.catch(()=>{});
  return work;
 }
+function policyNeedsUpdate(m){
+ return m.auto!==true||m.autoRelease!==false||
+  m.permanentAutoAccept!==true||m.seatTimeoutSec!=null||
+  Object.values(m.seats||{}).some(r=>r?.inactiveSince!=null);
+}
+async function ensurePermanentPolicy(){
+ if(!controller||policyBusy||meta.closed||!policyNeedsUpdate(meta))return;
+ policyBusy=true;
+ try{
+  await editMeta(m=>{
+   const patch={};
+   for(const [seat,r]of Object.entries(m.seats||{}))
+    if(r?.inactiveSince!=null)patch[`seats/${seat}/inactiveSince`]=null;
+   return patch;
+  });
+  log("Permanent auto-accept applied; all seat inactivity timers disabled.");
+ }catch(error){log("Policy update: "+error.message);}
+ finally{policyBusy=false;}
+}
 
 async function registerViewer(){
  if(!isStaff||registering||meta.closed||staffRevoked)return;
- registering=true;
- lastViewerRetry=now();
+ registering=true;lastViewerRetry=now();
  try{
-  const current=await getDB(roomPath("meta"));
-  if(!validMeta(current)||current.closed)
-   throw Error("Room unavailable.");
-
-  const entries=Object.entries(current.viewers||{});
+  const m=await getDB(roomPath("meta"));
+  if(!validMeta(m)||m.closed)throw Error("Room unavailable.");
+  const entries=Object.entries(m.viewers||{});
   const others=entries.filter(([id,v])=>
-   id!==viewerID&&
-   !(v.uid===identity&&v.tab===tab)&&
-   now()-(v.heartbeat||0)<VIEWER_TTL
-  );
-  if(others.length>=MAX_VIEWERS)
-   throw Error("Four staff viewers are already active.");
-
+   id!==viewerID&&!(v.uid===identity&&v.tab===tab)&&
+   now()-(v.heartbeat||0)<VIEWER_TTL);
+  if(others.length>=MAX_VIEWERS)throw Error("Four staff viewers are already active.");
   viewerID||=uuid();
   const patch={};
-
-  for(const [id,v]of entries){
-   if((v.uid===identity&&v.tab===tab)||
-    now()-(v.heartbeat||0)>120000)
+  for(const [id,v]of entries)
+   if((v.uid===identity&&v.tab===tab)||now()-(v.heartbeat||0)>120000)
     patch[`viewers/${id}`]=null;
-  }
-
   patch[`viewers/${viewerID}`]={
-   uid:identity,label:viewerLabel,tab,
-   createdAt:now(),heartbeat:now()
+   uid:identity,label:viewerLabel,tab,createdAt:now(),heartbeat:now()
   };
-
   await patchDB(roomPath("meta"),patch);
-  viewerReady=true;
-  lastHeartbeat=now();
+  viewerReady=true;lastHeartbeat=now();
   log("Staff viewer registered.");
- }finally{
-  registering=false;
- }
+ }finally{registering=false;}
 }
 
 async function claim(force=false,ask=false){
  if(!isStaff||claiming||meta.closed||staffRevoked)return;
- if(ask&&!confirm(
-  "Move controller duties here? Other staff may keep viewing."
- ))return;
-
+ if(ask&&!confirm("Move controller duties here? Other staff may keep viewing."))return;
  claiming=true;
  try{
   await metaQueue.catch(()=>{});
-  const current=await getDB(roomPath("meta"));
-  if(!validMeta(current)||current.closed)
-   throw Error("Room unavailable.");
-
-  if(current.controlTab&&current.controlTab!==tab&&
-   now()-(current.heartbeat||0)<30000&&!force&&
-   current.controller!==epoch){
-   notice("Another teacher controls this room. You can view as an assistant.");
+  const m=await getDB(roomPath("meta"));
+  if(!validMeta(m)||m.closed)throw Error("Room unavailable.");
+  if(m.controlTab&&m.controlTab!==tab&&now()-(m.heartbeat||0)<30000&&
+   !force&&m.controller!==epoch){
+   notice("Another teacher controls this room. Use Take controller role to move control here.");
    return;
   }
-
   const next=uuid();
-  await patchDB(roomPath("meta"),{
+  const patch={
    controller:next,controlTab:tab,controlViewer:viewerID,
-   heartbeat:now(),revision:(current.revision||0)+1
-  });
-
+   heartbeat:now(),revision:(m.revision||0)+1,
+   auto:true,autoRelease:false,permanentAutoAccept:true,
+   seatTimeoutSec:null
+  };
+  for(const [seat,r]of Object.entries(m.seats||{}))
+   if(r?.inactiveSince!=null)patch[`seats/${seat}/inactiveSince`]=null;
+  await patchDB(roomPath("meta"),patch);
   const verify=await getDB(roomPath("meta"));
-  if(verify?.controller!==next)
-   throw Error("Another staff tab took control.");
-
-  epoch=next;
-  controller=true;
-  meta=normalizeMeta(verify);
-  syncControls();
-  showRoom();
-  notice("Teacher controller ready.");
- }finally{
-  claiming=false;
- }
+  if(verify?.controller!==next)throw Error("Another staff tab took control.");
+  epoch=next;controller=true;meta=normalizeMeta(verify);
+  syncControls();showRoom();
+  notice("Teacher controller ready. Auto-accept is permanent; seats never expire.");
+ }finally{claiming=false;}
 }
 
-async function openRoom(value=$("roomInput").value,internal=false){
+async function openRoom(input=$("roomInput").value,internal=false){
  if(!ready||room||(!internal&&busy))return;
-
- const id=parseInput(value);
+ const id=parseInput(input);
  if(!internal)busy=true;
-
  try{
   const root=`rooms/${id}`;
   const ownerID=await getDB(root+"/owner");
   if(!ownerID)throw Error("Room not found on this endpoint.");
-
   const value=await getDB(root+"/meta");
-  if(!validMeta(value))
-   throw Error("This room is not a v15/v16 REST classroom.");
-
-  const owner=ownerID===identity;
-  const role=params.get("role");
+  if(!validMeta(value))throw Error("This room is not a compatible REST classroom.");
+  const owner=ownerID===identity,role=params.get("role");
   const grant=await getDB(root+"/teachers/"+identity);
   let key="";
-
   if(owner||inviteKey||grant){
    key=await getDB(root+"/teacherKey")||"";
    if(owner&&!key){
-    key=uuid()+uuid();
-    await putDB(root+"/teacherKey",key);
+    key=uuid()+uuid();await putDB(root+"/teacherKey",key);
    }
   }
-
   if(inviteKey){
-   if(inviteKey.length<32||inviteKey!==key)
-    throw Error("Invalid staff invitation.");
+   if(inviteKey.length<32||inviteKey!==key)throw Error("Invalid staff invitation.");
    await putDB(root+"/teachers/"+identity,inviteKey);
   }
-
   const staff=owner||!!(key&&(inviteKey===key||grant===key));
-
   if(["teacher","assistant"].includes(role)&&!staff)
    throw Error("Open the private staff invitation link.");
-
   if(role==="student"&&staff)
-   throw Error(
-    "This browser identity is staff. Use another browser profile " +
-    "or device for a student."
-   );
+   throw Error("This browser is staff. Use another profile/device for a student.");
 
-  room=id;
-  meta=normalizeMeta(value);
-  isOwner=owner;
-  isStaff=staff;
-  staffKey=staff?key:"";
-  inviteKey="";
+  room=id;meta=normalizeMeta(value);isOwner=owner;isStaff=staff;
+  staffKey=staff?key:"";inviteKey="";
+  save("classroom-rest-last-room",room);cleanAddress();
 
-  save("classroom-rest-last-room",room);
-  cleanAddress();
-
-  viewerLabel=(
-   params.get("label")||
-   load("classroom-rest-staff-label")||
-   (role==="assistant"?"Class assistant":"Teacher")
-  ).slice(0,40);
-
+  viewerLabel=(params.get("label")||load("classroom-rest-staff-label")||
+   (role==="assistant"?"Class assistant":"Teacher")).slice(0,40);
   $("staffLabel").value=viewerLabel;
-
-  if(["fit","large"].includes(params.get("view")))
-   $("view").value=params.get("view");
-
-  syncControls();
-  showRoom();
+  if(["fit","large"].includes(params.get("view")))$("view").value=params.get("view");
+  syncControls();showRoom();
 
   if(isStaff&&!meta.closed){
    await registerViewer();
-
-   if(role!=="assistant")
-    await claim(params.get("takeover")==="1");
-
+   if(role!=="assistant")await claim(params.get("takeover")==="1");
    const config=settingsURL();
    if(controller&&Object.keys(config).length){
     await editMeta(current=>{
-     const next={...current,...config};
-     checkSettings(next);
-
-     const highest=Math.max(
-      0,...Object.keys(current.seats||{}).map(Number)
-     );
-     if(highest>next.rows*next.cols)
-      throw Error("URL layout would remove reserved seats.");
-
+     const next={...current,...config};checkSettings(next);
+     if(Math.max(0,...Object.keys(current.seats||{}).map(Number))>
+      next.rows*next.cols)throw Error("URL layout would remove reserved seats.");
      const patch={...config};
-     if(next.transport!==current.transport||
-      next.tlsHost!==current.tlsHost)
+     if(next.transport!==current.transport||next.tlsHost!==current.tlsHost)
       patch.streamRevision=(current.streamRevision||0)+1;
-
      return patch;
     });
    }
   }else if(!isStaff&&!meta.closed){
-   notice(
-    "Click Start sharing and approve your desktop screen. "+
-    "Keep this tab open."
-   );
+   notice("Click Start sharing and approve your screen. Your seat will not expire.");
    void publishPresence(true);
   }
-
-  await pollRoom();
-  closeMenu();
-
-  if(!isStaff&&params.get("start")==="1")
-   $("shareBtn").focus({preventScroll:true});
- }finally{
-  if(!internal)busy=false;
- }
+  await pollRoom();closeMenu();
+  if(!isStaff&&params.get("start")==="1")$("shareBtn").focus({preventScroll:true});
+ }finally{if(!internal)busy=false;}
 }
-
 async function createRoom(){
  if(!ready||busy||room)return;
  busy=true;
  try{
-  const id=uuid();
-  const key=uuid()+uuid();
-  const initial={
-   ...defaults(),createdAt:now(),...settingsURL()
-  };
+  const id=uuid(),key=uuid()+uuid();
+  const initial={...defaults(),createdAt:now(),...settingsURL()};
   checkSettings(initial);
-
   await putDB(`rooms/${id}/owner`,identity);
   await putDB(`rooms/${id}/teacherKey`,key);
   await putDB(`rooms/${id}/meta`,initial);
-
   for(const key of Object.keys(settingsURL()))params.delete(key);
-  params.set("role","teacher");
-  params.delete("create");
-  inviteKey="";
-
+  params.set("role","teacher");params.delete("create");inviteKey="";
   await openRoom(id,true);
- }finally{
-  busy=false;
- }
+ }finally{busy=false;}
 }
 
 async function staffHeartbeat(){
- if(!isStaff||!room||!viewerReady||heartbeatBusy||
-  meta.closed||now()-lastHeartbeat<8000)return;
-
+ if(!isStaff||!room||!viewerReady||heartbeatBusy||meta.closed||
+  now()-lastHeartbeat<8000)return;
  heartbeatBusy=true;
  try{
   const key=await getDB(roomPath("teacherKey"));
   if(key!==staffKey){
    if(isOwner)staffKey=key||"";
    else{
-    staffRevoked=true;
-    viewerReady=false;
-    controller=false;
-    for(const peer of viewers.values())destroyPeer(peer);
+    staffRevoked=true;viewerReady=false;controller=false;
+    for(const p of viewers.values())destroyPeer(p);
     viewers.clear();
     notice("Staff invitation changed. Open a new staff link.",true);
     return;
    }
   }
-
-  const current=await getDB(roomPath("meta"));
-  if(!validMeta(current)||current.closed)return;
-
-  if(!current.viewers?.[viewerID]){
-   viewerReady=false;
-   await registerViewer();
-   return;
+  const m=await getDB(roomPath("meta"));
+  if(!validMeta(m)||m.closed)return;
+  if(!m.viewers?.[viewerID]){
+   viewerReady=false;await registerViewer();return;
   }
-
   const patch={
    [`viewers/${viewerID}/heartbeat`]:now(),
    [`viewers/${viewerID}/label`]:viewerLabel
   };
-
-  if(controller&&current.controller===epoch){
-   patch.heartbeat=now();
-   patch.controlViewer=viewerID;
-  }else if(controller){
-   controller=false;
-   epoch="";
-  }
-
-  await patchDB(roomPath("meta"),patch);
-  lastHeartbeat=now();
- }catch(error){
-  log("Staff heartbeat: "+error.message);
- }finally{
-  heartbeatBusy=false;
- }
+  if(controller&&m.controller===epoch){
+   patch.heartbeat=now();patch.controlViewer=viewerID;
+  }else if(controller){controller=false;epoch="";}
+  await patchDB(roomPath("meta"),patch);lastHeartbeat=now();
+ }catch(error){log("Staff heartbeat: "+error.message);}
+ finally{heartbeatBusy=false;}
 }
 
 /* Polling */
 async function pollRoom(){
  if(!room||pollBusy)return;
  pollBusy=true;
-
  try{
   const value=await getDB(roomPath("meta"));
   if(!value)throw Error("Room removed.");
   receiveMeta(value);
+  if(controller)void ensurePermanentPolicy();
 
   if(isStaff&&now()-lastDetailPoll>2500){
    if(staffRevoked)return;
    records=await getDB(roomPath("peers"))||{};
-   recordsReady=true;
    lastDetailPoll=now();
-   scanStaff();
-   renderPeople();
+   scanStaff();renderPeople();
   }else if(!isStaff&&now()-lastDetailPoll>2500){
    ownRecords=await getDB(personPath(identity))||{};
    lastDetailPoll=now();
    handleOwnRecords();
   }
- }catch(error){
-  log("Room polling: "+error.message);
- }finally{
-  pollBusy=false;
- }
+ }catch(error){log("Room polling: "+error.message);}
+ finally{pollBusy=false;}
 }
 
 function handleOwnRecords(){
  const s=student;
  if(!s?.active)return;
-
- if(rejected(ownRecords,{
-  captureID:s.captureID,requestID:s.requestID
- })){
-  void stopSharing(
-   ownRecords.decision.reason||"Teacher declined the request."
-  );
+ if(rejected(ownRecords,{captureID:s.captureID,requestID:s.requestID})){
+  void stopSharing(ownRecords.decision.reason||"Teacher released your request.");
   return;
  }
-
  const assistance=ownRecords.assistance;
  if(s.helpAt&&assistance?.requestId===s.helpAt){
   s.assistance=assistance;
   if(assistance.state==="resolved"){
-   s.helpAt=0;
-   void publishPresence(true);
-   notice("Help request resolved.");
+   s.helpAt=0;void publishPresence(true);notice("Help request resolved.");
   }
  }
-
  for(const peer of s.links.values()){
   const answer=ownRecords.answers?.[peer.id];
-
-  if(answer&&answer.viewerID===peer.viewerID&&
-   currentLink(s,peer)&&!peer.answered&&!peer.applying){
+  if(answer&&answer.viewerID===peer.viewerID&&currentLink(s,peer)&&
+   !peer.answered&&!peer.applying){
    peer.applying=true;
-
    applyRemote(peer,answer.answer).then(async()=>{
     if(!currentLink(s,peer))return;
-    peer.answered=true;
-    await cap(peer);
+    peer.answered=true;await cap(peer);
    }).catch(error=>{
     if(peer.active){
-     peer.error=error.message;
-     destroyPeer(peer);
+     peer.error=error.message;destroyPeer(peer);
      s.retry.set(peer.viewerID,now()+6000);
     }
    });
@@ -1364,282 +1069,165 @@ function handleOwnRecords(){
  }
 }
 
-/* TURN and complete gathered browser SDP */
+/* Media: TURN only */
 function rtc(){
- const mode=meta.transport;
- const urls=[];
-
+ const mode=meta.transport,urls=[];
  if(["udp","both","all"].includes(mode))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=udp`);
-
  if(["tcp","both","all"].includes(mode))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=tcp`);
-
  if(["tls","all"].includes(mode)){
-  if(!tlsHostValid(meta.tlsHost))
-   throw Error("Configure the TURN TLS hostname.");
+  if(!tlsHostValid(meta.tlsHost))throw Error("Configure the TURN TLS hostname.");
   urls.push(`turns:${meta.tlsHost}:443?transport=tcp`);
  }
-
  return {
-  iceServers:[{
-   urls,
-   username:TURN.username,
-   credential:TURN.password
-  }],
+  iceServers:[{urls,username:TURN.username,credential:TURN.password}],
   iceTransportPolicy:"relay",
-  bundlePolicy:"max-bundle",
-  rtcpMuxPolicy:"require",
-  iceCandidatePoolSize:0
+  bundlePolicy:"max-bundle",rtcpMuxPolicy:"require",iceCandidatePoolSize:0
  };
 }
-
-function checkSDP(description){
- if(!description||
-  !["offer","answer"].includes(description.type)||
-  typeof description.sdp!=="string"||
-  description.sdp.length>200000)
-  throw Error("Invalid SDP.");
-
- const candidates=description.sdp.split(/\r?\n/)
-  .filter(line=>line.startsWith("a=candidate:"));
-
- if(!candidates.some(line=>/\styp relay(?:\s|$)/.test(line)))
+function checkSDP(d){
+ if(!d||!["offer","answer"].includes(d.type)||typeof d.sdp!=="string"||
+  d.sdp.length>200000)throw Error("Invalid SDP.");
+ const candidates=d.sdp.split(/\r?\n/).filter(l=>l.startsWith("a=candidate:"));
+ if(!candidates.some(l=>/\styp relay(?:\s|$)/.test(l)))
   throw Error("No relay candidate in complete SDP.");
-
- if(candidates.some(line=>!/\styp relay(?:\s|$)/.test(line)))
+ if(candidates.some(l=>!/\styp relay(?:\s|$)/.test(l)))
   throw Error("Non-relay candidate rejected.");
 }
-
 function makePeer(label,receiver=false){
  const pc=new RTCPeerConnection(rtc());
-
- const peer={
-  pc,label,receiver,active:true,
-  created:now(),connectedAt:0,badSince:0,
-  dc:null,stream:null,track:null,sender:null,
-  phase:"Preparing",error:"",events:[],
-  bytes:0,frames:0,lastFrame:0,lastBeat:0,
-  remoteInfo:null,answered:false,applying:false,lastStats:""
+ const p={
+  pc,label,receiver,active:true,created:now(),connectedAt:0,badSince:0,
+  dc:null,stream:null,track:null,sender:null,phase:"Preparing",error:"",
+  events:[],bytes:0,frames:0,lastFrame:0,lastBeat:0,remoteInfo:null,
+  answered:false,applying:false,lastStats:""
  };
-
- peer.event=message=>{
-  peer.events.push(message);
-  if(peer.events.length>35)peer.events.shift();
-  log(label+": "+message);
-  render();
+ p.event=message=>{
+  p.events.push(message);if(p.events.length>35)p.events.shift();
+  log(label+": "+message);render();
  };
-
- pc.onicecandidateerror=event=>{
-  peer.event(
-   `ICE attempt ${event.errorCode}: ${event.errorText||""}`
-  );
- };
-
+ pc.onicecandidateerror=e=>p.event(`ICE attempt ${e.errorCode}: ${e.errorText||""}`);
  pc.onconnectionstatechange=()=>{
-  const state=pc.connectionState;
-  peer.phase=state;
-  if(state==="connected"){
-   peer.connectedAt=now();
-   peer.badSince=0;
-  }else if(["failed","disconnected"].includes(state)){
-   peer.badSince||=now();
-  }
-  peer.event("Connection "+state);
+  const state=pc.connectionState;p.phase=state;
+  if(state==="connected"){p.connectedAt=now();p.badSince=0;}
+  else if(["failed","disconnected"].includes(state))p.badSince||=now();
+  p.event("Connection "+state);
  };
-
- return peer;
+ return p;
 }
-
-function destroyPeer(peer){
- if(!peer?.active)return;
- peer.active=false;
- try{peer.dc?.close();}catch{}
- try{peer.pc.close();}catch{}
- try{peer.track?.stop();}catch{}
+function destroyPeer(p){
+ if(!p?.active)return;p.active=false;
+ try{p.dc?.close();}catch{}
+ try{p.pc.close();}catch{}
+ try{p.track?.stop();}catch{}
 }
-
-async function gather(peer,description){
- await peer.pc.setLocalDescription(description);
- peer.phase="Gathering relay";
+async function gather(p,description){
+ await p.pc.setLocalDescription(description);
+ p.phase="Gathering relay";
  const deadline=now()+45000;
-
- while(peer.pc.iceGatheringState!=="complete"){
-  if(!peer.active)throw Error("Connection superseded.");
+ while(p.pc.iceGatheringState!=="complete"){
+  if(!p.active)throw Error("Connection superseded.");
   if(now()>deadline)throw Error("TURN gathering timed out.");
   await sleep(100);
  }
-
- const result={
-  type:peer.pc.localDescription.type,
-  sdp:peer.pc.localDescription.sdp
- };
- checkSDP(result);
- return result;
+ const result={type:p.pc.localDescription.type,sdp:p.pc.localDescription.sdp};
+ checkSDP(result);return result;
 }
-
-async function applyRemote(peer,description){
+async function applyRemote(p,description){
  checkSDP(description);
- if(!peer.active)throw Error("Connection superseded.");
- await peer.pc.setRemoteDescription(description);
- peer.phase="Connecting";
+ if(!p.active)throw Error("Connection superseded.");
+ await p.pc.setRemoteDescription(description);p.phase="Connecting";
 }
-
-function send(peer,data){
- if(peer?.active&&peer.dc?.readyState==="open"){
-  try{peer.dc.send(JSON.stringify(data));}catch{}
- }
+function send(p,data){
+ if(p?.active&&p.dc?.readyState==="open")
+  try{p.dc.send(JSON.stringify(data));}catch{}
 }
-
-function channel(peer,dc){
- if(peer.dc&&peer.dc!==dc){
-  dc.close();return;
- }
- peer.dc=dc;
-
+function channel(p,dc){
+ if(p.dc&&p.dc!==dc){dc.close();return;}p.dc=dc;
  dc.onopen=()=>{
-  peer.lastBeat=now();
-  peer.event("DataChannel open");
-  sendBeats();
+  p.lastBeat=now();p.event("DataChannel open");sendBeats();
  };
-
- dc.onmessage=event=>{
-  if(typeof event.data!=="string"||event.data.length>20000)return;
+ dc.onmessage=e=>{
+  if(typeof e.data!=="string"||e.data.length>20000)return;
   try{
-   const data=JSON.parse(event.data);
+   const data=JSON.parse(e.data);
    if(data.type==="beat"){
-    peer.lastBeat=now();
-    peer.remoteInfo=data;
-    send(peer,{type:"ack"});
-   }else if(data.type==="ack"){
-    peer.lastBeat=now();
-   }
+    p.lastBeat=now();p.remoteInfo=data;send(p,{type:"ack"});
+   }else if(data.type==="ack")p.lastBeat=now();
   }catch{}
  };
 }
-
-async function cap(peer){
- if(!peer?.active||!peer.sender)return;
+async function cap(p){
+ if(!p?.active||!p.sender)return;
  try{
-  const parameters=peer.sender.getParameters();
+  const parameters=p.sender.getParameters();
   if(!parameters.encodings?.length)parameters.encodings=[{}];
   for(const encoding of parameters.encodings){
-   encoding.maxBitrate=150000;
-   encoding.maxFramerate=meta.fps;
+   encoding.maxBitrate=150000;encoding.maxFramerate=meta.fps;
   }
   parameters.degradationPreference="maintain-resolution";
-  await peer.sender.setParameters(parameters);
- }catch(error){
-  log("Encoder target: "+error.message);
- }
+  await p.sender.setParameters(parameters);
+ }catch(error){log("Encoder target: "+error.message);}
 }
-
 function sendBeats(){
- const s=student;
- if(!s?.active)return;
+ const s=student;if(!s?.active)return;
  const track=s.raw?.getVideoTracks()[0];
-
- for(const peer of s.links.values()){
-  send(peer,{
-   type:"beat",
-   captureState:track?.readyState||"none",
-   muted:!!track?.muted,
-   draws:s.draws,
-   helpAt:s.helpAt
-  });
- }
+ for(const p of s.links.values())send(p,{
+  type:"beat",captureState:track?.readyState||"none",
+  muted:!!track?.muted,draws:s.draws,helpAt:s.helpAt
+ });
 }
 
-/* Presence, admission and seat expiry */
+/* Presence is a liveness signal, never a seat expiry timer. */
 function presenceData(){
  const s=student;
  return {
-  appVersion:APP,
-  tab,
-  updatedAt:now(),
-  captureActive:!!s?.active,
-  captureID:s?.captureID||"",
-  requestID:s?.requestID||"",
-  requestedAt:s?.requestedAt||0,
-  seat:s?.seat||mySeat()||0,
+  appVersion:APP,tab,updatedAt:now(),captureActive:!!s?.active,
+  captureID:s?.captureID||"",requestID:s?.requestID||"",
+  requestedAt:s?.requestedAt||0,seat:s?.seat||mySeat()||0,
   captureState:s?.raw?.getVideoTracks()[0]?.readyState||"none",
-  phase:s?.phase||idlePhase,
-  draws:s?.draws||0,
-  helpAt:s?.helpAt||0,
-  release:releaseRequested
+  phase:s?.phase||idlePhase,draws:s?.draws||0,
+  helpAt:s?.helpAt||0,release:releaseRequested
  };
 }
-
 async function publishPresence(force=false){
  if(isStaff||!room)return;
- if(presenceBusy){
-  if(force)presenceAgain=true;
-  return;
- }
+ if(presenceBusy){if(force)presenceAgain=true;return;}
  if(!force&&now()-lastPresence<7000)return;
-
  presenceBusy=true;
  try{
   do{
    presenceAgain=false;
-   await patchDB(
-    personPath(identity,"_presence"),presenceData()
-   );
+   await patchDB(personPath(identity,"_presence"),presenceData());
    lastPresence=now();
   }while(presenceAgain);
- }catch(error){
-  log("Presence: "+error.message);
- }finally{
-  presenceBusy=false;
- }
+ }catch(error){log("Presence: "+error.message);}
+ finally{presenceBusy=false;}
 }
 
-async function admit(person,presence){
+async function admit(person,p){
  if(!controller||admitting.has(person))return;
  admitting.add(person);
  try{
-  await editMeta(current=>{
-   const seat=Number(presence.seat);
-   if(!Number.isInteger(seat)||seat<1||
-    seat>current.rows*current.cols)
+  await editMeta(m=>{
+   const seat=Number(p.seat);
+   if(!Number.isInteger(seat)||seat<1||seat>m.rows*m.cols)
     throw Error("Invalid seat request.");
-
-   const existing=current.seats?.[seat];
-   if(existing&&existing.person!==person)
-    throw Error("Seat occupied.");
-
-   for(const [number,reservation]of Object.entries(current.seats||{})){
-    if(reservation.person===person&&Number(number)!==seat)
-     throw Error("Student already owns another seat.");
-   }
-
+   const existing=m.seats?.[seat];
+   if(existing&&existing.person!==person)return null;
+   for(const [number,r]of Object.entries(m.seats||{}))
+    if(r.person===person&&Number(number)!==seat)return null;
    return {
     [`seats/${seat}`]:{
-     ...(existing||{}),
-     person,
-     captureID:presence.captureID,
+     ...(existing||{}),person,captureID:p.captureID,
      assignedAt:existing?.assignedAt||now(),
-     inactiveSince:null,
-     restartToken:existing?.restartToken||""
+     inactiveSince:null,restartToken:existing?.restartToken||""
     }
    };
   });
- }catch(error){
-  log("Admission: "+error.message);
- }finally{
-  admitting.delete(person);
- }
-}
-
-async function reject(person,presence){
- if(!controller)throw Error("Only the controller can reject requests.");
- await putDB(personPath(person,"decision"),{
-  captureID:presence.captureID,
-  requestID:presence.requestID,
-  state:"rejected",
-  reason:"Teacher declined this seat request.",
-  at:now()
- });
+ }catch(error){log("Admission: "+error.message);}
+ finally{admitting.delete(person);}
 }
 
 async function releaseSeat(seat,notify=true){
@@ -1647,1447 +1235,768 @@ async function releaseSeat(seat,notify=true){
  const reservation=meta.seats?.[seat];
  if(!reservation)return;
  releasing.add(seat);
-
  try{
   if(notify){
-   const p=records[reservation.person]?._presence;
+   // Re-read to target the current capture request before releasing.
+   const p=await getDB(personPath(reservation.person,"_presence"));
    if(p?.captureID){
-    await putDB(personPath(reservation.person,"decision"),{
-     captureID:p.captureID,
-     requestID:p.requestID,
-     state:"rejected",
-     reason:"Teacher released your seat.",
+    const decision={
+     captureID:p.captureID,requestID:p.requestID,state:"rejected",
+     reason:"Teacher explicitly released your seat. Click Start sharing to request again.",
      at:now()
-    });
+    };
+    await putDB(personPath(reservation.person,"decision"),decision);
+    if(records[reservation.person])records[reservation.person].decision=decision;
    }
   }
-
-  await editMeta(current=>
-   current.seats?.[seat]?.person===reservation.person?
+  await editMeta(m=>
+   m.seats?.[seat]?.person===reservation.person?
     {[`seats/${seat}`]:null}:null
   );
- }finally{
-  releasing.delete(seat);
- }
+  log(`Seat ${seat} explicitly released.`);
+ }finally{releasing.delete(seat);}
+}
+async function releaseSeatUI(seat){
+ if(confirm(`Release seat ${seat}? Its current student will need to request sharing again.`))
+  await releaseSeat(seat,true);
 }
 
 function scanStaff(){
- if(!isStaff||!recordsReady||meta.closed||staffRevoked)return;
-
+ if(!isStaff||meta.closed||staffRevoked)return;
  if(controller&&!claiming){
-  for(const [person,record]of Object.entries(records)){
-   const presence=record?._presence;
-   if(!presence)continue;
-
-   if(presence.release){
-    for(const [seat,reservation]of Object.entries(meta.seats||{})){
+  // No inactivity/expiry logic. Only explicit release and fresh admissions.
+  const entries=Object.entries(records).sort((a,b)=>
+   (a[1]?._presence?.requestedAt||0)-(b[1]?._presence?.requestedAt||0));
+  for(const [person,r]of entries){
+   const p=r?._presence;if(!p)continue;
+   if(p.release){
+    for(const [seat,reservation]of Object.entries(meta.seats||{}))
      if(reservation.person===person)
-      void releaseSeat(Number(seat),false)
-       .catch(error=>log(error.message));
-    }
+      void releaseSeat(Number(seat),false).catch(e=>log(e.message));
     continue;
    }
-
-   if(presence.appVersion!==APP||
-    !freshCapture(presence,presence.seat)||
-    rejected(record,presence))continue;
-
-   const existing=meta.seats?.[presence.seat];
-
-   if(!existing&&meta.auto)
-    void admit(person,presence);
+   if(p.appVersion!==APP||!freshCapture(p,p.seat)||rejected(r,p))continue;
+   const existing=meta.seats?.[p.seat];
+   // Permanently auto accept; never depend on a toggle.
+   if(!existing)void admit(person,p);
   }
  }
 
- const registered=viewerReady&&
-  activeViewers().some(([id])=>id===viewerID);
+ if(!viewerReady||!activeViewers().some(([id])=>id===viewerID))return;
 
- if(!registered)return;
-
- for(const [person,peer]of viewers){
-  if(!records[person]){
-   destroyPeer(peer);
-   viewers.delete(person);
-  }
+ for(const [person,p]of viewers){
+  if(!records[person]){destroyPeer(p);viewers.delete(person);}
  }
-
- for(const [person,record]of Object.entries(records)){
-  const offer=record.offers?.[viewerID];
-  const presence=record._presence;
-
-  if(!offer||offer.appVersion!==APP||
-   !freshCapture(presence,offer.seat)||
+ for(const [person,r]of Object.entries(records)){
+  const offer=r.offers?.[viewerID],presence=r._presence;
+  if(!offer||offer.appVersion!==APP||!freshCapture(presence,offer.seat)||
    presence.captureID!==offer.captureID||
-   meta.seats?.[offer.seat]?.person!==person||
-   rejected(record,presence)){
-   const previous=viewers.get(person);
-   if(previous){
-    destroyPeer(previous);
-    viewers.delete(person);
-   }
+   meta.seats?.[offer.seat]?.person!==person||rejected(r,presence)){
+   const old=viewers.get(person);
+   if(old){destroyPeer(old);viewers.delete(person);}
    continue;
   }
-
-  if(viewers.get(person)?.id===offer.id||
-   answering.has(person))continue;
-
+  if(viewers.get(person)?.id===offer.id||answering.has(person))continue;
   const error=errors.get(person);
   if(error?.id===offer.id&&now()<error.retryAt)continue;
-
   void answerStudent(person,offer);
  }
 }
-
 async function answerStudent(person,offer){
- if(answering.has(person))return;
- answering.add(person);
-
- let peer;
+ if(answering.has(person))return;answering.add(person);
  const targetViewer=viewerID;
-
+ let p;
  try{
-  const fresh=await getDB(
-   personPath(person,`offers/${targetViewer}`)
-  );
-  if(fresh?.id!==offer.id||viewerID!==targetViewer)
-   throw Error("Offer superseded.");
-
+  const fresh=await getDB(personPath(person,`offers/${targetViewer}`));
+  if(fresh?.id!==offer.id||viewerID!==targetViewer)throw Error("Offer superseded.");
   checkSDP(offer.offer);
   destroyPeer(viewers.get(person));
-
-  peer=makePeer(`Seat ${offer.seat} → ${viewerLabel}`,true);
-  Object.assign(peer,{
+  p=makePeer(`Seat ${offer.seat} → ${viewerLabel}`,true);
+  Object.assign(p,{
    person,id:offer.id,seat:offer.seat,
    captureID:offer.captureID,viewerID:targetViewer
   });
-  viewers.set(person,peer);
-
-  peer.pc.ondatachannel=event=>channel(peer,event.channel);
-  peer.pc.ontrack=event=>{
-   if(!peer.active||event.track.kind!=="video")return;
-   peer.stream=new MediaStream([event.track]);
-   peer.event("Video track announced");
+  viewers.set(person,p);
+  p.pc.ondatachannel=e=>channel(p,e.channel);
+  p.pc.ontrack=e=>{
+   if(!p.active||e.track.kind!=="video")return;
+   p.stream=new MediaStream([e.track]);p.event("Video track announced");
   };
-
-  await applyRemote(peer,offer.offer);
-  const answer=await gather(peer,await peer.pc.createAnswer());
-
-  if(!peer.active||viewerID!==targetViewer||
+  await applyRemote(p,offer.offer);
+  const answer=await gather(p,await p.pc.createAnswer());
+  if(!p.active||viewerID!==targetViewer||
    records[person]?.offers?.[targetViewer]?.id!==offer.id||
    meta.seats?.[offer.seat]?.person!==person)
    throw Error("Offer superseded.");
-
   await putDB(personPath(person,`answers/${offer.id}`),{
    id:offer.id,viewerID:targetViewer,answer,at:now()
   });
-
-  peer.answered=true;
-  errors.delete(person);
+  p.answered=true;errors.delete(person);
  }catch(error){
-  errors.set(person,{
-   id:offer.id,error:error.message,retryAt:now()+7000
-  });
-
-  if(peer){
-   peer.error=error.message;
-   destroyPeer(peer);
-   if(viewers.get(person)===peer)viewers.delete(person);
+  errors.set(person,{id:offer.id,error:error.message,retryAt:now()+7000});
+  if(p){
+   p.error=error.message;destroyPeer(p);
+   if(viewers.get(person)===p)viewers.delete(person);
   }
   log("Viewer answer: "+error.message);
- }finally{
-  answering.delete(person);
-  render();
- }
+ }finally{answering.delete(person);render();}
 }
-
 function presenceText(person){
- const presence=records[person]?._presence;
- if(!presence)return "No student presence";
-
- const age=Math.max(
-  0,Math.round((now()-(presence.updatedAt||0))/1000)
- );
-
- if(age>45)return `Offline/suspended (${age}s)`;
-
- return presence.captureActive?
-  presence.phase||"Capture active":
-  "Capture stopped — sharing needs a click";
+ const p=records[person]?._presence;
+ if(!p)return "No presence — seat kept";
+ const age=Math.max(0,Math.round((now()-(p.updatedAt||0))/1000));
+ if(age>45)return `Offline/suspended (${age}s) — seat kept`;
+ return p.captureActive?p.phase||"Capture active":"Capture stopped — seat kept";
 }
 
-function livePeer(person){
- const peer=viewers.get(person);
- return peer?.active&&
-  peer.pc.connectionState==="connected"&&
-  peer.lastBeat&&now()-peer.lastBeat<30000;
-}
-
-function expiryText(seat,reservation){
- if(meta.autoRelease===false)return "Expiry disabled";
-
- if(freshCapture(records[reservation.person]?._presence,seat)||
-  livePeer(reservation.person))
-  return "Active";
-
- if(!reservation.inactiveSince)return "Inactivity grace pending";
-
- const left=Math.max(0,Math.ceil(
-  meta.seatTimeoutSec-(now()-reservation.inactiveSince)/1000
- ));
- return left?`Release in ${left}s`:"Release pending";
-}
-
-async function expiryWorker(){
- if(expiryBusy||!controller||claiming||!recordsReady||
-  meta.closed||meta.autoRelease===false||
-  now()-lastExpiry<8000)return;
-
- expiryBusy=true;
- lastExpiry=now();
-
- try{
-  for(const [number,reservation]of Object.entries(meta.seats||{})){
-   const seat=Number(number);
-   const active=
-    freshCapture(records[reservation.person]?._presence,seat)||
-    livePeer(reservation.person);
-
-   if(active){
-    if(reservation.inactiveSince){
-     await editMeta(current=>
-      current.seats?.[seat]?.person===reservation.person?
-       {[`seats/${seat}/inactiveSince`]:null}:null
-     );
-    }
-   }else if(!reservation.inactiveSince){
-    await editMeta(current=>
-     current.seats?.[seat]?.person===reservation.person&&
-     !current.seats[seat].inactiveSince?
-      {[`seats/${seat}/inactiveSince`]:now()}:null
-    );
-   }else if(
-    now()-reservation.inactiveSince>=meta.seatTimeoutSec*1000
-   ){
-    const fresh=await getDB(
-     personPath(reservation.person,"_presence")
-    );
-
-    if(freshCapture(fresh,seat)||livePeer(reservation.person))
-     continue;
-
-    await editMeta(current=>{
-     const r=current.seats?.[seat];
-     if(current.autoRelease===false||
-      r?.person!==reservation.person||
-      !r.inactiveSince||
-      now()-r.inactiveSince<current.seatTimeoutSec*1000)
-      return null;
-     return {[`seats/${seat}`]:null};
-    });
-   }
-  }
- }catch(error){
-  log("Seat expiry: "+error.message);
- }finally{
-  expiryBusy=false;
- }
-}
-
-/* Capture starts directly from a real click, before any await. */
+/* Capture must begin directly from the student's click. */
 async function startSeat(seat){
  if(isStaff||!seat||student||captureStarting||meta.closed)return;
-
- if(mySeat()&&mySeat()!==seat){
-  notice("Use your reserved seat.",true);
-  return;
- }
-
+ if(mySeat()&&mySeat()!==seat){notice("Use your reserved seat.",true);return;}
  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
-  notice(
-   "Screen capture requires HTTPS and a supported desktop browser.",
-   true
-  );
-  return;
+  notice("Capture requires HTTPS and a supported desktop browser.",true);return;
  }
-
  const s={
-  active:true,seat,
-  captureID:uuid(),requestID:uuid(),requestedAt:now(),
+  active:true,seat,captureID:uuid(),requestID:uuid(),requestedAt:now(),
   raw:null,video:null,canvas:null,output:null,timer:null,
   draws:0,phase:"Requesting permission",
   links:new Map(),building:new Set(),retry:new Map(),
   serial:0,helpAt:0,assistance:null
  };
-
- student=s;
- captureStarting=true;
- releaseRequested=false;
-
+ student=s;captureStarting=true;releaseRequested=false;
  let permission;
  try{
-  // No asynchronous network work before this call.
+  // There is no await or network work before this call.
   permission=navigator.mediaDevices.getDisplayMedia({
-   video:{frameRate:{ideal:2,max:5}},
-   audio:false
+   video:{frameRate:{ideal:2,max:5}},audio:false
   });
  }catch(error){
-  student=null;
-  captureStarting=false;
-  fail(error);
-  return;
+  student=null;captureStarting=false;fail(error);return;
  }
-
  try{
   s.raw=await permission;
-  if(!s.active){
-   s.raw.getTracks().forEach(track=>track.stop());
-   return;
-  }
-
+  if(!s.active){s.raw.getTracks().forEach(t=>t.stop());return;}
   s.raw.getVideoTracks()[0].addEventListener("ended",()=>{
-   if(student===s)
-    void stopSharing(
-     "Capture stopped. Approve sharing again to resume."
-    );
+   if(student===s)void stopSharing("Capture stopped. Your seat is still reserved.");
   },{once:true});
-
   s.video=document.createElement("video");
-  s.video.muted=true;
-  s.video.autoplay=true;
-  s.video.playsInline=true;
-  s.video.srcObject=s.raw;
-  await s.video.play();
-
+  s.video.muted=true;s.video.autoplay=true;s.video.playsInline=true;
+  s.video.srcObject=s.raw;await s.video.play();
   if(!s.active)return;
-
   s.canvas=document.createElement("canvas");
   const context=s.canvas.getContext("2d",{alpha:false});
   if(!context)throw Error("Canvas unavailable.");
-
   function draw(){
    if(!s.active)return;
-
-   const width=meta.width;
-   const height=Math.round(width*9/16);
-
+   const width=meta.width,height=Math.round(width*9/16);
    if(s.canvas.width!==width||s.canvas.height!==height){
-    s.canvas.width=width;
-    s.canvas.height=height;
+    s.canvas.width=width;s.canvas.height=height;
    }
-
-   context.fillStyle="#000";
-   context.fillRect(0,0,width,height);
-
-   const sourceWidth=s.video.videoWidth;
-   const sourceHeight=s.video.videoHeight;
-
-   if(sourceWidth&&sourceHeight&&s.video.readyState>=2){
-    const scale=Math.min(
-     width/sourceWidth,height/sourceHeight
-    );
-    const dw=sourceWidth*scale;
-    const dh=sourceHeight*scale;
-    context.drawImage(
-     s.video,(width-dw)/2,(height-dh)/2,dw,dh
-    );
+   context.fillStyle="#000";context.fillRect(0,0,width,height);
+   const sw=s.video.videoWidth,sh=s.video.videoHeight;
+   if(sw&&sh&&s.video.readyState>=2){
+    const scale=Math.min(width/sw,height/sh),dw=sw*scale,dh=sh*scale;
+    context.drawImage(s.video,(width-dw)/2,(height-dh)/2,dw,dh);
     s.draws++;
    }
-
    s.timer=setTimeout(draw,1000/meta.fps);
   }
-
-  draw();
-  s.output=s.canvas.captureStream(2);
-  if(!s.output.getVideoTracks()[0])
-   throw Error("Canvas capture unavailable.");
-
-  s.phase="Capture active — requesting seat";
-  notice("Sharing started. Keep this tab open.");
+  draw();s.output=s.canvas.captureStream(2);
+  if(!s.output.getVideoTracks()[0])throw Error("Canvas capture unavailable.");
+  s.phase="Capture active — automatic seat admission pending";
+  notice("Sharing started. Keep this tab open. Your reservation has no timeout.");
   void publishPresence(true);
  }catch(error){
   if(s.active)await stopSharing(error.message);
  }finally{
-  captureStarting=false;
-  render();
-  void studentLoop();
+  captureStarting=false;render();void studentLoop();
  }
 }
-
 function linkTarget(s,id){
  return [
   s.captureID,id,meta.streamRevision||0,
   meta.seats?.[s.seat]?.restartToken||"",s.serial
  ].join("|");
 }
-
-function currentLink(s,peer){
- return student===s&&s.active&&peer.active&&
-  s.links.get(peer.viewerID)===peer&&
+function currentLink(s,p){
+ return student===s&&s.active&&p.active&&s.links.get(p.viewerID)===p&&
   meta.seats?.[s.seat]?.person===identity&&
-  peer.target===linkTarget(s,peer.viewerID)&&
-  activeViewers().some(([id])=>id===peer.viewerID)&&
-  !meta.closed;
+  p.target===linkTarget(s,p.viewerID)&&
+  activeViewers().some(([id])=>id===p.viewerID)&&!meta.closed;
 }
-
 async function studentLoop(){
- if(studentLoopBusy||isStaff)return;
- studentLoopBusy=true;
-
+ if(studentLoopBusy||isStaff)return;studentLoopBusy=true;
  try{
-  const s=student;
-  if(!s?.active||!s.output||meta.closed)return;
-
+  const s=student;if(!s?.active||!s.output||meta.closed)return;
   if(s.raw.getVideoTracks()[0]?.readyState!=="live"){
-   void stopSharing("Capture ended.");
-   return;
+   void stopSharing("Capture ended. Seat remains reserved.");return;
   }
-
   const reservation=meta.seats?.[s.seat];
-
   if(reservation?.person!==identity){
-   for(const peer of s.links.values())destroyPeer(peer);
+   for(const p of s.links.values())destroyPeer(p);
    s.links.clear();
-
    s.phase=reservation?
-    `Waiting for occupied seat ${s.seat}`:
-    "Waiting for teacher admission";
+    `Waiting for explicit release of occupied seat ${s.seat}`:
+    "Waiting for online teacher controller to auto-accept";
    return;
   }
-
-  const staff=activeViewers();
-  const ids=new Set(staff.map(([id])=>id));
-
-  for(const [id,peer]of s.links){
-   if(!ids.has(id)||peer.target!==linkTarget(s,id)){
-    destroyPeer(peer);
-    s.links.delete(id);
+  const staff=activeViewers(),ids=new Set(staff.map(([id])=>id));
+  for(const [id,p]of s.links){
+   if(!ids.has(id)||p.target!==linkTarget(s,id)){
+    destroyPeer(p);s.links.delete(id);
    }
   }
-
-  if(!navigator.onLine){
-   s.phase="Capture retained — offline";
-   return;
-  }
-
-  for(const [id,viewer]of staff){
-   let peer=s.links.get(id);
-
-   if(peer?.active){
-    const age=now()-peer.created;
-    const state=peer.pc.connectionState;
-
-    const bad=
-     state==="failed"||
-     (state==="disconnected"&&
-      now()-(peer.badSince||now())>10000)||
-     (peer.lastBeat&&now()-peer.lastBeat>30000)||
-     (!peer.answered&&age>90000)||
-     (peer.answered&&state!=="connected"&&age>65000)||
-     (state==="connected"&&peer.dc?.readyState!=="open"&&
-      now()-(peer.connectedAt||now())>25000);
-
-    if(bad){
-     destroyPeer(peer);
-     s.links.delete(id);
-     peer=null;
-    }
+  if(!navigator.onLine){s.phase="Capture retained — offline";return;}
+  for(const [id,v]of staff){
+   let p=s.links.get(id);
+   if(p?.active){
+    const age=now()-p.created,state=p.pc.connectionState;
+    const bad=state==="failed"||
+     (state==="disconnected"&&now()-(p.badSince||now())>10000)||
+     (p.lastBeat&&now()-p.lastBeat>30000)||
+     (!p.answered&&age>90000)||
+     (p.answered&&state!=="connected"&&age>65000)||
+     (state==="connected"&&p.dc?.readyState!=="open"&&
+      now()-(p.connectedAt||now())>25000);
+    if(bad){destroyPeer(p);s.links.delete(id);p=null;}
    }
-
-   if((!peer||!peer.active)&&!s.building.has(id)&&
-    now()>=(s.retry.get(id)||0))
-    void publishToViewer(s,id,viewer);
+   if((!p||!p.active)&&!s.building.has(id)&&now()>=(s.retry.get(id)||0))
+    void publishToViewer(s,id,v);
   }
-
-  const count=[...s.links.values()].filter(peer=>
-   peer.active&&peer.pc.connectionState==="connected"
-  ).length;
-
+  const count=[...s.links.values()].filter(p=>
+   p.active&&p.pc.connectionState==="connected").length;
   s.phase=staff.length?
    `Sharing with ${count}/${staff.length} staff viewers`:
-   "Waiting for staff viewer";
- }finally{
-  studentLoopBusy=false;
- }
+   "Waiting for staff viewer — seat stays reserved";
+ }finally{studentLoopBusy=false;}
 }
-
-async function publishToViewer(s,id,viewer){
+async function publishToViewer(s,id,v){
  if(!s.active||s.building.has(id))return;
-
- s.building.add(id);
- s.retry.set(id,now()+7000);
-
+ s.building.add(id);s.retry.set(id,now()+7000);
  const previous=s.links.get(id);
  if(previous){
   destroyPeer(previous);
-  void deleteDB(personPath(identity,`answers/${previous.id}`))
-   .catch(()=>{});
+  void deleteDB(personPath(identity,`answers/${previous.id}`)).catch(()=>{});
  }
-
- let peer;
+ let p;
  try{
-  peer=makePeer(`Seat ${s.seat} → ${viewer.label||"Staff"}`);
-  Object.assign(peer,{
-   id:uuid(),viewerID:id,seat:s.seat,target:linkTarget(s,id)
-  });
-  s.links.set(id,peer);
-
-  peer.track=s.output.getVideoTracks()[0].clone();
-  try{peer.track.contentHint="detail";}catch{}
-
-  peer.sender=peer.pc.addTransceiver(peer.track,{
-   direction:"sendonly",
-   streams:[new MediaStream([peer.track])]
+  p=makePeer(`Seat ${s.seat} → ${v.label||"Staff"}`);
+  Object.assign(p,{id:uuid(),viewerID:id,seat:s.seat,target:linkTarget(s,id)});
+  s.links.set(id,p);
+  p.track=s.output.getVideoTracks()[0].clone();
+  try{p.track.contentHint="detail";}catch{}
+  p.sender=p.pc.addTransceiver(p.track,{
+   direction:"sendonly",streams:[new MediaStream([p.track])]
   }).sender;
-
-  channel(peer,peer.pc.createDataChannel(
-   "classroom",{ordered:true}
-  ));
-
-  const offer=await gather(peer,await peer.pc.createOffer());
-  if(!currentLink(s,peer))return;
-
-  await cap(peer);
-  if(!currentLink(s,peer))return;
-
+  channel(p,p.pc.createDataChannel("classroom",{ordered:true}));
+  const offer=await gather(p,await p.pc.createOffer());
+  if(!currentLink(s,p))return;
+  await cap(p);if(!currentLink(s,p))return;
   await putDB(personPath(identity,`offers/${id}`),{
-   appVersion:APP,
-   id:peer.id,
-   captureID:s.captureID,
-   seat:s.seat,
-   viewerID:id,
-   offer,
-   publishedAt:now()
+   appVersion:APP,id:p.id,captureID:s.captureID,seat:s.seat,
+   viewerID:id,offer,publishedAt:now()
   });
-
-  peer.event("Offer published");
+  p.event("Offer published");
  }catch(error){
   log("Student offer: "+error.message);
-  if(peer){
-   peer.error=error.message;
-   destroyPeer(peer);
-  }
+  if(p){p.error=error.message;destroyPeer(p);}
   s.retry.set(id,now()+7000);
  }finally{
   s.building.delete(id);
-  if(peer&&!currentLink(s,peer))destroyPeer(peer);
+  if(p&&!currentLink(s,p))destroyPeer(p);
  }
 }
-
-async function stopSharing(
- reason="Sharing stopped. Seat remains temporarily reserved.",
- release=false
-){
- const s=student;
- if(!s?.active)return;
-
- s.active=false;
- clearTimeout(s.timer);
- s.raw?.getTracks().forEach(track=>track.stop());
- s.output?.getTracks().forEach(track=>track.stop());
-
- if(s.video){
-  s.video.pause();
-  s.video.srcObject=null;
- }
-
- for(const peer of s.links.values())destroyPeer(peer);
-
- student=null;
- idlePhase=reason;
+async function stopSharing(reason="Sharing stopped. Your seat remains reserved indefinitely.",release=false){
+ const s=student;if(!s?.active)return;
+ s.active=false;clearTimeout(s.timer);
+ s.raw?.getTracks().forEach(t=>t.stop());
+ s.output?.getTracks().forEach(t=>t.stop());
+ if(s.video){s.video.pause();s.video.srcObject=null;}
+ for(const p of s.links.values())destroyPeer(p);
+ student=null;idlePhase=reason;
  if(release)releaseRequested=true;
-
- notice(reason);
- render();
- await publishPresence(true);
+ notice(reason);render();await publishPresence(true);
 }
-
 async function releaseMine(){
  const seat=mySeat()||student?.seat;
- if(!seat||!confirm(`Stop capture and release seat ${seat}?`))return;
-
+ if(!seat||!confirm(`Stop capture and explicitly release seat ${seat}?`))return;
  releaseRequested=true;
-
- if(student){
-  await stopSharing("Seat release requested.",true);
- }else{
+ if(student)await stopSharing("Seat release requested.",true);
+ else{
   idlePhase="Seat release requested.";
   await publishPresence(true);
-  notice("Seat release requested. The online controller will release it.");
+  notice("Explicit release requested. The online controller will process it.");
  }
 }
-
 async function askHelp(){
  if(!student?.active)return;
- student.helpAt=now();
- student.assistance=null;
- await publishPresence(true);
- notice("Help requested. Keep sharing and wait for staff.");
+ student.helpAt=now();student.assistance=null;
+ await publishPresence(true);notice("Help requested. Keep sharing.");
 }
-
 async function cancelHelp(){
  if(!student)return;
- student.helpAt=0;
- student.assistance=null;
- await publishPresence(true);
- render();
+ student.helpAt=0;student.assistance=null;
+ await publishPresence(true);render();
 }
-
 async function helpSeat(seat,state){
- const reservation=meta?.seats?.[seat];
- const help=reservation?helpInfo(reservation.person):null;
-
+ const r=meta?.seats?.[seat],help=r?helpInfo(r.person):null;
  if(!isStaff||staffRevoked||!help)return;
-
- await putDB(personPath(reservation.person,"assistance"),{
-  requestId:help.at,
-  state,
-  label:viewerLabel,
-  viewerID,
-  at:now()
+ await putDB(personPath(r.person,"assistance"),{
+  requestId:help.at,state,label:viewerLabel,viewerID,at:now()
  });
 }
 
-/* Stable grid: corner changes do not recreate video nodes. */
+/* Stable tiles preserve videos when corner or layout changes. */
 function bind(video,stream){
- stream||=null;
- if(video.srcObject===stream)return;
+ stream||=null;if(video.srcObject===stream)return;
  video.srcObject=stream;
-
- if(stream){
-  video.play().catch(error=>{
-   if(error.name!=="AbortError"&&video.srcObject===stream)
-    log("Playback: "+error.message);
-  });
- }
+ if(stream)video.play().catch(error=>{
+  if(error.name!=="AbortError"&&video.srcObject===stream)
+   log("Playback: "+error.message);
+ });
 }
-
 function position(seat){
- const row=Math.floor((seat-1)/meta.cols);
- const col=(seat-1)%meta.cols;
- const origin=corner();
+ const row=Math.floor((seat-1)/meta.cols),col=(seat-1)%meta.cols,c=corner();
  return {
-  row:origin.startsWith("bottom")?meta.rows-row:row+1,
-  col:origin.endsWith("right")?meta.cols-col:col+1
+  row:c.startsWith("bottom")?meta.rows-row:row+1,
+  col:c.endsWith("right")?meta.cols-col:col+1
  };
 }
-
-function health(peer){
- if(!peer)return {live:false,label:"Waiting",detail:""};
-
- if(!peer.active)
-  return {
-   live:false,label:"Reconnecting",detail:peer.error||""
-  };
-
- if(peer.pc.connectionState!=="connected")
-  return {
-   live:false,label:peer.phase,
-   detail:peer.error||peer.pc.iceConnectionState
-  };
-
- if(peer.dc?.readyState!=="open")
-  return {
-   live:false,label:"Control channel pending",detail:""
-  };
-
- if(peer.lastBeat&&now()-peer.lastBeat>25000)
-  return {
-   live:false,label:"Heartbeat delayed",detail:"Recovery pending"
-  };
-
- if(peer.receiver){
-  if(peer.remoteInfo?.captureState==="ended"||
-   peer.remoteInfo?.muted)
-   return {
-    live:false,label:"Capture unavailable",detail:""
-   };
-
-  if(!peer.lastFrame)
-   return {
-    live:false,label:"Waiting for video",
-    detail:`${peer.bytes} bytes`
-   };
-
-  if(now()-peer.lastFrame>25000)
-   return {
-    live:false,label:"No recent frames",
-    detail:"Static source or stalled capture"
-   };
+function health(p){
+ if(!p)return {live:false,label:"Waiting",detail:"Seat kept indefinitely"};
+ if(!p.active)return {live:false,label:"Reconnecting",detail:p.error||""};
+ if(p.pc.connectionState!=="connected")
+  return {live:false,label:p.phase,detail:p.error||p.pc.iceConnectionState};
+ if(p.dc?.readyState!=="open")
+  return {live:false,label:"Control channel pending",detail:""};
+ if(p.lastBeat&&now()-p.lastBeat>25000)
+  return {live:false,label:"Heartbeat delayed",detail:"Recovery pending"};
+ if(p.receiver){
+  if(p.remoteInfo?.captureState==="ended"||p.remoteInfo?.muted)
+   return {live:false,label:"Capture unavailable",detail:"Seat kept"};
+  if(!p.lastFrame)
+   return {live:false,label:"Waiting for video",detail:`${p.bytes} bytes`};
+  if(now()-p.lastFrame>25000)
+   return {live:false,label:"No recent frames",detail:"Static source or stalled capture"};
  }
-
  return {
-  live:true,label:peer.receiver?"Live":"Sharing",
-  detail:
-   `${peer.frames} frames · ${Math.round(peer.bytes/1024)} KiB`
+  live:true,label:p.receiver?"Live":"Sharing",
+  detail:`${p.frames} frames · ${Math.round(p.bytes/1024)} KiB`
  };
 }
-
 function receiverAt(seat){
- const reservation=meta?.seats?.[seat];
- return reservation?viewers.get(reservation.person):null;
+ const r=meta?.seats?.[seat];return r?viewers.get(r.person):null;
 }
-
 function makeTile(seat){
  const tile=document.createElement("button");
- tile.type="button";
- tile.className="tile";
-
- const head=document.createElement("div");
- head.className="tileHead";
-
- const label=document.createElement("span");
- label.textContent="Seat "+seat;
-
- const flag=document.createElement("span");
- flag.className="flag";
- flag.hidden=true;
-
+ tile.type="button";tile.className="tile";
+ const head=document.createElement("div");head.className="tileHead";
+ const label=document.createElement("span");label.textContent="Seat "+seat;
+ const flag=document.createElement("span");flag.className="flag";flag.hidden=true;
  head.append(label,flag);
-
- const picture=document.createElement("div");
- picture.className="picture";
-
+ const picture=document.createElement("div");picture.className="picture";
  const video=document.createElement("video");
- video.autoplay=true;
- video.muted=true;
- video.playsInline=true;
-
- const overlay=document.createElement("div");
- overlay.className="overlay";
-
- const foot=document.createElement("div");
- foot.className="foot";
-
- picture.append(video,overlay);
- tile.append(head,picture,foot);
-
+ video.autoplay=true;video.muted=true;video.playsInline=true;
+ const overlay=document.createElement("div");overlay.className="overlay";
+ const foot=document.createElement("div");foot.className="foot";
+ picture.append(video,overlay);tile.append(head,picture,foot);
  tile.onclick=()=>{
   if(isStaff){
-   zoomSeat=seat;
-   updateZoom();
-   if(!$("zoom").open)$("zoom").showModal();
-  }else{
-   void startSeat(seat);
-  }
+   zoomSeat=seat;updateZoom();if(!$("zoom").open)$("zoom").showModal();
+  }else void startSeat(seat);
  };
-
  const result={tile,video,overlay,foot,flag};
- tiles.set(seat,result);
- $("grid").append(tile);
- return result;
+ tiles.set(seat,result);$("grid").append(tile);return result;
 }
-
 function render(){
  if(!room||!meta)return;
-
- const count=meta.rows*meta.cols;
- const large=$("view").value==="large";
-
+ const count=meta.rows*meta.cols,large=$("view").value==="large";
  $("grid").style.gridTemplateColumns=large?
   `repeat(${meta.cols},minmax(200px,1fr))`:
   `repeat(${meta.cols},minmax(0,1fr))`;
-
  $("grid").style.minWidth=large?meta.cols*210+"px":"0";
-
- for(const [seat,tile]of tiles){
-  if(seat>count){
-   bind(tile.video,null);
-   tile.tile.remove();
-   tiles.delete(seat);
-  }
+ for(const [seat,t]of tiles){
+  if(seat>count){bind(t.video,null);t.tile.remove();tiles.delete(seat);}
  }
-
  const mine=!isStaff?mySeat():null;
- let live=0;
- let helpCount=0;
-
+ let live=0,helps=0;
  for(let seat=1;seat<=count;seat++){
-  const t=tiles.get(seat)||makeTile(seat);
-  const reservation=meta.seats?.[seat];
-  const pos=position(seat);
-
-  t.tile.style.gridRow=String(pos.row);
-  t.tile.style.gridColumn=String(pos.col);
-
-  const peer=isStaff?receiverAt(seat):null;
+  const t=tiles.get(seat)||makeTile(seat),r=meta.seats?.[seat],pos=position(seat);
+  t.tile.style.gridRow=String(pos.row);t.tile.style.gridColumn=String(pos.col);
+  const p=isStaff?receiverAt(seat):null;
   const ownCapture=!isStaff&&student?.seat===seat;
-  const ownReservation=!isStaff&&reservation?.person===identity;
-  const help=isStaff&&reservation?
-   helpInfo(reservation.person):null;
-
+  const ownReservation=!isStaff&&r?.person===identity;
+  const help=isStaff&&r?helpInfo(r.person):null;
   let state;
-
-  if(meta.closed){
-   state={live:false,label:"Room closed",detail:""};
-  }else if(peer){
-   state=health(peer);
-  }else if(ownCapture){
-   state={
-    live:[...student.links.values()].some(p=>
-     p.active&&p.pc.connectionState==="connected"
-    ),
-    label:"Capture active",detail:student.phase
-   };
-  }else if(ownReservation){
-   state={
-    live:false,label:"Your reserved seat",
-    detail:"Click to resume sharing"
-   };
-  }else if(reservation){
-   state={
-    live:false,
-    label:isStaff?"Reserved / waiting":"Occupied — click to wait",
-    detail:isStaff?presenceText(reservation.person):"Wait for release"
-   };
-  }else{
-   state={
-    live:false,label:isStaff?"Empty":"Click to share",
-    detail:"Available"
-   };
-  }
-
-  if(state.live)live++;
-  if(help)helpCount++;
-
+  if(meta.closed)state={live:false,label:"Room closed",detail:""};
+  else if(p)state=health(p);
+  else if(ownCapture)state={
+   live:[...student.links.values()].some(p=>p.active&&p.pc.connectionState==="connected"),
+   label:"Capture active",detail:student.phase
+  };
+  else if(ownReservation)state={
+   live:false,label:"Your reserved seat",detail:"No expiry — click to resume"
+  };
+  else if(r)state={
+   live:false,label:isStaff?"Reserved / waiting":"Occupied — click to wait",
+   detail:isStaff?presenceText(r.person):"Explicit release required"
+  };
+  else state={live:false,label:isStaff?"Empty":"Click to share",detail:"Auto-accept"};
+  if(state.live)live++;if(help)helps++;
   t.tile.classList.toggle("live",state.live);
   t.tile.classList.toggle("mine",ownReservation);
   t.tile.classList.toggle("helping",!!help);
-  t.flag.hidden=!help;
-  t.flag.textContent=help?
-   (help.state==="helping"?"Helping":"Help!"):"";
-
-  t.overlay.textContent=state.label;
-  t.foot.textContent=state.detail;
+  t.flag.hidden=!help;t.flag.textContent=help?help.state==="helping"?"Helping":"Help!":"";
+  t.overlay.textContent=state.label;t.foot.textContent=state.detail;
   t.tile.title=`Seat ${seat}: ${state.label}. ${state.detail}`;
-
-  bind(t.video,
-   isStaff?peer?.stream:ownCapture?student.output:null
-  );
-
+  bind(t.video,isStaff?p?.stream:ownCapture?student.output:null);
   t.tile.disabled=!isStaff&&(
-   meta.closed||!!student||captureStarting||
-   (!!mine&&mine!==seat)
+   meta.closed||!!student||captureStarting||!!mine&&mine!==seat
   );
  }
-
  $("gridStatus").textContent=isStaff?
-  `${live} live · ${Object.keys(meta.seats||{}).length} reserved · `+
-  `${activeViewers().length} staff`:
+  `${live} live · ${Object.keys(meta.seats||{}).length} reserved · ${activeViewers().length} staff`:
   student?.phase||"Choose a seat";
-
- $("cornerBadge").textContent=
-  "Seat 1: "+corner().replace("-"," ");
- $("helpCount").textContent=isStaff?
-  `${helpCount} help requests`:"No audio";
-
+ $("cornerBadge").textContent="Seat 1: "+corner().replace("-"," ");
+ $("helpCount").textContent=isStaff?`${helps} help requests`:"No seat expiry";
  const seat=!isStaff?selectedSeat():null;
-
- $("shareBtn").textContent=seat?
-  `Start sharing seat ${seat}`:"Choose a seat";
- $("shareBtn").disabled=
-  !!student||captureStarting||!seat||meta.closed;
- $("stopBtn").disabled=!student;
- $("retryBtn").disabled=!student;
- $("helpBtn").disabled=!student?.output;
- $("cancelHelpBtn").disabled=!student?.helpAt;
-
+ $("shareBtn").textContent=seat?`Start sharing seat ${seat}`:"Choose a seat";
+ $("shareBtn").disabled=!!student||captureStarting||!seat||meta.closed;
+ $("stopBtn").disabled=!student;$("retryBtn").disabled=!student;
+ $("helpBtn").disabled=!student?.output;$("cancelHelpBtn").disabled=!student?.helpAt;
  if(!isStaff){
-  $("studentStatus").textContent=student?
-   `Seat ${student.seat}: ${student.phase}`:
-   seat?
-    `Seat ${seat} selected. Click Start sharing and approve screen capture.`:
-    "Choose a seat.";
-
-  const assistance=student?.assistance;
+  $("studentStatus").textContent=student?`Seat ${student.seat}: ${student.phase}`:
+   seat?`Seat ${seat} selected. Click Start sharing and approve screen capture.`:"Choose a seat.";
+  const a=student?.assistance;
   $("helpStatus").textContent=student?.helpAt?
-   assistance?.requestId===student.helpAt&&
-   assistance.state==="helping"?
-    `${assistance.label} is helping you.`:
-    "Help requested. Keep this tab open.":
-   "Start sharing, then use Request help if needed.";
+   a?.requestId===student.helpAt&&a.state==="helping"?
+    `${a.label} is helping you.`:"Help requested. Keep this tab open.":
+   "Your reservation does not expire. Use Request help when needed.";
  }
-
  updateZoom();
 }
-
 function updateZoom(){
  if(zoomSeat===null)return;
-
- const reservation=meta?.seats?.[zoomSeat];
- const peer=receiverAt(zoomSeat);
- const state=health(peer);
- const help=reservation?helpInfo(reservation.person):null;
-
- $("zoomTitle").textContent=
-  `Seat ${zoomSeat} — existing tiny preview`;
- $("zoomStatus").textContent=
-  state.label+". "+state.detail+(help?" · "+help.label:"");
-
- bind($("zoomVideo"),peer?.stream);
+ const r=meta?.seats?.[zoomSeat],p=receiverAt(zoomSeat),state=health(p);
+ const help=r?helpInfo(r.person):null;
+ $("zoomTitle").textContent=`Seat ${zoomSeat} — existing tiny preview`;
+ $("zoomStatus").textContent=state.label+". "+state.detail+(help?" · "+help.label:"");
+ bind($("zoomVideo"),p?.stream);
  $("ackBtn").disabled=!help||!isStaff||staffRevoked;
  $("resolveBtn").disabled=!help||!isStaff||staffRevoked;
 }
-
 function renderPeople(){
  if(!isStaff||!meta)return;
-
- const box=$("people");
- box.replaceChildren();
-
+ const box=$("people");box.replaceChildren();
  function row(text,buttons,error=""){
-  const element=document.createElement("div");
-  element.className="person";
-
-  const words=document.createElement("div");
-  words.className="words";
-  words.textContent=text;
-
+  const element=document.createElement("div");element.className="person";
+  const words=document.createElement("div");words.className="words";words.textContent=text;
   if(error){
-   const detail=document.createElement("div");
-   detail.className="err";
-   detail.textContent=error;
-   words.append(detail);
+   const detail=document.createElement("div");detail.className="err";
+   detail.textContent=error;words.append(detail);
   }
-
-  const controls=document.createElement("div");
-  controls.className="row";
-
+  const controls=document.createElement("div");controls.className="row";
   for(const [label,fn]of buttons){
-   const button=document.createElement("button");
-   button.textContent=label;
-   button.onclick=action(fn);
-   controls.append(button);
+   const button=document.createElement("button");button.textContent=label;
+   button.onclick=action(fn);controls.append(button);
   }
-
-  element.append(words,controls);
-  box.append(element);
+  element.append(words,controls);box.append(element);
  }
-
- for(const [seat,reservation]of Object.entries(meta.seats||{})){
-  const peer=viewers.get(reservation.person);
-  const help=helpInfo(reservation.person);
-  const buttons=[];
-
+ for(const [seat,r]of Object.entries(meta.seats||{})){
+  const p=viewers.get(r.person),help=helpInfo(r.person),buttons=[];
   if(help&&!staffRevoked){
-   buttons.push([
-    "I am helping",()=>helpSeat(Number(seat),"helping")
-   ]);
-   buttons.push([
-    "Resolved",()=>helpSeat(Number(seat),"resolved")
-   ]);
+   buttons.push(["I am helping",()=>helpSeat(Number(seat),"helping")]);
+   buttons.push(["Resolved",()=>helpSeat(Number(seat),"resolved")]);
   }
-
   if(controller){
-   buttons.push([
-    "Reconnect",
-    ()=>editMeta(current=>
-     current.seats?.[seat]?.person===reservation.person?
-      {[`seats/${seat}/restartToken`]:uuid()}:null
-    )
-   ]);
-   buttons.push([
-    "Release",()=>releaseSeat(Number(seat))
-   ]);
+   buttons.push(["Reconnect",()=>editMeta(m=>
+    m.seats?.[seat]?.person===r.person?
+     {[`seats/${seat}/restartToken`]:uuid()}:null)]);
+   buttons.push(["Release seat",()=>releaseSeatUI(Number(seat))]);
   }
-
   row(
-   `Seat ${seat}: `+
-   `${peer?health(peer).label:presenceText(reservation.person)}. `+
-   `${expiryText(Number(seat),reservation)}`+
-   `${help?" · "+help.label:""}`,
-   buttons,
-   errors.get(reservation.person)?.error||""
+   `Seat ${seat}: ${p?health(p).label:presenceText(r.person)}. `+
+   `Permanent reservation${help?" · "+help.label:""}`,
+   buttons,errors.get(r.person)?.error||""
   );
  }
-
- if(controller){
-  for(const [person,record]of Object.entries(records)){
-   const presence=record._presence;
-
-   if(!presence||presence.appVersion!==APP||
-    !freshCapture(presence,presence.seat)||
-    presence.release||
-    meta.seats?.[presence.seat]?.person===person||
-    rejected(record,presence))continue;
-
-   const occupied=!!meta.seats?.[presence.seat];
-
-   row(
-    `Requested seat ${presence.seat}`+
-    (occupied?" — occupied, waiting":" — lobby"),
-    occupied?[]:[
-     ["Accept",()=>admit(person,presence)],
-     ["Reject",()=>reject(person,presence)]
-    ]
-   );
-  }
+ for(const [person,r]of Object.entries(records)){
+  const p=r._presence;
+  if(!p||p.appVersion!==APP||!freshCapture(p,p.seat)||p.release||
+   meta.seats?.[p.seat]?.person===person||rejected(r,p))continue;
+  const occupied=!!meta.seats?.[p.seat];
+  row(
+   `Requested seat ${p.seat} — `+
+   (occupied?"waiting for explicit release":
+    controller?"automatic admission pending":"waiting for teacher controller"),
+   []
+  );
  }
-
  $("staffList").replaceChildren();
- for(const [id,viewer]of activeViewers()){
-  const element=document.createElement("div");
-  element.className="person";
-  element.textContent=
-   `${viewer.label||"Staff"}`+
-   `${id===viewerID?" (this tab)":""}`+
+ for(const [id,v]of activeViewers()){
+  const element=document.createElement("div");element.className="person";
+  element.textContent=`${v.label||"Staff"}${id===viewerID?" (this tab)":""}`+
    `${meta.controlViewer===id?" — controller":""}`;
   $("staffList").append(element);
  }
 }
 
-/* Diagnostics and independent workers */
-async function readStats(peer){
- const stats=await peer.pc.getStats();
- let bytes=0;
- let frames=0;
-
+/* Independent maintenance and diagnostics */
+async function readStats(p){
+ const stats=await p.pc.getStats();let bytes=0,frames=0;
  const out=[
-  `${peer.label}: ${peer.pc.connectionState}; `+
-  `ICE=${peer.pc.iceConnectionState}; `+
-  `DC=${peer.dc?.readyState||"none"}`
+  `${p.label}: ${p.pc.connectionState}; ICE=${p.pc.iceConnectionState}; DC=${p.dc?.readyState||"none"}`
  ];
-
- stats.forEach(report=>{
-  if(report.type==="candidate-pair"&&report.nominated){
-   out.push(
-    `Pair ${report.state}; `+
-    `bytes=${report.bytesSent||0}/${report.bytesReceived||0}`
-   );
+ stats.forEach(r=>{
+  if(r.type==="candidate-pair"&&r.nominated)
+   out.push(`Pair ${r.state}; bytes=${r.bytesSent||0}/${r.bytesReceived||0}`);
+  if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
+  if(r.type==="inbound-rtp"){
+   out.push(`Inbound bytes=${r.bytesReceived||0}; decoded=${r.framesDecoded||0}`);
+   if(p.receiver){bytes+=r.bytesReceived||0;frames+=r.framesDecoded||0;}
   }
-
-  if(report.isRemote||(report.kind||report.mediaType)!=="video")
-   return;
-
-  if(report.type==="inbound-rtp"){
-   out.push(
-    `Inbound bytes=${report.bytesReceived||0}; `+
-    `decoded=${report.framesDecoded||0}`
-   );
-   if(peer.receiver){
-    bytes+=report.bytesReceived||0;
-    frames+=report.framesDecoded||0;
-   }
-  }
-
-  if(report.type==="outbound-rtp"){
-   out.push(
-    `Outbound bytes=${report.bytesSent||0}; `+
-    `encoded=${report.framesEncoded||0}`
-   );
-   if(!peer.receiver){
-    bytes+=report.bytesSent||0;
-    frames+=report.framesEncoded||0;
-   }
+  if(r.type==="outbound-rtp"){
+   out.push(`Outbound bytes=${r.bytesSent||0}; encoded=${r.framesEncoded||0}`);
+   if(!p.receiver){bytes+=r.bytesSent||0;frames+=r.framesEncoded||0;}
   }
  });
-
- if(frames>peer.frames)peer.lastFrame=now();
- peer.bytes=bytes;
- peer.frames=frames;
- peer.lastStats=out.join("\n");
+ if(frames>p.frames)p.lastFrame=now();
+ p.bytes=bytes;p.frames=frames;p.lastStats=out.join("\n");
 }
-
 async function statsWorker(){
- if(statsBusy||!meta)return;
- statsBusy=true;
+ if(statsBusy||!meta)return;statsBusy=true;
  try{
-  const list=isStaff?[...viewers.values()]:
-   student?[...student.links.values()]:[];
-
-  await Promise.all(list.filter(peer=>peer.active).map(peer=>
-   readStats(peer).catch(()=>{})
-  ));
- }finally{
-  statsBusy=false;
-  render();
- }
+  const list=isStaff?[...viewers.values()]:student?[...student.links.values()]:[];
+  await Promise.all(list.filter(p=>p.active).map(p=>readStats(p).catch(()=>{})));
+ }finally{statsBusy=false;render();}
 }
-
 function maintenance(){
  if(!room||!meta)return;
-
- void pollRoom();
- void studentLoop();
- sendBeats();
- void publishPresence();
- void staffHeartbeat();
- void expiryWorker();
-
- if(isStaff&&!viewerReady&&!registering&&!renewing&&
-  !meta.closed&&!staffRevoked&&now()-lastViewerRetry>12000){
-  void registerViewer().catch(error=>{
-   log("Viewer registration retry: "+error.message);
-  });
+ void pollRoom();void studentLoop();sendBeats();
+ void publishPresence();void staffHeartbeat();
+ // Intentionally NO expiry worker.
+ if(isStaff&&!viewerReady&&!registering&&!renewing&&!meta.closed&&
+  !staffRevoked&&now()-lastViewerRetry>12000){
+  void registerViewer().catch(e=>log("Viewer retry: "+e.message));
  }
-
  render();
 }
-
 async function renewViewer(){
- if(renewing||registering||!isStaff||staffRevoked||meta.closed)
-  return;
-
+ if(renewing||registering||!isStaff||staffRevoked||meta.closed)return;
  renewing=true;
- const previous=viewerID;
- viewerReady=false;
- viewerID="";
-
- for(const peer of viewers.values())destroyPeer(peer);
- viewers.clear();
-
+ const previous=viewerID;viewerReady=false;viewerID="";
+ for(const p of viewers.values())destroyPeer(p);viewers.clear();
  try{
   if(previous){
-   try{
-    await deleteDB(roomPath(`meta/viewers/${previous}`));
-   }catch(error){
-    log("Old viewer cleanup: "+error.message);
-   }
+   try{await deleteDB(roomPath(`meta/viewers/${previous}`));}
+   catch(error){log("Old viewer cleanup: "+error.message);}
   }
-
   await registerViewer();
- }catch(error){
-  log("Viewer recovery: "+error.message);
- }finally{
-  renewing=false;
- }
+ }catch(error){log("Viewer recovery: "+error.message);}
+ finally{renewing=false;}
 }
-
 function networkChanged(reason){
  log("Network: "+reason);
- if(now()-lastNetwork<1500)return;
- lastNetwork=now();
-
+ if(now()-lastNetwork<1500)return;lastNetwork=now();
  if(student){
   student.serial++;
-  for(const peer of student.links.values())destroyPeer(peer);
-  student.links.clear();
-  student.retry.clear();
+  for(const p of student.links.values())destroyPeer(p);
+  student.links.clear();student.retry.clear();
  }
-
  if(isStaff)void renewViewer();
 }
-
-window.addEventListener("online",()=>{
- networkChanged("browser online");
-});
-window.addEventListener("offline",()=>{
- notice("Offline. Active capture is retained for reconnection.");
-});
-navigator.connection?.addEventListener?.("change",()=>{
- networkChanged("interface changed");
-});
-
+window.addEventListener("online",()=>networkChanged("browser online"));
+window.addEventListener("offline",()=>notice("Offline. Capture is retained and your seat will not expire."));
+navigator.connection?.addEventListener?.("change",()=>networkChanged("interface changed"));
 document.addEventListener("visibilitychange",()=>{
  log("Visibility: "+document.visibilityState);
  if(document.visibilityState==="visible"){
-  void pollRoom();
-  void publishPresence(true);
+  void pollRoom();void publishPresence(true);
  }
 });
-
 async function report(){
  const out=[
-  APP,
-  new Date().toISOString(),
-  navigator.userAgent,
+  APP,new Date().toISOString(),navigator.userAgent,
   `Database endpoint: ${endpoint}`,
-  "Client authentication: NONE",
-  "Authorization header: NOT SENT",
-  "Auth query parameter: NOT SENT",
-  "Cookies: OMITTED",
+  "Database authentication: NONE; no Authorization, auth query, or cookies.",
   `Local unverified browser ID: ${identity}`,
-  `Room: ${room}; staff=${isStaff}; controller=${controller}`,
-  `Database healthy=${dbHealthy}`,
+  `Room=${room}; staff=${isStaff}; controller=${controller}; databaseHealthy=${dbHealthy}`,
+  "Admission: PERMANENT AUTO ACCEPT",
+  "Automatic seat release: DISABLED",
+  "Seat inactivity timeout: NONE",
+  `Persisted policy: auto=${meta?.auto}; autoRelease=${meta?.autoRelease}; permanent=${meta?.permanentAutoAccept}`,
   `Layout=${meta?.rows}x${meta?.cols}; corner=${corner()}`,
   `Viewer=${viewerID}; active=${activeViewers().length}/${MAX_VIEWERS}`,
-  `Capture=${!!student}; phase=${student?.phase||idlePhase}; `+
-   `draws=${student?.draws||0}`,
-  "Invitation keys and full SDP are omitted."
+  `Capture=${!!student}; phase=${student?.phase||idlePhase}; draws=${student?.draws||0}`,
+  "Media: TURN RELAY ONLY",
+  "Invitation secrets and full SDP omitted."
  ];
-
  if(isStaff){
-  for(const [seat,reservation]of Object.entries(meta?.seats||{})){
-   out.push(
-    `Seat ${seat}: ${presenceText(reservation.person)}; `+
-     expiryText(Number(seat),reservation),
-    "Reservation: "+JSON.stringify(reservation),
-    "Presence: "+JSON.stringify(
-     records[reservation.person]?._presence
-    ),
-    "Error: "+JSON.stringify(
-     errors.get(reservation.person)||null
-    )
-   );
-  }
+  for(const [seat,r]of Object.entries(meta?.seats||{}))
+   out.push(`Seat ${seat}: ${presenceText(r.person)}; permanent reservation`,
+    "Reservation: "+JSON.stringify(r),
+    "Presence: "+JSON.stringify(records[r.person]?._presence),
+    "Error: "+JSON.stringify(errors.get(r.person)||null));
  }
-
- const list=isStaff?[...viewers.values()]:
-  student?[...student.links.values()]:[];
-
- for(const peer of list){
-  if(peer.active){
-   try{await readStats(peer);}catch{}
-  }
-  out.push(
-   `Attempt=${peer.id}; error=${peer.error}`,
-   peer.lastStats,
-   peer.events.join("\n")
-  );
+ const list=isStaff?[...viewers.values()]:student?[...student.links.values()]:[];
+ for(const p of list){
+  if(p.active)try{await readStats(p);}catch{}
+  out.push(`Attempt=${p.id}; error=${p.error}`,p.lastStats,p.events.join("\n"));
  }
-
  return out.join("\n\n");
 }
 
-/* Buttons */
+/* Controls */
 async function copyText(text){
- await navigator.clipboard.writeText(text);
- notice("Link copied.");
+ await navigator.clipboard.writeText(text);notice("Link copied.");
 }
-function needRoom(){
- if(!room)throw Error("Open a room first.");
-}
-function needController(){
- if(!controller)throw Error("Use the controlling teacher tab.");
-}
+function needRoom(){if(!room)throw Error("Open a room first.");}
+function needController(){if(!controller)throw Error("Use the controlling teacher tab.");}
 
 $("createBtn").onclick=action(createRoom);
 $("openBtn").onclick=action(()=>openRoom());
-$("lastBtn").onclick=action(()=>
- openRoom(load("classroom-rest-last-room"))
-);
-
-$("copyStudentBtn").onclick=action(()=>{
- needRoom();return copyText(studentURL());
-});
-$("copySeat1Btn").onclick=action(()=>{
- needRoom();return copyText(studentURL(1));
-});
+$("lastBtn").onclick=action(()=>openRoom(load("classroom-rest-last-room")));
+$("copyStudentBtn").onclick=action(()=>{needRoom();return copyText(studentURL());});
+$("copySeat1Btn").onclick=action(()=>{needRoom();return copyText(studentURL(1));});
 $("copySeatBtn").onclick=action(()=>{
- needRoom();
- const seat=Number($("linkSeat").value);
+ needRoom();const seat=Number($("linkSeat").value);
  if(!Number.isInteger(seat)||seat<1||seat>meta.rows*meta.cols)
   throw Error("Invalid seat.");
  return copyText(studentURL(seat));
 });
-$("copyAssistantBtn").onclick=action(()=>
- copyText(staffURL(true))
-);
-$("copyTeacherBtn").onclick=action(()=>
- copyText(staffURL(false))
-);
-$("copyCreateBtn").onclick=action(()=>
- copyText(createURL())
-);
-
+$("copyAssistantBtn").onclick=action(()=>copyText(staffURL(true)));
+$("copyTeacherBtn").onclick=action(()=>copyText(staffURL(false)));
+$("copyCreateBtn").onclick=action(()=>copyText(createURL()));
 $("takeoverBtn").onclick=action(()=>claim(true,true));
-
 $("labelBtn").onclick=action(async()=>{
  if(!isStaff||!viewerID)throw Error("Open a staff room first.");
-
  viewerLabel=$("staffLabel").value.trim().slice(0,40)||"Staff";
  save("classroom-rest-staff-label",viewerLabel);
-
  await patchDB(roomPath(`meta/viewers/${viewerID}`),{
   label:viewerLabel,heartbeat:now()
  });
  notice("Staff label saved.");
 });
-
 $("rotateBtn").onclick=action(async()=>{
  if(!isOwner||!confirm(
-  "Rotate the invitation key? Existing delegated staff must use new links. "+
-  "This is not a security barrier on a publicly writable database."
+  "Rotate staff invitations? This is not a security barrier on an open database."
  ))return;
-
- staffKey=uuid()+uuid();
- await putDB(roomPath("teacherKey"),staffKey);
-
- const current=await getDB(roomPath("meta"));
- const patch={};
-
- for(const [id,viewer]of Object.entries(current.viewers||{}))
-  if(viewer.uid!==identity)patch[`viewers/${id}`]=null;
-
- if(Object.keys(patch).length)
-  await patchDB(roomPath("meta"),patch);
-
- await claim(true);
- notice("Invitation key rotated. Share newly generated staff links.");
+ staffKey=uuid()+uuid();await putDB(roomPath("teacherKey"),staffKey);
+ const m=await getDB(roomPath("meta")),patch={};
+ for(const [id,v]of Object.entries(m.viewers||{}))
+  if(v.uid!==identity)patch[`viewers/${id}`]=null;
+ if(Object.keys(patch).length)await patchDB(roomPath("meta"),patch);
+ await claim(true);notice("Invitation key rotated. Share newly generated staff links.");
 });
 
-/* Intentionally not wrapped in a Promise: preserves user activation. */
+// Direct click handler preserves screen-capture user activation.
 $("shareBtn").onclick=()=>void startSeat(selectedSeat());
-
 $("stopBtn").onclick=action(()=>stopSharing());
 $("helpBtn").onclick=action(askHelp);
 $("cancelHelpBtn").onclick=action(cancelHelp);
 $("releaseMineBtn").onclick=action(releaseMine);
 $("ackBtn").onclick=action(()=>helpSeat(zoomSeat,"helping"));
 $("resolveBtn").onclick=action(()=>helpSeat(zoomSeat,"resolved"));
-
 $("retryBtn").onclick=()=>{
  if(!student)return;
  student.serial++;
- for(const peer of student.links.values())destroyPeer(peer);
- student.links.clear();
- student.retry.clear();
+ for(const p of student.links.values())destroyPeer(p);
+ student.links.clear();student.retry.clear();
  void studentLoop();
- notice("Reconnecting without asking for screen permission again.");
+ notice("Reconnecting without requesting screen permission again.");
 };
-
 $("settingsBtn").onclick=action(async()=>{
  needController();
-
  const config={
-  rows:Number($("rows").value),
-  cols:Number($("cols").value),
-  corner:$("corner").value,
-  width:Number($("width").value),
-  fps:Number($("fps").value),
-  auto:$("auto").checked,
-  autoRelease:$("autoRelease").checked,
-  seatTimeoutSec:Math.round(Number($("timeout").value)*60)
+  rows:Number($("rows").value),cols:Number($("cols").value),
+  corner:$("corner").value,width:Number($("width").value),
+  fps:Number($("fps").value)
  };
-
  checkSettings({...meta,...config});
-
- await editMeta(current=>{
-  const highest=Math.max(
-   0,...Object.keys(current.seats||{}).map(Number)
-  );
-  if(highest>config.rows*config.cols)
-   throw Error("Release reserved seats outside the new grid first.");
+ await editMeta(m=>{
+  if(Math.max(0,...Object.keys(m.seats||{}).map(Number))>config.rows*config.cols)
+   throw Error("Explicitly release seats outside the new grid first.");
   return config;
  });
-
- notice("Layout and settings saved.");
+ notice("Layout saved. Auto-accept stays ON; seat expiry stays OFF.");
  void pollRoom();
 });
-
 $("networkBtn").onclick=action(async()=>{
  needController();
- const config={
-  transport:$("transport").value,
-  tlsHost:$("tlsHost").value.trim()
- };
-
+ const config={transport:$("transport").value,tlsHost:$("tlsHost").value.trim()};
  checkSettings({...meta,...config});
-
- await editMeta(current=>({
-  ...config,streamRevision:(current.streamRevision||0)+1
- }));
-
+ await editMeta(m=>({...config,streamRevision:(m.streamRevision||0)+1}));
  notice("TURN settings saved. Streams reconnect.");
 });
-
 $("reconnectAllBtn").onclick=action(()=>
- editMeta(current=>({
-  streamRevision:(current.streamRevision||0)+1
- }))
-);
-
+ editMeta(m=>({streamRevision:(m.streamRevision||0)+1})));
 $("closeRoomBtn").onclick=action(async()=>{
  needController();
- if(confirm("Permanently close this room?"))
-  await editMeta(()=>({closed:true}));
+ if(confirm("Permanently close this room?"))await editMeta(()=>({closed:true}));
 });
-
 $("view").onchange=render;
-
 $("closeZoomBtn").onclick=()=>$("zoom").close();
 $("zoom").addEventListener("close",()=>{
- zoomSeat=null;
- bind($("zoomVideo"),null);
+ zoomSeat=null;bind($("zoomVideo"),null);
 });
-
 $("homeBtn").onclick=()=>{
- if(student&&!confirm("Stop capture and return home?"))return;
+ if(student&&!confirm("Stop capture and return home? Your seat stays reserved."))return;
  location.href=baseURL().href;
 };
-
 $("diagnoseBtn").onclick=action(async()=>{
  $("diagnostics").textContent=await report();
 });
-
 $("downloadBtn").onclick=action(async()=>{
  const text=await report()+"\n\nEVENT LOG\n"+logs.join("\n");
- const url=URL.createObjectURL(new Blob(
-  ["\uFEFF",text],{type:"text/plain;charset=utf-8"}
- ));
-
- const anchor=document.createElement("a");
- anchor.href=url;
- anchor.download="classroom-noauth-v16-diagnostics.txt";
- anchor.click();
-
+ const url=URL.createObjectURL(new Blob(["\uFEFF",text],{
+  type:"text/plain;charset=utf-8"
+ }));
+ const a=document.createElement("a");
+ a.href=url;a.download="classroom-permanent-auto-v17-diagnostics.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 
-/* Connection: endpoint only; authentication is always NONE. */
-$("dbEndpoint").value=endpoint;
-$("endpointText").textContent=endpoint;
-
+$("dbEndpoint").value=endpoint;$("endpointText").textContent=endpoint;
 $("saveConnectionBtn").onclick=action(()=>{
  const next=normalizeEndpoint($("dbEndpoint").value.trim());
-
- if(student&&!confirm(
-  "Changing endpoint reloads this page and stops capture. Continue?"
- ))return;
-
+ if(student&&!confirm("Reload and stop capture to change endpoint?"))return;
  save("classroom-noauth-v16-endpoint",next);
  location.href=baseURL().href;
 });
-
 $("resetConnectionBtn").onclick=()=>{
  $("dbEndpoint").value=DEFAULT_ENDPOINT;
- notice("Default endpoint restored in the field. Click Save endpoint and reload.");
+ notice("Default endpoint restored in the field. Save and reload to apply.");
 };
-
 $("testConnectionBtn").onclick=action(async()=>{
- if(!ready)throw Error("Save a valid HTTPS endpoint and reload first.");
-
- const entered=normalizeEndpoint($("dbEndpoint").value.trim());
- if(entered!==endpoint)
+ if(!ready)throw Error("Save a valid endpoint and reload first.");
+ if(normalizeEndpoint($("dbEndpoint").value.trim())!==endpoint)
   throw Error("Save the changed endpoint and reload before testing.");
-
  const path=room?roomPath("owner"):
   `rooms/connection-test-${uuid()}/owner`;
-
- const result=await getDB(path);
-
+ const value=await getDB(path);
  $("diagnostics").textContent=[
   "REST GET succeeded.",
   "Endpoint: "+endpoint,
   "Client authentication: NONE",
-  "No Authorization header, auth query, or cookies sent.",
-  "Result: "+JSON.stringify(result),
-  "",
-  "This tests GET only.",
-  "Create/open a room to test writes and application behavior."
+  "No Authorization, auth query, or cookies sent.",
+  "Result: "+JSON.stringify(value),
+  "This tests GET only. Create/open a room to test writes."
  ].join("\n");
-
- notice(
-  "REST GET succeeded with no client authentication. "+
-  "Write support must still be tested by creating a room."
- );
+ notice("REST GET succeeded without client authentication.");
 });
 
-/* Unload writes are unreliable: reservations expire using presence instead. */
 window.addEventListener("pagehide",()=>{
  if(student){
-  student.active=false;
-  clearTimeout(student.timer);
-  student.raw?.getTracks().forEach(track=>track.stop());
-  student.output?.getTracks().forEach(track=>track.stop());
-
-  for(const peer of student.links.values())destroyPeer(peer);
+  student.active=false;clearTimeout(student.timer);
+  student.raw?.getTracks().forEach(t=>t.stop());
+  student.output?.getTracks().forEach(t=>t.stop());
+  for(const p of student.links.values())destroyPeer(p);
  }
-
- for(const peer of viewers.values())destroyPeer(peer);
+ for(const p of viewers.values())destroyPeer(p);
+ // Never delete or expire a seat on unload.
 });
-
-window.addEventListener("pageshow",event=>{
- if(event.persisted)location.reload();
+window.addEventListener("pageshow",e=>{
+ if(e.persisted)location.reload();
 });
 
 setInterval(maintenance,2000);
@@ -3095,43 +2004,28 @@ setInterval(()=>void statsWorker(),3500);
 
 async function boot(){
  endpoint=normalizeEndpoint(endpoint);
-
- $("dbEndpoint").value=endpoint;
- $("endpointText").textContent=endpoint;
-
+ $("dbEndpoint").value=endpoint;$("endpointText").textContent=endpoint;
  ready=true;
- $("createBtn").disabled=false;
- $("openBtn").disabled=false;
+ $("createBtn").disabled=false;$("openBtn").disabled=false;
  $("lastBtn").disabled=!load("classroom-rest-last-room");
-
- log(`Loaded ${APP}`);
- log(`REST endpoint: ${endpoint}`);
- log("Database authentication: NONE; cookies omitted.");
-
+ log(`Loaded ${APP}; REST endpoint ${endpoint}`);
+ log("Database auth: NONE. Permanent auto-accept ON. Seat expiry OFF.");
  $("backendBadge").textContent="No-auth connection ready";
-
- if(["fit","large"].includes(params.get("view")))
-  $("view").value=params.get("view");
-
+ if(["fit","large"].includes(params.get("view")))$("view").value=params.get("view");
  const id=params.get("room");
-
  if(id){
-  $("roomInput").value=id;
-  await openRoom(id);
+  $("roomInput").value=id;await openRoom(id);
  }else if(params.get("create")==="1"){
   await createRoom();
  }else{
   notice(
-   "No client authentication is enabled by default. "+
-   "Create a classroom or open a v15/v16 REST room link."
+   "Permanent auto-accept enabled. No seat timeout. "+
+   "Create a classroom or open an existing REST room."
   );
  }
 }
-
 boot().catch(error=>{
- $("backendBadge").textContent="Setup error";
- fail(error);
- openMenu("connection");
+ $("backendBadge").textContent="Setup error";fail(error);openMenu("connection");
 });
 </script>
 </body>
