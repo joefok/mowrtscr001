@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>Tap Timestamp</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding:
+        max(24px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(24px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+      display: grid;
+      place-items: center;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      text-align: center;
+      color: #172033;
+      background: #f5f7fb;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    main {
+      width: min(100%, 480px);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.4rem, 6vw, 2rem);
+    }
+
+    p {
+      margin: 0 0 28px;
+      color: #526078;
+      font-size: 1rem;
+    }
+
+    #tapButton {
+      width: 100%;
+      min-height: 64px;
+      padding: 16px 24px;
+      border: 0;
+      border-radius: 16px;
+      color: #fff;
+      background: #0666cc;
+      font: inherit;
+      font-size: 1.1rem;
+      font-weight: 700;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    #tapButton:active {
+      background: #004f9f;
+      transform: scale(0.98);
+    }
+
+    #time {
+      margin-top: 32px;
+      color: #0666cc;
+      font-size: clamp(2rem, 10vw, 3rem);
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    #coordinates {
+      min-height: 1.5em;
+      margin-top: 12px;
+      color: #526078;
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Tap to Record Time</h1>
+    <p>Tap the button or anywhere on the page.</p>
+
+    <button id="tapButton" type="button">Tap anywhere</button>
+
+    <div id="time" aria-live="polite">Waiting…</div>
+    <div id="coordinates"></div>
+  </main>
+
+  <script>
+    const timeOutput = document.getElementById("time");
+    const coordinatesOutput = document.getElementById("coordinates");
+
+    function recordTap(event) {
+      const date = new Date();
+      const time = [
+        String(date.getHours()).padStart(2, "0"),
+        String(date.getMinutes()).padStart(2, "0"),
+        String(date.getSeconds()).padStart(2, "0")
+      ].join(":") + "." + String(date.getMilliseconds()).padStart(3, "0");
+
+      timeOutput.textContent = time;
+
+      // Use the changed touch point on touchscreens, or the pointer position.
+      const point = event.changedTouches
+        ? event.changedTouches[0]
+        : event;
+
+      coordinatesOutput.textContent =
+        `Screen position: X=${Math.round(point.clientX)}, Y=${Math.round(point.clientY)}`;
+    }
+
+    document.addEventListener("pointerdown", recordTap);
+  </script>
+</body>
+</html>
