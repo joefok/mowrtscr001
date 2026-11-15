@@ -109,7 +109,7 @@ dialog::backdrop{background:#000b}
 <header>
  <div class="row">
   <b id="heading">Classroom Screens</b>
-  <span class="badge">Fast Help v29</span>
+  <span class="badge">Hierarchy Guard v30</span>
   <span id="dbBadge" class="badge">Ready</span>
   <span id="roleBadge" class="badge" hidden></span>
  </div>
@@ -126,12 +126,8 @@ dialog::backdrop{background:#000b}
   <h3>Create room</h3>
   <div class="row">
    <input id="newName" class="grow" placeholder="Room name" maxlength="60">
-   <label>Rows
-    <input id="newRows" type="number" value="5" min="1" max="64">
-   </label>
-   <label>Columns
-    <input id="newCols" type="number" value="8" min="1" max="64">
-   </label>
+   <label>Rows <input id="newRows" type="number" value="5" min="1" max="64"></label>
+   <label>Columns <input id="newCols" type="number" value="8" min="1" max="64"></label>
    <button id="createBtn" class="primary">Create</button>
   </div>
 
@@ -143,8 +139,8 @@ dialog::backdrop{background:#000b}
   </div>
 
   <p class="muted">
-   No teacher controller is required for seat leases.
-   Keep external database IP restrictions enabled.
+   Existing v28/v29 room paths are retained.
+   No browser operation deletes the room, keys, d, meta, or sg28.
   </p>
  </section>
 
@@ -155,12 +151,13 @@ dialog::backdrop{background:#000b}
    <button id="shareBtn" class="primary">Start sharing</button>
    <button id="retryBtn">Reconnect without recapture</button>
    <button id="helpBtn" class="helpButton">Request help</button>
-   <button id="stopBtn">Stop & release</button>
+   <button id="stopBtn">Stop sharing</button>
   </div>
   <p id="helpStatus" class="muted"></p>
   <p class="muted">
    Keep this page open and prevent sleep.
-   Refreshing or restarting requires screen-capture approval again.
+   After refresh or browser restart, approve capture again.
+   When sharing stops, the seat expires automatically.
   </p>
   <details>
    <summary>Connection progress</summary>
@@ -191,14 +188,13 @@ dialog::backdrop{background:#000b}
   <button id="closeAdminBtn">Close</button>
  </div>
 
- <h3>Connection</h3>
+ <h3>Hierarchy protection</h3>
  <pre id="connectionInfo"></pre>
- <p class="muted">
-   Help uses the existing DataChannel for immediate delivery.
-   The existing database help path is also polled by staff every second
-   as a fallback. This adds approximately one small help-path GET per
-   second per open staff tab.
- </p>
+ <p class="warning">
+   This page never deletes keys, d, meta, sg28, or signaling leaves.
+   Old signaling records can accumulate and should be monitored.
+   Database administrators and backend faults remain outside browser control.
+  </p>
 
  <div id="roomLinks" hidden>
   <h3>Invitations</h3>
@@ -208,15 +204,9 @@ dialog::backdrop{background:#000b}
    <button id="copyTeacherBtn">Copy teacher link</button>
   </div>
   <div class="row" style="margin-top:10px">
-   <label>Fixed seat
-    <input id="linkSeat" type="number" min="1" max="64" value="1">
-   </label>
+   <label>Fixed seat <input id="linkSeat" type="number" min="1" max="64" value="1"></label>
    <button id="copySeatBtn">Copy fixed-seat link</button>
   </div>
-  <p class="muted">
-   Use the automatic-seat link for multiple students.
-   A fixed-seat link waits for its designated seat.
-  </p>
  </div>
 
  <div id="config" hidden>
@@ -240,9 +230,7 @@ dialog::backdrop{background:#000b}
      <option value="320">320 × 180</option>
     </select>
    </label>
-   <label>FPS
-    <select id="cfgFPS"><option>1</option><option>2</option></select>
-   </label>
+   <label>FPS <select id="cfgFPS"><option>1</option><option>2</option></select></label>
    <label>Seat expiry
     <input id="cfgTTL" type="number" min="60" max="3600"> seconds
    </label>
@@ -258,8 +246,7 @@ dialog::backdrop{background:#000b}
    </label>
   </div>
   <p class="muted">
-   TURN host and port are fixed in this file:
-   <strong>61.238.240.78:3478</strong>.
+   TURN endpoint: <strong>61.238.240.78:3478</strong>.
   </p>
   <div class="row">
    <button id="saveBtn" class="primary">Save settings</button>
@@ -270,8 +257,7 @@ dialog::backdrop{background:#000b}
 
  <h3>Diagnostics</h3>
  <div class="row">
-  <button id="testDBBtn">Test database GET</button>
-  <button id="testSignalsBtn">Test signaling writes</button>
+  <button id="testDBBtn">Test metadata GET</button>
   <button id="testTURNBtn">Test TURN relay echo</button>
   <button id="reportBtn">Collect report</button>
   <button id="downloadBtn">Download report</button>
@@ -284,24 +270,26 @@ dialog::backdrop{background:#000b}
   <pre id="log"></pre>
  </details>
 
+ <p class="muted">
+   Help uses the existing DataChannel immediately and the existing help
+   database path as a one-second staff fallback.
+   Seat operations are read/write/read checks, not atomic transactions.
+  </p>
  <p class="warning">
-   Database authentication is not used. Keep external IP restrictions enabled.
-   Allowed clients can read and modify room data. Compatibility-mode seat
-   claims are not atomic.
+   No database authentication is used. Keep your external IP restrictions.
+   Staff keys are workflow checks, not secure database authorization.
   </p>
 </aside>
 
 <dialog id="zoom">
  <div class="row" style="justify-content:space-between">
-  <b id="zoomTitle"></b>
-  <button id="closeZoomBtn">Close</button>
+  <b id="zoomTitle"></b><button id="closeZoomBtn">Close</button>
  </div>
  <video id="zoomVideo" autoplay muted playsinline></video>
  <p id="zoomStatus" class="muted"></p>
  <div class="row">
   <button id="ackHelpBtn" class="helpButton">I am helping</button>
   <button id="resolveHelpBtn">Help resolved</button>
-  <button id="releaseSeatBtn">Release & automatic rejoin</button>
  </div>
 </dialog>
 
@@ -309,10 +297,10 @@ dialog::backdrop{background:#000b}
 "use strict";
 
 /*
- FAST HELP / NEW TURN — V29
+ HIERARCHY GUARD V30
 
- Database design remains the same as low-data v28:
- rooms/R/keys
+ Database schema remains v28/v29:
+ rooms/R/keys {t,a}
  rooms/R/d/meta
  rooms/R/d/seats/N
  rooms/R/d/viewers/V
@@ -322,29 +310,24 @@ dialog::backdrop{background:#000b}
  rooms/R/sg28/offers/V/U/OFFER_ID
  rooms/R/sg28/answers/U/OFFER_ID
 
- Signal app tag remains classroom-low-data-v28 so the existing record
- format remains compatible.
-
- Faster help:
- - Immediate message over each connected DataChannel.
- - Existing help record is still written to d/help/U.
- - Staff poll d/help every 1 second as a database fallback.
- - Immediate local overlay prevents a stale poll from hiding a new request.
- - Help acknowledgement/resolution is sent over DataChannel and persisted
-   using fields compatible with the existing help record.
-
- No database authentication. Compatibility seat writes are not atomic.
- TURN is fixed to 61.238.240.78:3478.
+ IMPORTANT:
+ - This page contains no DELETE request.
+ - No PUT null is sent.
+ - Existing room, keys, d, meta and sg28 are never replaced as a whole.
+ - Room creation writes one new UUID room only.
+ - Signaling records are retained to avoid deleting the final sg28 child.
+ - Seat expiry is logical; stopped/offline sessions stop renewing.
+ - Room reset changes meta.g, not d/seats deletion.
+ - Ordinary seat writes are best-effort and NOT atomic.
+ - Do not run older cleanup clients against a protected production room.
 */
 
-const UI_VERSION="classroom-fast-help-v29";
+const UI_VERSION="classroom-hierarchy-guard-v30";
 const SIGNAL_APP="classroom-low-data-v28";
 const DB="https://default--default.ubcoturneastasia.duckdns.org";
 const TURN={
- host:"61.238.240.78",
- port:3478,
- username:"testuser",
- password:"testpass"
+ host:"61.238.240.78",port:3478,
+ username:"testuser",password:"testpass"
 };
 const Q=new URLSearchParams(location.search);
 const H=new URLSearchParams(location.hash.slice(1));
@@ -353,27 +336,15 @@ const CORNERS=["bottom-right","bottom-left","top-right","top-left"];
 const $=id=>document.getElementById(id);
 const uuid=()=>crypto.randomUUID();
 const now=()=>Date.now();
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const jitter=(base,spread)=>base+Math.floor(Math.random()*spread);
 
-function load(k,d=""){
- try{return localStorage.getItem(k)??d;}catch{return d;}
-}
-function save(k,v){
- try{localStorage.setItem(k,String(v));}catch{}
-}
-function sess(k,d=""){
- try{return sessionStorage.getItem(k)??d;}catch{return d;}
-}
-function setSess(k,v){
- try{sessionStorage.setItem(k,String(v));}catch{}
-}
-function validID(v){
- return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);
-}
-function isRecord(v){
- return v!==null&&typeof v==="object"&&!Array.isArray(v);
-}
+function load(k,d=""){try{return localStorage.getItem(k)??d;}catch{return d;}}
+function save(k,v){try{localStorage.setItem(k,String(v));}catch{}}
+function sess(k,d=""){try{return sessionStorage.getItem(k)??d;}catch{return d;}}
+function setSess(k,v){try{sessionStorage.setItem(k,String(v));}catch{}}
+function validID(v){return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);}
+function isRecord(v){return v!==null&&typeof v==="object"&&!Array.isArray(v);}
 function records(v){
  if(!v||typeof v!=="object")return {};
  return Object.fromEntries(Object.entries(v).filter(([,x])=>isRecord(x)));
@@ -384,47 +355,31 @@ let room="",wantedRoom=Q.get("room")||"";
 let role="student",staff=false,teacherKey="",assistantKey="";
 let viewerID="",viewerLabel="",meta=null,source=null;
 let seats={},viewerMap={},helpMap={},ownHelp=null,ownHold=null,indexMap={};
-
 let offset=0,clockKnown=false,bestRTT=Infinity;
 const T=()=>now()+offset;
 
 let creating=false,opening=false,lastOpen=0;
-let metaBusy=false,nextMeta=0;
-let seatsBusy=false,nextSeats=0;
-let viewersBusy=false,nextViewers=0;
-let ownBusy=false,nextOwn=0;
-let leaseBusy=false,nextLease=0;
-let viewerBusy=false,nextViewerWrite=0;
-let indexBusy=false,nextIndex=0;
-let answerPollBusy=false,nextAnswers=0;
-let helpPollBusy=false,nextHelpPoll=0;
-let statsBusy=false,testBusy=false,turnBusy=false;
+let metaBusy=false,nextMeta=0,seatsBusy=false,nextSeats=0;
+let viewersBusy=false,nextViewers=0,ownBusy=false,nextOwn=0;
+let leaseBusy=false,nextLease=0,viewerBusy=false,nextViewerWrite=0;
+let indexBusy=false,nextIndex=0,answerPollBusy=false,nextAnswers=0;
+let helpPollBusy=false,nextHelpPoll=0,statsBusy=false,turnBusy=false;
 let zoomSeat=null,pauseUntil=0,lastNetwork=0;
 let idle="Ready to share.",lastError="",dbErrors=0;
 let requestCount=0,responseBytes=0;
 let helpWriteQueue=Promise.resolve();
+let nextBeat=0,nextHelpResend=0;
 
-const receivers=new Map();
-const answering=new Set();
-const offerFetch=new Set();
-const offerRetry=new Map();
-const tiles=new Map();
-const logs=[];
-
-/*
- Immediate help overlay:
- id -> { record, expires }
- A brief overlay avoids a stale GET response hiding a DataChannel event.
- This does not add database fields or paths.
-*/
+const receivers=new Map(),answering=new Set(),offerFetch=new Set();
+const offerRetry=new Map(),tiles=new Map(),logs=[];
 const fastHelp=new Map();
 
 const rp=p=>`rooms/${room}/${p}`;
 const dp=p=>rp("d/"+p);
 const sp=n=>dp("seats/"+n);
-const indexPath=(viewer,student)=>rp(`sg28/index/${viewer}/${student}`);
-const offerPath=(viewer,student,id)=>rp(`sg28/offers/${viewer}/${student}/${id}`);
-const answerPath=(student,id)=>rp(`sg28/answers/${student}/${id}`);
+const indexPath=(v,u)=>rp(`sg28/index/${v}/${u}`);
+const offerPath=(v,u,id)=>rp(`sg28/offers/${v}/${u}/${id}`);
+const answerPath=(u,id)=>rp(`sg28/answers/${u}/${id}`);
 
 function log(s){
  logs.push(`[${new Date().toISOString()}] ${s}`);
@@ -432,26 +387,19 @@ function log(s){
  $("log").textContent=logs.slice().reverse().join("\n");
 }
 function notice(s,bad=false){
- $("notice").textContent=s;
- $("notice").classList.toggle("error",bad);
+ $("notice").textContent=s;$("notice").classList.toggle("error",bad);
 }
 function fail(e){
  lastError=e?.message||String(e);
- log("ERROR: "+lastError);
- notice(lastError,true);
+ log("ERROR: "+lastError);notice(lastError,true);
 }
-const act=fn=>(...args)=>
- Promise.resolve().then(()=>fn(...args)).catch(fail);
+const act=fn=>(...args)=>Promise.resolve().then(()=>fn(...args)).catch(fail);
 function launch(fn){
- Promise.resolve().then(fn).catch(e=>
-  log("Worker error: "+(e?.message||String(e)))
- );
+ Promise.resolve().then(fn).catch(e=>log("Worker: "+(e?.message||String(e))));
 }
-
 function updateTitle(){
  if(!meta||!room){
-  document.title=creating?
-   "Classroom Screens — Creating room":"Classroom Screens — Ready";
+  document.title=creating?"Classroom Screens — Creating room":"Classroom Screens — Ready";
   return;
  }
  let state=staff?(role==="teacher"?"Teacher":"Assistant"):"Student";
@@ -467,29 +415,27 @@ function updateTitle(){
 }
 
 /*
- responseBytes is decoded response body size, not measured transferred bytes.
- It excludes compression and HTTP/TLS overhead.
+ Only GET, PUT of non-null objects, and PATCH of non-null objects.
+ No DELETE or PUT null operation exists in this application.
 */
 async function req(method,path,value){
+ if(!["GET","PUT","PATCH"].includes(method))
+  throw Error("Protective client rejected unsupported write method.");
+ if(method!=="GET"&&!isRecord(value))
+  throw Error("Protective client rejected null/non-object write.");
+
  const safe=path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
- const abort=new AbortController();
- const timer=setTimeout(()=>abort.abort(),15000);
- const started=now();
- requestCount++;
+ const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),15000);
+ const started=now();requestCount++;
 
  try{
   const headers={Accept:"application/json"};
   if(value!==undefined)headers["Content-Type"]="application/json";
-
   const response=await fetch(DB+"/"+safe+".json",{
-   method,
-   headers,
+   method,headers,
    body:value===undefined?undefined:JSON.stringify(value),
-   credentials:"omit",
-   cache:"no-store",
-   redirect:"error",
-   referrerPolicy:"no-referrer",
-   signal:abort.signal
+   credentials:"omit",cache:"no-store",redirect:"error",
+   referrerPolicy:"no-referrer",signal:abort.signal
   });
 
   const ended=now(),date=response.headers.get("Date");
@@ -497,29 +443,22 @@ async function req(method,path,value){
    const parsed=Date.parse(date),rtt=ended-started;
    if(Number.isFinite(parsed)&&rtt<=bestRTT+300){
     offset=parsed+500-(started+ended)/2;
-    bestRTT=Math.min(bestRTT,rtt);
-    clockKnown=true;
+    bestRTT=Math.min(bestRTT,rtt);clockKnown=true;
    }
   }
 
   const text=await response.text();
   responseBytes+=new TextEncoder().encode(text).length;
   let result=null;
-
   if(text){
    try{result=JSON.parse(text);}
-   catch{
-    throw Error(`${method} ${path}: HTTP ${response.status}, non-JSON response.`);
-   }
+   catch{throw Error(`${method} ${path}: HTTP ${response.status}, non-JSON response.`);}
   }
-
-  if(!response.ok){
+  if(!response.ok)
    throw Error(`${method} ${path}: HTTP ${response.status}: ${
     typeof result?.error==="string"?result.error:"request rejected"
    }`);
-  }
-  if(typeof result?.error==="string")
-   throw Error(`${method} ${path}: ${result.error}`);
+  if(typeof result?.error==="string")throw Error(`${method} ${path}: ${result.error}`);
 
   $("dbBadge").textContent="DB online";
   return result;
@@ -534,7 +473,6 @@ async function req(method,path,value){
 const get=p=>req("GET",p);
 const put=(p,v)=>req("PUT",p,v);
 const patch=(p,v)=>req("PATCH",p,v);
-const del=p=>req("DELETE",p);
 
 function defaults(){
  return {
@@ -547,38 +485,24 @@ function validate(m){
  if(!Number.isInteger(m.rows)||!Number.isInteger(m.cols)||
   m.rows<1||m.cols<1||m.rows*m.cols>64)
   throw Error("Grid must contain 1–64 seats.");
-
- if(!CORNERS.includes(m.corner)||![160,256,320].includes(m.w)||
-  ![1,2].includes(m.fps))
+ if(!CORNERS.includes(m.corner)||![160,256,320].includes(m.w)||![1,2].includes(m.fps))
   throw Error("Invalid layout or preview.");
-
  if(!Number.isInteger(m.ttl)||m.ttl<60||m.ttl>3600)
   throw Error("Seat expiry must be 60–3600 seconds.");
-
  if(!["tcp","udp","both"].includes(m.tr))
-  throw Error("Use TCP, UDP, or both for the new TURN server.");
-
+  throw Error("TURN transport must be TCP, UDP, or both.");
  if(!Number.isInteger(m.maxViewers)||m.maxViewers<1||m.maxViewers>8)
   throw Error("Maximum viewers must be 1–8.");
-
  if(!Number.isInteger(m.g)||m.g<0)
   throw Error("Invalid room generation.");
-
  if(typeof m.name!=="string"||m.name.length>60)
   throw Error("Invalid room name.");
 }
 function normalize(v){
  if(!isRecord(v))throw Error("Room metadata missing.");
  const m={...defaults(),...v};
-
- /*
- Existing rooms may contain a legacy TLS transport or old port.
- The new server is used at 3478. Preserve the stored metadata without
- rewriting it simply because a participant opens the room.
- */
  if(!["tcp","udp","both"].includes(m.tr))m.tr="tcp";
- validate(m);
- return m;
+ validate(m);return m;
 }
 function live(v){
  if(!isRecord(v)||!meta)return false;
@@ -614,9 +538,8 @@ function base(){
 function roomLink(e,kind,seat){
  const u=base();
  u.searchParams.set("room",e.id);
- u.searchParams.set("build","29");
+ u.searchParams.set("build","30");
  u.searchParams.set("view",$("view").value||"fit");
-
  if(kind==="student"){
   u.searchParams.set("start","1");
   if(seat)u.searchParams.set("seat",seat);
@@ -649,7 +572,6 @@ function renderHome(){
  $("rooms").replaceChildren();
  const list=saved();
  if(!list.length)$("rooms").textContent="No saved staff rooms on this browser.";
-
  for(const e of list){
   if(!validID(e.id))continue;
   const row=document.createElement("div");row.className="roomRow";
@@ -672,20 +594,18 @@ function createSettings(){
   rows:Number(Q.get("rows")??$("newRows").value),
   cols:Number(Q.get("cols")??$("newCols").value),
   corner:Q.get("corner")||"bottom-right",
-  w:Number(Q.get("width")??256),
-  fps:Number(Q.get("fps")??1),
+  w:Number(Q.get("width")??256),fps:Number(Q.get("fps")??1),
   ttl:Number(Q.get("ttl")??120),
   tr:Q.get("transport")||"tcp",
   maxViewers:Number(Q.get("maxViewers")??4),
-  port:3478,
-  fallbackPorts:false
+  port:3478,fallbackPorts:false
  };
  validate(m);return m;
 }
 function createLink(){
  const m=meta||createSettings(),u=base();
  const values={
-  create:1,build:29,name:m.name,rows:m.rows,cols:m.cols,
+  create:1,build:30,name:m.name,rows:m.rows,cols:m.cols,
   corner:m.corner,width:m.w,fps:m.fps,ttl:m.ttl,
   turnPort:3478,transport:m.tr,maxViewers:m.maxViewers,
   view:$("view").value,label:"Teacher"
@@ -701,13 +621,16 @@ function fillSettings(){
  };
  for(const [id,key]of Object.entries(fields))$(id).value=meta[key];
 }
-
 async function createRoom(){
  if(creating||room)return;
  creating=true;$("createBtn").disabled=true;updateTitle();
  try{
   const id=uuid(),t=uuid()+uuid(),a=uuid()+uuid(),m=createSettings();
   notice("Creating "+m.name+"…");
+  /*
+   This is the only whole-room PUT. It targets a newly generated UUID.
+   Existing rooms are never written at the room root.
+  */
   await put("rooms/"+id,{keys:{t,a},d:{meta:m}});
   remember({id,name:m.name,t,a});
   location.replace(roomLink({id,t,a},"teacher"));
@@ -721,8 +644,7 @@ async function openRoom(){
  opening=true;lastOpen=now();
 
  try{
-  const id=wantedRoom;
-  const m=normalize(await get(`rooms/${id}/d/meta`));
+  const id=wantedRoom,m=normalize(await get(`rooms/${id}/d/meta`));
   const t=H.get("t")||"",a=H.get("a")||"";
   const kind=t?"teacher":a?"assistant":"student";
   let assistant=a;
@@ -730,10 +652,9 @@ async function openRoom(){
   if(kind!=="student"){
    const keys=obj(await get(`rooms/${id}/keys`));
    if((t||a)!==(kind==="teacher"?keys.t:keys.a))
-    throw Error("Invalid staff invitation or unreadable keys.");
+    throw Error("Invalid staff invitation or unreadable room keys.");
    if(kind==="teacher")assistant=keys.a||"";
   }
-
   if(kind==="student"&&Q.has("seat")){
    const n=Number(Q.get("seat"));
    if(!Number.isInteger(n)||n<1||n>m.rows*m.cols)
@@ -759,20 +680,15 @@ async function openRoom(){
   if(staff)fillSettings();
 
   updateTitle();
-
-  await Promise.all([
-   pollViewers(true),
-   staff?pollSeats(true):Promise.resolve()
-  ]);
+  await Promise.all([pollViewers(true),staff?pollSeats(true):Promise.resolve()]);
 
   if(staff){
    await renewViewer();
-   nextHelpPoll=0;
-   launch(pollHelp);
+   nextHelpPoll=0;launch(pollHelp);
   }
 
   notice(staff?
-   m.name+" is ready. Fast help is active.":
+   m.name+" is ready. Hierarchy-protection client active.":
    m.name+" is ready. Click Start sharing.");
 
   if(!staff&&Q.get("start")==="1")$("shareBtn").focus({preventScroll:true});
@@ -780,7 +696,6 @@ async function openRoom(){
  }finally{opening=false;}
 }
 
-/* Targeted database reads; database layout is unchanged. */
 async function pollMeta(force=false){
  if(!room||metaBusy||(!force&&now()<nextMeta))return;
  metaBusy=true;nextMeta=now()+jitter(45000,10000);
@@ -815,25 +730,15 @@ async function pollOwn(force=false){
  if(staff||!room||ownBusy||(!force&&now()<nextOwn))return;
  ownBusy=true;nextOwn=now()+jitter(18000,4000);
  try{
-  const [h,help]=await Promise.all([
-   get(dp("hold/"+SESSION)),
-   get(dp("help/"+SESSION))
+  const [holdRecord,help]=await Promise.all([
+   get(dp("hold/"+SESSION)),get(dp("help/"+SESSION))
   ]);
-  ownHold=h;
-
-  /*
-   Avoid replacing a newer local request with a stale database response.
-   Existing request ID is used; no schema changes.
-  */
+  ownHold=holdRecord;
   if(isRecord(help)){
    if(!ownHelp||help.id===ownHelp.id||Number(help.at)>Number(ownHelp.at||0))
     ownHelp=help;
-  }else if(!source?.helpAt){
-   ownHelp=null;
-  }
-
-  if(source?.helpAt&&ownHelp?.id===source.helpID&&
-   ownHelp.state==="resolved"){
+  }else if(!source?.helpAt)ownHelp=null;
+  if(source?.helpAt&&ownHelp?.id===source.helpID&&ownHelp.state==="resolved"){
    source.helpAt=0;source.helpID="";
    notice("Help resolved by "+(ownHelp.label||"staff")+".");
   }
@@ -845,8 +750,7 @@ async function renewViewer(){
  viewerBusy=true;nextViewerWrite=now()+jitter(18000,4000);
  try{
   const active=activeViewers().filter(([id])=>id!==viewerID);
-  if(active.length>=meta.maxViewers)
-   throw Error("Maximum active staff viewers reached.");
+  if(active.length>=meta.maxViewers)throw Error("Maximum active staff viewers reached.");
   const previous=obj(viewerMap[viewerID]);
   const value={
    role,label:viewerLabel,at:previous.at||T(),b:T(),
@@ -857,37 +761,20 @@ async function renewViewer(){
  }catch(e){log("Viewer registration: "+e.message);}
  finally{viewerBusy=false;}
 }
-
-/*
- Fast help database fallback: one GET per staff page per second.
- This uses the same existing d/help path and same record fields.
-*/
 async function pollHelp(){
  if(!staff||!room||helpPollBusy||now()<nextHelpPoll)return;
- helpPollBusy=true;
- nextHelpPoll=now()+1000;
-
- try{
-  helpMap=records(await get(dp("help")));
- }catch(e){
-  log("Help polling: "+e.message);
- }finally{
-  helpPollBusy=false;
- }
+ helpPollBusy=true;nextHelpPoll=now()+1000;
+ try{helpMap=records(await get(dp("help")));}
+ catch(e){log("Help polling: "+e.message);}
+ finally{helpPollBusy=false;}
 }
 
-/* Compatibility-mode seat leases: not atomic. */
+/*
+ No seat deletion is performed. Stop/release causes the lease to expire.
+ This avoids a stale read-check-delete deleting another student's lease.
+*/
 function dropLease(s){
  closeLinks(s);s.seat=0;s.leaseID="";s.g=meta?.g||0;nextLease=0;
-}
-async function releaseExact(n,v){
- if(!n||!v)return false;
- const current=await get(sp(n));
- if(!isRecord(current)||current.u!==v.u||current.c!==v.c||
-  current.l!==v.l)return false;
- await put(sp(n),null);
- delete seats[n];log("RELEASED — seat "+n);
- return true;
 }
 function adopt(s,n,v){
  s.seat=n;s.leaseID=v.l;s.g=Number(v.g)||0;s.pending=null;
@@ -899,7 +786,6 @@ async function leaseLoop(){
  const s=source;
  if(!captureLive(s)||leaseBusy||now()<nextLease)return;
  leaseBusy=true;
-
  try{
   if(s.pending){
    const pending=s.pending,current=await get(sp(pending.seat));
@@ -908,16 +794,12 @@ async function leaseLoop(){
     adopt(s,pending.seat,current);
    else s.pending=null;
   }
-
   if(!captureLive(s))return;
-  const until=Math.max(pauseUntil,holdUntil());
 
+  const until=Math.max(pauseUntil,holdUntil());
   if(T()<until){
-   if(s.seat){
-    const n=s.seat,v={u:SESSION,c:s.cid,l:s.leaseID};
-    dropLease(s);await releaseExact(n,v);
-   }
-   s.phase=`Rejoining in ${Math.ceil((until-T())/1000)}s`;
+   if(s.seat)dropLease(s);
+   s.phase=`Waiting for seat release (${Math.ceil((until-T())/1000)}s)`;
    nextLease=now()+4000;return;
   }
 
@@ -928,19 +810,19 @@ async function leaseLoop(){
    if(!captureLive(s))return;
    if(!owned(current,s)){dropLease(s);return;}
 
+   /*
+    Read/write/read is best-effort, not atomic.
+    No metadata, room, key or signaling ancestor is modified here.
+   */
    const updated={...current,b:T(),g:meta.g};
    await put(sp(n),updated);
    const verified=await get(sp(n));
-
-   if(!captureLive(s)){await releaseExact(n,updated);return;}
+   if(!captureLive(s))return;
    if(!owned(verified,s)){dropLease(s);return;}
-
-   seats[n]=verified;nextLease=now()+jitter(16000,4000);
-   return;
+   seats[n]=verified;nextLease=now()+jitter(16000,4000);return;
   }
 
   await pollSeats(true);
-
   const cap=meta.rows*meta.cols,pin=pinned();
   const preferred=Number(sess("cr-v28-seat-"+room))||0;
   let choices=[];
@@ -964,15 +846,11 @@ async function leaseLoop(){
 
    const value={u:SESSION,c:s.cid,l:uuid(),g:meta.g,b:T(),at:T()};
    s.pending={seat:n,value};
-
    await put(sp(n),value);
    await sleep(250+Math.random()*250);
    const verified=await get(sp(n));
 
-   if(!captureLive(s)){
-    await releaseExact(n,value);s.pending=null;return;
-   }
-
+   if(!captureLive(s))return;
    if(isRecord(verified)&&verified.u===SESSION&&
     verified.c===s.cid&&verified.l===value.l){
     adopt(s,n,verified);return;
@@ -991,19 +869,14 @@ async function leaseLoop(){
  }finally{leaseBusy=false;}
 }
 
-/* TURN host and port are deliberately fixed to the new server. */
 function rtcConfig(){
- const transport=meta?.tr||"tcp";
- const urls=[];
+ const transport=meta?.tr||"tcp",urls=[];
  if(["udp","both"].includes(transport))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=udp`);
  if(["tcp","both"].includes(transport))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=tcp`);
-
  return {
-  iceServers:[{
-   urls,username:TURN.username,credential:TURN.password
-  }],
+  iceServers:[{urls,username:TURN.username,credential:TURN.password}],
   iceTransportPolicy:"relay",
   bundlePolicy:"max-bundle",
   rtcpMuxPolicy:"require",
@@ -1011,12 +884,9 @@ function rtcConfig(){
  };
 }
 function checkSDP(type,sdp){
- if(!["offer","answer"].includes(type)||typeof sdp!=="string"||
-  sdp.length>100000)throw Error("Invalid or oversized SDP.");
-
- const candidates=sdp.split(/\r?\n/)
-  .filter(l=>l.startsWith("a=candidate:"));
-
+ if(!["offer","answer"].includes(type)||typeof sdp!=="string"||sdp.length>100000)
+  throw Error("Invalid or oversized SDP.");
+ const candidates=sdp.split(/\r?\n/).filter(l=>l.startsWith("a=candidate:"));
  if(!candidates.some(l=>/\styp relay(?:\s|$)/.test(l)))
   throw Error("No TURN relay candidate from 61.238.240.78:3478.");
  if(candidates.some(l=>!/\styp relay(?:\s|$)/.test(l)))
@@ -1029,10 +899,9 @@ function makePeer(name,receiver=false){
   dc:null,track:null,sender:null,stream:null,id:"",
   phase:"Preparing",error:"",answered:false,applying:false,
   lastBeat:0,remote:null,frames:0,bytes:0,lastFrame:0,stats:"",
-  nextAnswer:0,cleaned:false,helpAck:false
+  nextAnswer:0,helpAck:false
  };
- pc.onicecandidateerror=e=>
-  log(name+`: ICE ${e.errorCode} ${e.errorText||""}`);
+ pc.onicecandidateerror=e=>log(name+`: ICE ${e.errorCode} ${e.errorText||""}`);
  pc.onconnectionstatechange=()=>{
   const state=pc.connectionState;
   if(state==="connected"){p.connectedAt=now();p.badSince=0;}
@@ -1058,16 +927,13 @@ async function gather(p,type){
  p.phase="Gathering TURN";
  await p.pc.setLocalDescription(description);
  const deadline=now()+60000;
-
  while(p.pc.iceGatheringState!=="complete"){
   if(!p.active)throw Error("Connection superseded.");
   if(now()>deadline)throw Error("TURN gathering timed out.");
   await sleep(100);
  }
-
  const sdp=p.pc.localDescription.sdp;
- checkSDP(type,sdp);
- return sdp;
+ checkSDP(type,sdp);return sdp;
 }
 async function remote(p,type,sdp){
  checkSDP(type,sdp);
@@ -1080,11 +946,6 @@ function send(p,d){
  }
  return false;
 }
-
-/*
- Help overlay is local only. It does not create a new database schema.
- Records expire from the overlay; the normal database helpMap remains.
-*/
 function setFastHelp(id,record){
  fastHelp.set(id,{record,expires:now()+15000});
  render();
@@ -1101,137 +962,91 @@ function helpActive(h){
 }
 function helpText(h){
  if(!helpActive(h))return "";
- return h.state==="helping"?
-  `${h.label||"Staff"} is helping`:"Help requested";
+ return h.state==="helping"?`${h.label||"Staff"} is helping`:"Help requested";
 }
 function currentHelpRecord(){
  const s=source;
  if(!s?.helpAt||!s.helpID)return null;
- return {
-  id:s.helpID,g:meta.g,seat:s.seat,at:s.helpAt,state:"requested"
- };
+ return {id:s.helpID,g:meta.g,seat:s.seat,at:s.helpAt,state:"requested"};
 }
 function sendHelpToPeer(p){
  const record=currentHelpRecord();
- if(!record)return;
- send(p,{type:"help-request",record});
+ if(record)send(p,{type:"help-request",record});
 }
 function broadcastHelp(record){
  if(!source)return;
- for(const p of source.links.values())
-  send(p,{type:"help-request",record});
+ for(const p of source.links.values())send(p,{type:"help-request",record});
 }
 function broadcastCancel(id){
  if(!source||!id)return;
- for(const p of source.links.values())
-  send(p,{type:"help-cancel",id,g:meta.g});
+ for(const p of source.links.values())send(p,{type:"help-cancel",id,g:meta.g});
 }
 function sendPeerHelpState(id,type,record){
  const p=receivers.get(id);
  if(p)send(p,{type,id:record.id,label:viewerLabel,g:meta.g});
 }
-
 function attach(p,dc){
  p.dc=dc;
-
  dc.onopen=()=>{
   p.lastBeat=now();
-
   if(!p.receiver){
-   if(p.answered){
-    send(p,{type:"answer-applied",id:p.id});
-    launch(()=>cleanupSignal(p));
-   }
+   if(p.answered)send(p,{type:"answer-applied",id:p.id});
    sendHelpToPeer(p);
   }
  };
-
  dc.onmessage=e=>{
   if(typeof e.data!=="string"||e.data.length>10000)return;
-
   try{
    const d=JSON.parse(e.data);
-
    if(d.type==="beat"){
-    p.lastBeat=now();p.remote=d;send(p,{type:"ack"});
-    return;
+    p.lastBeat=now();p.remote=d;send(p,{type:"ack"});return;
    }
-   if(d.type==="ack"){
-    p.lastBeat=now();return;
-   }
+   if(d.type==="ack"){p.lastBeat=now();return;}
    if(d.type==="answer-applied"&&p.receiver&&d.id===p.id){
     p.lastBeat=now();return;
    }
-
    if(p.receiver&&d.type==="help-request"){
-    const r=d.record;
-    const lease=seats[p.seat];
-
-    if(!isRecord(r)||!validID(r.id)||
-     Number(r.g)!==meta.g||
-     Number(r.seat)!==Number(p.seat)||
-     !Number.isFinite(Number(r.at))||
-     !live(lease)||lease.u!==p.person||
-     lease.l!==p.leaseID)return;
-
-    const record={
-     id:r.id,g:meta.g,seat:p.seat,
-     at:Number(r.at),state:"requested"
-    };
-
+    const r=d.record,lease=seats[p.seat];
+    if(!isRecord(r)||!validID(r.id)||Number(r.g)!==meta.g||
+     Number(r.seat)!==Number(p.seat)||!Number.isFinite(Number(r.at))||
+     !live(lease)||lease.u!==p.person||lease.l!==p.leaseID)return;
+    const record={id:r.id,g:meta.g,seat:p.seat,at:Number(r.at),state:"requested"};
     setFastHelp(p.person,record);
     send(p,{type:"help-received",id:record.id});
-    log("FAST HELP — seat "+p.seat);
-    return;
+    log("FAST HELP — seat "+p.seat);return;
    }
-
    if(p.receiver&&d.type==="help-cancel"){
     const current=effectiveHelp(p.person);
-    if(current?.id===d.id){
-     setFastHelp(p.person,{
-      ...current,state:"cancelled"
-     });
-    }
+    if(current?.id===d.id)setFastHelp(p.person,{...current,state:"cancelled"});
     return;
    }
-
    if(!p.receiver&&d.type==="help-received"){
     if(source?.helpID===d.id)p.helpAck=true;
     return;
    }
-
    if(!p.receiver&&d.type==="help-helping"){
     if(source?.helpID===d.id){
-     source.helpState={
-      id:d.id,state:"helping",label:String(d.label||"Staff").slice(0,40)
-     };
+     source.helpState={id:d.id,state:"helping",label:String(d.label||"Staff").slice(0,40)};
      render();
     }
     return;
    }
-
    if(!p.receiver&&d.type==="help-resolved"){
     if(source?.helpID===d.id){
-     source.helpState={
-      id:d.id,state:"resolved",label:String(d.label||"Staff").slice(0,40)
-     };
+     source.helpState={id:d.id,state:"resolved",label:String(d.label||"Staff").slice(0,40)};
      source.helpAt=0;source.helpID="";
-     notice("Help resolved by "+source.helpState.label+".");
-     render();
+     notice("Help resolved by "+source.helpState.label+".");render();
     }
    }
   }catch{}
  };
 }
-
 async function limitSender(p){
  if(!p.active||!p.sender)return;
  try{
   const parameters=p.sender.getParameters();
   if(!parameters.encodings?.length)parameters.encodings=[{}];
-  for(const e of parameters.encodings){
-   e.maxBitrate=150000;e.maxFramerate=meta.fps;
-  }
+  for(const e of parameters.encodings){e.maxBitrate=150000;e.maxFramerate=meta.fps;}
   parameters.degradationPreference="maintain-resolution";
   await p.sender.setParameters(parameters);
  }catch(e){log("Encoder target: "+e.message);}
@@ -1252,16 +1067,14 @@ function target(s,id){
 }
 function current(s,p){
  return captureLive(s)&&p.active&&s.links.get(p.viewer)===p&&s.seat>0&&
-  p.target===target(s,p.viewer)&&
-  T()>=Math.max(pauseUntil,holdUntil())&&
+  p.target===target(s,p.viewer)&&T()>=Math.max(pauseUntil,holdUntil())&&
   activeViewers().some(([id])=>id===p.viewer);
 }
 
-/* Existing sg28 offer/answer schema retained. */
+/* Signaling writes use existing v28/v29 paths; no signaling deletion. */
 async function buildOffer(s,id,v){
  s.building.add(id);s.retry.set(id,now()+8000);
  let p;
-
  try{
   p=makePeer(`Seat ${s.seat} → ${v.label||"Staff"}`);
   Object.assign(p,{
@@ -1269,7 +1082,6 @@ async function buildOffer(s,id,v){
    cid:s.cid,leaseID:s.leaseID,g:s.g
   });
   s.links.set(id,p);
-
   p.track=s.out.getVideoTracks()[0].clone();
   try{p.track.contentHint="detail";}catch{}
   p.sender=p.pc.addTransceiver(p.track,{
@@ -1283,8 +1095,7 @@ async function buildOffer(s,id,v){
 
   p.phase="Publishing offer";
   await put(offerPath(id,SESSION,p.id),{
-   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.leaseID,g:s.g,
-   sdp,b:T()
+   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.leaseID,g:s.g,sdp,b:T()
   });
   if(!current(s,p))return;
 
@@ -1296,7 +1107,6 @@ async function buildOffer(s,id,v){
   p.phase="Offer published — waiting for answer";
   p.published=true;p.nextAnswer=0;
   log("OFFER PUBLISHED — seat "+s.seat);
-
  }catch(e){
   if(p){p.error=e.message;closePeer(p);}
   s.retry.set(id,now()+8000);log("Offer: "+e.message);
@@ -1305,47 +1115,26 @@ async function buildOffer(s,id,v){
   if(p&&!current(s,p))closePeer(p);
  }
 }
-async function cleanupSignal(p){
- if(p.cleaned||!p.answered||p.dc?.readyState!=="open")return;
- p.cleaned=true;
- try{
-  await Promise.all([
-   del(offerPath(p.viewer,SESSION,p.id)),
-   del(answerPath(SESSION,p.id))
-  ]);
-  log("SIGNAL CLEANUP — "+p.id.slice(0,8));
- }catch(e){
-  p.cleaned=false;
-  log("Signal cleanup pending: "+e.message);
- }
-}
 function studentPeers(){
  const s=source;
  if(!captureLive(s)||!s.seat)return;
-
  const until=Math.max(pauseUntil,holdUntil());
  if(T()<until){
-  s.phase=`Rejoining in ${Math.ceil((until-T())/1000)}s`;
+  s.phase=`Waiting to rejoin (${Math.ceil((until-T())/1000)}s)`;
   nextLease=0;return;
  }
-
  const active=activeViewers(),ids=new Set(active.map(([id])=>id));
-
  for(const [id,p]of s.links){
   if(!ids.has(id)||p.target!==target(s,id)||badPeer(p)){
    closePeer(p);s.links.delete(id);
   }
  }
-
  for(const [id,v]of active){
   if(!s.links.has(id)&&!s.building.has(id)&&s.building.size<2&&
-   (s.retry.get(id)||0)<now())
-   launch(()=>buildOffer(s,id,v));
+   (s.retry.get(id)||0)<now())launch(()=>buildOffer(s,id,v));
  }
-
  const count=[...s.links.values()].filter(p=>
   p.active&&p.pc.connectionState==="connected").length;
-
  s.phase=active.length?
   `Seat ${s.seat}: ${count}/${active.length} viewers connected`:
   `Seat ${s.seat}: waiting for staff viewer`;
@@ -1353,12 +1142,10 @@ function studentPeers(){
 async function pollAnswers(){
  const s=source;
  if(!captureLive(s)||answerPollBusy||now()<nextAnswers)return;
-
  const waiting=[...s.links.values()].filter(p=>
   p.active&&p.published&&!p.answered&&!p.applying&&now()>=p.nextAnswer
  );
  if(!waiting.length)return;
-
  answerPollBusy=true;nextAnswers=now()+jitter(2500,1000);
  try{
   await Promise.all(waiting.map(async p=>{
@@ -1367,18 +1154,15 @@ async function pollAnswers(){
     const answer=await get(answerPath(SESSION,p.id));
     if(!isRecord(answer)||answer.id!==p.id||answer.viewer!==p.viewer||
      !current(s,p)||p.answered||p.applying)return;
-
     p.applying=true;p.phase="Applying answer";
     await remote(p,"answer",answer.sdp);
-
     if(current(s,p)){
      p.answered=true;p.phase="Answer applied — connecting";
      await limitSender(p);
      log("ANSWER APPLIED — seat "+s.seat);
-     if(p.dc?.readyState==="open")await cleanupSignal(p);
     }
    }catch(e){
-    p.error=e.message;log("Answer polling/apply: "+e.message);
+    p.error=e.message;log("Answer: "+e.message);
     if(p.pc.signalingState==="closed")closePeer(p);
    }finally{p.applying=false;}
   }));
@@ -1397,56 +1181,42 @@ async function pollIndex(force=false){
 function scanOffers(){
  if(!staff)return;
  const liveIDs=new Set();
-
  for(const [number,lease]of Object.entries(records(seats))){
   if(!live(lease))continue;
   liveIDs.add(lease.u);
-
   const idx=indexMap[lease.u],old=receivers.get(lease.u);
-  if(old&&(old.leaseID!==lease.l||badPeer(old)||
-   (idx&&old.id!==idx.id))){
+  if(old&&(old.leaseID!==lease.l||badPeer(old)||(idx&&old.id!==idx.id))){
    closePeer(old);receivers.delete(lease.u);
   }
-
   const existing=receivers.get(lease.u);
   if(existing?.active&&existing.id===idx?.id)continue;
-
   if(!isRecord(idx)||idx.app!==SIGNAL_APP||!validID(idx.id)||
    Number(idx.seat)!==Number(number)||idx.c!==lease.c||
    idx.l!==lease.l||Number(idx.g||0)!==meta.g)continue;
-
   if(answering.has(lease.u)||offerFetch.has(lease.u)||
    (offerRetry.get(lease.u)||0)>now()||answering.size>=8)continue;
-
   launch(()=>fetchAndAnswer(lease.u,idx));
  }
-
- for(const [id,p]of receivers){
+ for(const [id,p]of receivers)
   if(!liveIDs.has(id)){closePeer(p);receivers.delete(id);}
- }
 }
 async function fetchAndAnswer(id,idx){
  if(offerFetch.has(id)||answering.has(id))return;
  offerFetch.add(id);
-
  try{
   const offer=await get(offerPath(viewerID,id,idx.id));
   if(!isRecord(offer)||offer.id!==idx.id||offer.app!==SIGNAL_APP)
    throw Error("Offer missing or incompatible.");
-
   const lease=seats[offer.seat];
   if(!live(lease)||lease.u!==id||lease.l!==offer.l)return;
-
   await answerOffer(id,offer);
  }catch(e){
-  offerRetry.set(id,now()+8000);
-  log("Offer fetch: "+e.message);
+  offerRetry.set(id,now()+8000);log("Offer fetch: "+e.message);
  }finally{offerFetch.delete(id);}
 }
 async function answerOffer(id,offer){
  if(answering.has(id))return;
  answering.add(id);let p;
-
  try{
   checkSDP("offer",offer.sdp);
   p=makePeer("Receiving seat "+offer.seat,true);
@@ -1455,20 +1225,15 @@ async function answerOffer(id,offer){
    leaseID:offer.l,cid:offer.c
   });
   receivers.set(id,p);
-
   p.pc.ontrack=e=>{
-   if(p.active&&e.track.kind==="video")
-    p.stream=new MediaStream([e.track]);
+   if(p.active&&e.track.kind==="video")p.stream=new MediaStream([e.track]);
   };
   p.pc.ondatachannel=e=>attach(p,e.channel);
-
   await remote(p,"offer",offer.sdp);
   const sdp=await gather(p,"answer");
-
   const lease=seats[p.seat];
   if(!p.active||!live(lease)||lease.u!==id||lease.l!==p.leaseID)
    throw Error("Offer superseded.");
-
   p.phase="Publishing answer";
   await put(answerPath(id,p.id),{
    app:SIGNAL_APP,id:p.id,viewer:viewerID,sdp,b:T()
@@ -1476,7 +1241,6 @@ async function answerOffer(id,offer){
   p.answered=true;p.phase="Answer published — connecting";
   offerRetry.delete(id);
   log("ANSWER PUBLISHED — seat "+p.seat);
-
  }catch(e){
   offerRetry.set(id,now()+8000);
   if(p){
@@ -1493,16 +1257,13 @@ async function startSharing(){
  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
   notice("HTTPS and a supported desktop browser are required.",true);return;
  }
-
  const s={
   active:true,cid:uuid(),seat:0,leaseID:"",g:meta.g,pending:null,
   raw:null,video:null,canvas:null,out:null,timer:null,draws:0,
-  phase:"Requesting permission",
-  links:new Map(),building:new Set(),retry:new Map(),
+  phase:"Requesting permission",links:new Map(),building:new Set(),retry:new Map(),
   helpAt:0,helpID:"",helpState:null
  };
  source=s;let permission;
-
  try{
   permission=navigator.mediaDevices.getDisplayMedia({
    video:{frameRate:{ideal:2,max:5}},audio:false
@@ -1511,15 +1272,12 @@ async function startSharing(){
   source=null;idle="Capture was not approved.";
   notice(e.message,true);render();return;
  }
-
  try{
   s.raw=await permission;
   if(!s.active){s.raw.getTracks().forEach(t=>t.stop());return;}
-
   s.raw.getVideoTracks()[0].addEventListener("ended",()=>{
    if(source===s)launch(()=>stopSharing("Capture ended by the browser."));
   },{once:true});
-
   s.video=document.createElement("video");
   s.video.muted=true;s.video.autoplay=true;s.video.playsInline=true;
   s.video.srcObject=s.raw;await s.video.play();
@@ -1528,45 +1286,36 @@ async function startSharing(){
   s.canvas=document.createElement("canvas");
   const ctx=s.canvas.getContext("2d",{alpha:false});
   if(!ctx)throw Error("Canvas unavailable.");
-
   s.canvas.width=meta.w;s.canvas.height=Math.round(meta.w*9/16);
   s.out=s.canvas.captureStream(0);
   let output=s.out.getVideoTracks()[0];
-
   if(!output)throw Error("Canvas capture unavailable.");
   if(typeof output.requestFrame!=="function"){
    s.out.getTracks().forEach(t=>t.stop());
-   s.out=s.canvas.captureStream(2);
-   output=s.out.getVideoTracks()[0];
+   s.out=s.canvas.captureStream(2);output=s.out.getVideoTracks()[0];
   }
 
   const draw=()=>{
    if(!s.active)return;
    const w=meta.w,h=Math.round(w*9/16);
-   if(s.canvas.width!==w||s.canvas.height!==h){
-    s.canvas.width=w;s.canvas.height=h;
-   }
+   if(s.canvas.width!==w||s.canvas.height!==h){s.canvas.width=w;s.canvas.height=h;}
    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
    const vw=s.video.videoWidth,vh=s.video.videoHeight;
    if(vw&&vh&&s.video.readyState>=2){
     const k=Math.min(w/vw,h/vh),dw=vw*k,dh=vh*k;
-    ctx.drawImage(s.video,(w-dw)/2,(h-dh)/2,dw,dh);
-    s.draws++;
+    ctx.drawImage(s.video,(w-dw)/2,(h-dh)/2,dw,dh);s.draws++;
    }
    try{output.requestFrame?.();}catch{}
    s.timer=setTimeout(draw,1000/meta.fps);
   };
-  draw();
-
-  s.phase="Capture approved — claiming seat";
+  draw();s.phase="Capture approved — claiming seat";
   notice("Capture approved. Keep this page open.");
   nextLease=0;launch(leaseLoop);
  }catch(e){await stopSharing(e.message);}
  finally{render();}
 }
-async function stopSharing(reason="Sharing stopped."){
+async function stopSharing(reason="Sharing stopped. Seat will expire automatically."){
  const s=source;if(!s)return;
- const n=s.seat,v={u:SESSION,c:s.cid,l:s.leaseID},pending=s.pending;
  if(s.helpID)broadcastCancel(s.helpID);
 
  s.active=false;source=null;clearTimeout(s.timer);
@@ -1575,72 +1324,55 @@ async function stopSharing(reason="Sharing stopped."){
  if(s.video){s.video.pause();s.video.srcObject=null;}
  closeLinks(s);idle=reason;notice(reason);render();
 
- try{
-  await releaseExact(n,v);
-  if(pending)await releaseExact(pending.seat,pending.value);
-  await del(dp("help/"+SESSION));
- }catch(e){log("Release failed; lease expires automatically: "+e.message);}
+ /*
+  No seat/help/signaling deletion. Existing records expire or become inactive.
+  A cancelled help record is a non-null update to the same leaf.
+ */
+ if(s.helpID){
+  const cancelled={
+   id:s.helpID,g:s.g,seat:s.seat,at:s.helpAt,state:"cancelled"
+  };
+  try{await put(dp("help/"+SESSION),cancelled);}
+  catch(e){log("Help cancellation: "+e.message);}
+ }
 }
-
-/* Student help writes are serialized to keep request/cancel ordering. */
 function queueHelpWrite(fn){
  const job=helpWriteQueue.catch(()=>{}).then(fn);
- helpWriteQueue=job;
- return job;
+ helpWriteQueue=job;return job;
 }
 async function toggleHelp(){
  const s=source;if(!captureLive(s)||!s.seat)return;
 
  if(s.helpID){
-  const previous=s.helpID;
-  broadcastCancel(previous);
-  s.helpID="";s.helpAt=0;s.helpState=null;ownHelp=null;
-  render();
-
-  await queueHelpWrite(()=>del(dp("help/"+SESSION)));
+  const record={
+   id:s.helpID,g:meta.g,seat:s.seat,at:s.helpAt,state:"cancelled"
+  };
+  broadcastCancel(s.helpID);
+  s.helpID="";s.helpAt=0;s.helpState=null;ownHelp=record;render();
+  await queueHelpWrite(()=>put(dp("help/"+SESSION),record));
   return;
  }
 
- const record={
-  id:uuid(),g:meta.g,seat:s.seat,at:T(),state:"requested"
- };
- s.helpID=record.id;s.helpAt=record.at;s.helpState=null;
- ownHelp=record;
+ const record={id:uuid(),g:meta.g,seat:s.seat,at:T(),state:"requested"};
+ s.helpID=record.id;s.helpAt=record.at;s.helpState=null;ownHelp=record;
+ for(const p of s.links.values())p.helpAck=false;
 
- // Immediate delivery first; database write runs independently.
- broadcastHelp(record);
- render();
- notice("Help requested.");
+ broadcastHelp(record);render();notice("Help requested.");
 
- try{
-  await queueHelpWrite(()=>put(dp("help/"+SESSION),record));
- }catch(e){
-  log("Help database write failed: "+e.message);
-  notice(
-   "Help was sent to connected staff, but database persistence failed. "+
-   "Keep sharing and request assistance verbally if needed.",
-   true
-  );
+ try{await queueHelpWrite(()=>put(dp("help/"+SESSION),record));}
+ catch(e){
+  log("Help persistence: "+e.message);
+  notice("Help sent to connected staff, but database persistence failed.",true);
  }
 }
-
-/*
- Staff acknowledgement/resolution uses the existing help record fields.
- A DataChannel message is sent immediately, then the record is persisted.
-*/
 async function staffHelp(state){
  const n=zoomSeat,lease=seats[n];
  if(!staff||!live(lease))return;
  const current=effectiveHelp(lease.u);
  if(!helpActive(current))return;
 
- const updated={
-  ...current,
-  state,
-  label:viewerLabel
- };
+ const updated={...current,state,label:viewerLabel};
  if(state==="resolved")updated.resolvedAt=T();
-
  setFastHelp(lease.u,updated);
  sendPeerHelpState(
   lease.u,state==="resolved"?"help-resolved":"help-helping",updated
@@ -1648,37 +1380,15 @@ async function staffHelp(state){
 
  try{
   const stored=await get(dp("help/"+lease.u));
-
-  // Do not intentionally overwrite a different newer request.
   if(isRecord(stored)&&stored.id===current.id){
    await put(dp("help/"+lease.u),{
-    ...stored,
-    state,
-    label:viewerLabel,
+    ...stored,state,label:viewerLabel,
     ...(state==="resolved"?{resolvedAt:T()}:{})
    });
-  }else if(!stored&&state==="helping"){
-   /*
-    The student's immediate DataChannel request may arrive before its
-    database PUT. Do not invent a conflicting database record here.
-   */
-   log("Help acknowledgement sent immediately; student write still pending.");
+  }else{
+   log("Help response sent live; matching database record not yet available.");
   }
- }catch(e){
-  log("Help status persistence failed: "+e.message);
-  notice("Staff response sent on the live connection, but database update failed.",true);
- }
-}
-
-async function staffRelease(){
- const n=zoomSeat,lease=seats[n];
- if(!staff||!live(lease))return;
- await put(dp("hold/"+lease.u),{until:T()+20000,g:meta.g,at:T()});
- await releaseExact(n,lease);
- const p=receivers.get(lease.u);
- if(p){closePeer(p);receivers.delete(lease.u);}
- notice("Seat released. Approved capture can rejoin after 20 seconds.");
- nextSeats=0;launch(()=>pollSeats(true));
+ }catch(e){log("Help response persistence: "+e.message);}
 }
 
 function bind(video,stream){
@@ -1709,8 +1419,7 @@ function tileFor(n){
  const el=document.createElement("button");el.type="button";el.className="tile";
  const head=document.createElement("div");head.className="tileHead";
  const title=document.createElement("span");title.textContent="Seat "+n;
- const flag=document.createElement("span");flag.className="flag";
- head.append(title,flag);
+ const flag=document.createElement("span");flag.className="flag";head.append(title,flag);
  const picture=document.createElement("div");picture.className="picture";
  const video=document.createElement("video");
  video.autoplay=true;video.muted=true;video.playsInline=true;
@@ -1722,22 +1431,18 @@ function tileFor(n){
  tiles.set(n,tile);$("grid").append(el);return tile;
 }
 function render(){
- updateTitle();
- if(!room||!meta)return;
+ updateTitle();if(!room||!meta)return;
 
  if(!staff){
   const s=source;
   $("studentStatus").textContent=s?s.phase:idle;
-  $("shareBtn").disabled=!!s;
-  $("stopBtn").disabled=!s;
-  $("retryBtn").disabled=!s;
-  $("helpBtn").disabled=!captureLive(s)||!s.seat;
+  $("shareBtn").disabled=!!s;$("stopBtn").disabled=!s;
+  $("retryBtn").disabled=!s;$("helpBtn").disabled=!captureLive(s)||!s.seat;
   $("helpBtn").textContent=s?.helpID?"Cancel help":"Request help";
 
   if(s?.helpState?.state==="helping")
    $("helpStatus").textContent=s.helpState.label+" is helping you.";
-  else if(s?.helpID)
-   $("helpStatus").textContent="Help requested. Keep this page open.";
+  else if(s?.helpID)$("helpStatus").textContent="Help requested. Keep this page open.";
   else if(ownHelp?.state==="resolved")
    $("helpStatus").textContent="Help resolved by "+(ownHelp.label||"staff")+".";
   else $("helpStatus").textContent="";
@@ -1752,7 +1457,7 @@ function render(){
    ...[...s.links.values()].map(p=>
     `${p.name}\n  ${p.phase}\n  answer applied=${p.answered}\n`+
     `  ICE=${p.pc.iceConnectionState}; connection=${p.pc.connectionState}\n`+
-    `  help received acknowledgment=${p.helpAck}\n  ${p.error||""}`)
+    `  help acknowledgment=${p.helpAck}\n  ${p.error||""}`)
   ].join("\n\n"):idle;
   return;
  }
@@ -1762,12 +1467,10 @@ function render(){
   `repeat(${meta.cols},${large?"minmax(220px,1fr)":"minmax(0,1fr)"})`;
  $("grid").style.minWidth=large?meta.cols*228+"px":"0";
  $("cornerBadge").textContent="Seat 1: "+meta.corner.replace("-"," ");
-
  for(const [n,t]of tiles)
   if(n>cap){bind(t.video,null);t.el.remove();tiles.delete(n);}
 
  let occupied=0,liveCount=0,helps=0;
-
  for(let n=1;n<=cap;n++){
   const tile=tileFor(n),lease=seats[n],fresh=live(lease);
   const row=Math.floor((n-1)/meta.cols),col=(n-1)%meta.cols;
@@ -1791,13 +1494,11 @@ function render(){
   tile.el.classList.toggle("help",!!(fresh&&helpActive(help)));
   tile.flag.textContent=fresh&&helpActive(help)?
    (help.state==="helping"?"Helping":"Help!"):"";
-
   tile.overlay.textContent=state.text;
   tile.foot.textContent=helpActive(help)?helpText(help):state.detail;
   tile.el.title=state.text+"\n"+(helpActive(help)?helpText(help):state.detail);
   bind(tile.video,peer?.stream);
  }
-
  $("gridStatus").textContent=
   `${occupied} seated · ${liveCount} live · ${activeViewers().length}/${meta.maxViewers} viewers`;
  $("helpCount").textContent=`${helps} help request${helps===1?"":"s"}`;
@@ -1807,18 +1508,14 @@ function updateZoom(){
  if(zoomSeat===null||!meta)return;
  const lease=seats[zoomSeat],fresh=live(lease);
  const peer=fresh?receivers.get(lease.u):null;
- const state=mediaState(peer);
- const help=fresh?effectiveHelp(lease.u):null;
-
+ const state=mediaState(peer),help=fresh?effectiveHelp(lease.u):null;
  $("zoomTitle").textContent=meta.name+" — Seat "+zoomSeat;
  $("zoomStatus").textContent=fresh?
   state.text+". "+state.detail+(helpActive(help)?" · "+helpText(help):""):
   "Seat is free or expired.";
-
  bind($("zoomVideo"),peer?.stream);
  $("ackHelpBtn").disabled=!fresh||!helpActive(help);
  $("resolveHelpBtn").disabled=!fresh||!helpActive(help);
- $("releaseSeatBtn").disabled=!fresh;
 }
 async function readStats(p){
  const stats=await p.pc.getStats();let frames=0,bytes=0;
@@ -1835,92 +1532,46 @@ async function readStats(p){
    );
   }
   if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
-  if(p.receiver&&r.type==="inbound-rtp"){
-   frames+=r.framesDecoded||0;bytes+=r.bytesReceived||0;
-  }
-  if(!p.receiver&&r.type==="outbound-rtp"){
-   frames+=r.framesEncoded||0;bytes+=r.bytesSent||0;
-  }
+  if(p.receiver&&r.type==="inbound-rtp"){frames+=r.framesDecoded||0;bytes+=r.bytesReceived||0;}
+  if(!p.receiver&&r.type==="outbound-rtp"){frames+=r.framesEncoded||0;bytes+=r.bytesSent||0;}
  });
  if(frames>p.frames)p.lastFrame=now();
  p.frames=frames;p.bytes=bytes;
  p.stats=lines.join("\n")+`\nFrames=${frames}; bytes=${bytes}`;
 }
 async function statsWorker(){
- if(statsBusy||!meta)return;
- statsBusy=true;
+ if(statsBusy||!meta)return;statsBusy=true;
  try{
   const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
   await Promise.all(list.filter(p=>p.active).map(p=>readStats(p).catch(()=>{})));
  }finally{statsBusy=false;render();}
 }
-
-async function testSignals(){
- if(!room){notice("Open a room first.",true);return;}
- if(testBusy)return;
- testBusy=true;
- const v="probe-"+uuid(),u="probe-"+uuid(),id=uuid();
- try{
-  const index={app:SIGNAL_APP,id,seat:1,c:"probe",l:"probe",g:meta.g,b:T()};
-  const offer={...index,sdp:"v=0\r\n"};
-  const answer={app:SIGNAL_APP,id,viewer:v,sdp:"v=0\r\n",b:T()};
-  await put(offerPath(v,u,id),offer);
-  await put(indexPath(v,u),index);
-  await put(answerPath(u,id),answer);
-  const [i,o,a]=await Promise.all([
-   get(indexPath(v,u)),get(offerPath(v,u,id)),get(answerPath(u,id))
-  ]);
-  if(i?.id!==id||o?.id!==id||a?.id!==id)
-   throw Error("Signaling readback did not match.");
-  $("report").textContent=
-   "SIGNALING WRITE TEST: PASS\n"+
-   "Existing sg28 index, offer and answer paths verified.\n"+
-   "This does not test TURN or real video.";
-  notice("Signaling paths passed.");
- }catch(e){
-  $("report").textContent="SIGNALING TEST FAILED:\n"+e.message;fail(e);
- }finally{
-  await Promise.allSettled([
-   del(indexPath(v,u)),del(offerPath(v,u,id)),del(answerPath(u,id))
-  ]);
-  testBusy=false;
- }
-}
 async function testTURN(){
  if(turnBusy)return;
  turnBusy=true;$("testTURNBtn").disabled=true;
  let a,b;
-
  try{
-  notice("Testing relay echo through 61.238.240.78:3478…");
+  notice("Testing TURN relay echo through 61.238.240.78:3478…");
   a=makePeer("TURN test A");b=makePeer("TURN test B");
   const token="relay-"+uuid();let echo=false;
-
   b.pc.ondatachannel=e=>{
-   b.dc=e.channel;
-   b.dc.onmessage=m=>{if(m.data===token)b.dc.send(token);};
+   b.dc=e.channel;b.dc.onmessage=m=>{if(m.data===token)b.dc.send(token);};
   };
   a.dc=a.pc.createDataChannel("turn-test");
   a.dc.onmessage=e=>{if(e.data===token)echo=true;};
-
-  const offer=await gather(a,"offer");
-  await remote(b,"offer",offer);
-  const answer=await gather(b,"answer");
-  await remote(a,"answer",answer);
-
+  const offer=await gather(a,"offer");await remote(b,"offer",offer);
+  const answer=await gather(b,"answer");await remote(a,"answer",answer);
   const deadline=now()+30000;
   while(!echo&&now()<deadline){
    if(a.dc.readyState==="open")a.dc.send(token);
    await sleep(400);
   }
-
   if(!echo)throw Error("No echoed relay message. Allocation alone is not a pass.");
   await readStats(a);await readStats(b);
   $("report").textContent="TURN RELAY ECHO: PASS\n\n"+a.stats+"\n\n"+b.stats;
   notice("TURN relay echo passed for this browser/network path.");
  }catch(e){
-  $("report").textContent="TURN RELAY ECHO FAILED:\n"+e.message;
-  fail(e);
+  $("report").textContent="TURN RELAY ECHO FAILED:\n"+e.message;fail(e);
  }finally{
   closePeer(a);closePeer(b);turnBusy=false;$("testTURNBtn").disabled=false;
  }
@@ -1928,7 +1579,6 @@ async function testTURN(){
 async function report(){
  const config=rtcConfig();
  config.iceServers=config.iceServers.map(s=>({...s,credential:"[omitted]"}));
-
  const lines=[
   UI_VERSION,
   `Signal compatibility tag=${SIGNAL_APP}`,
@@ -1937,19 +1587,18 @@ async function report(){
   "Database: "+DB,
   "Database authentication: NONE",
   `Room=${room}; role=${role}; session=${SESSION}`,
-  `Requests since page load=${requestCount}`,
-  `Decoded response bytes since page load=${responseBytes}`,
-  "Decoded bytes exclude transfer compression and HTTP/TLS overhead.",
+  `Requests since load=${requestCount}; decoded response bytes=${responseBytes}`,
+  "Decoded bytes exclude compression and HTTP/TLS overhead.",
   `Database errors=${dbErrors}; last error=${lastError}`,
-  `Server Date readable=${clockKnown}; estimated offset=${Math.round(offset)}ms`,
+  `Server Date readable=${clockKnown}; offset=${Math.round(offset)}ms`,
   "ICE configuration: "+JSON.stringify(config),
   `Viewer=${viewerID}; active viewers=${activeViewers().length}`,
   `Capture=${!!source}; seat=${source?.seat||0}; draws=${source?.draws||0}`,
   `Help request active=${!!source?.helpID}`,
-  "Help: DataChannel immediate + existing database path polled every second by staff.",
-  "Database schema unchanged from v28.",
+  "Protection: no DELETE or PUT null operations in this client.",
+  "Signaling records are retained; monitor growth.",
   "Compatibility seat writes are not atomic.",
-  "Invitation keys, TURN credentials and SDP omitted."
+  "Keys, TURN credential and SDP omitted."
  ];
  const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
  for(const p of list){
@@ -1965,9 +1614,6 @@ function networkChanged(){
  for(const p of receivers.values())closePeer(p);
  receivers.clear();offerRetry.clear();
 }
-
-let nextBeat=0,nextHelpResend=0;
-
 function maintenance(){
  if(!room){
   if(wantedRoom&&!opening&&now()-lastOpen>10000)
@@ -1999,34 +1645,24 @@ function maintenance(){
    });
   }
 
-  /*
-   If a live channel did not acknowledge a help request, resend briefly.
-   This is DataChannel traffic, not a new database path.
-  */
   if(source?.helpID&&now()>=nextHelpResend){
    nextHelpResend=now()+2000;
    const record=currentHelpRecord();
-   if(record){
-    for(const p of source.links.values())
-     if(!p.helpAck)send(p,{type:"help-request",record});
-   }
+   if(record)for(const p of source.links.values())
+    if(!p.helpAck)send(p,{type:"help-request",record});
   }
  }
-
  render();
 }
 
 /* Controls */
-async function copy(text){
- await navigator.clipboard.writeText(text);notice("Link copied.");
-}
+async function copy(text){await navigator.clipboard.writeText(text);notice("Link copied.");}
 $("createBtn").onclick=act(createRoom);
 $("joinBtn").onclick=act(()=>{
  const u=new URL($("joinInput").value.trim());
  if(!validID(u.searchParams.get("room")))throw Error("Invalid room invitation.");
  const dest=base();dest.search=u.search;dest.hash=u.hash;
- dest.searchParams.set("build","29");
- location.href=dest.href;
+ dest.searchParams.set("build","30");location.href=dest.href;
 });
 $("menuBtn").onclick=()=>$("admin").hidden=!$("admin").hidden;
 $("closeAdminBtn").onclick=()=>$("admin").hidden=true;
@@ -2040,7 +1676,6 @@ $("retryBtn").onclick=()=>{
 };
 $("stopBtn").onclick=act(()=>stopSharing());
 $("helpBtn").onclick=act(toggleHelp);
-
 $("copyStudentBtn").onclick=act(()=>copy(roomLink(currentEntry(),"student")));
 $("copyAssistantBtn").onclick=act(()=>{
  if(!assistantKey)throw Error("Assistant invitation unavailable.");
@@ -2063,26 +1698,19 @@ $("saveBtn").onclick=act(async()=>{
  const current=normalize(await get(dp("meta")));
  const settings={
   name:$("cfgName").value.trim()||current.name,
-  rows:Number($("cfgRows").value),
-  cols:Number($("cfgCols").value),
-  corner:$("cfgCorner").value,
-  w:Number($("cfgWidth").value),
-  fps:Number($("cfgFPS").value),
-  ttl:Number($("cfgTTL").value),
+  rows:Number($("cfgRows").value),cols:Number($("cfgCols").value),
+  corner:$("cfgCorner").value,w:Number($("cfgWidth").value),
+  fps:Number($("cfgFPS").value),ttl:Number($("cfgTTL").value),
   maxViewers:Number($("cfgMaxViewers").value),
-  tr:$("cfgTransport").value,
-  port:3478,
-  fallbackPorts:false
+  tr:$("cfgTransport").value,port:3478,fallbackPorts:false
  };
  validate({...current,...settings});
-
  const highest=Math.max(
   0,...Object.entries(records(seats))
    .filter(([,v])=>live(v)).map(([n])=>Number(n))
  );
  if(highest>settings.rows*settings.cols)
-  throw Error("Active seats outside new grid; release or reset first.");
-
+  throw Error("Active seats outside new grid; wait for expiry or reset first.");
  await patch(dp("meta"),{
   ...settings,streamRevision:(current.streamRevision||1)+1
  });
@@ -2093,7 +1721,7 @@ $("reconnectAllBtn").onclick=act(async()=>{
  if(role!=="teacher")throw Error("Teacher only.");
  const m=normalize(await get(dp("meta")));
  await patch(dp("meta"),{streamRevision:(m.streamRevision||1)+1});
- notice("Students reconnect when they receive the new settings revision.");
+ notice("Students reconnect when they receive the settings revision.");
 });
 $("resetBtn").onclick=act(async()=>{
  if(role!=="teacher")throw Error("Teacher only.");
@@ -2101,12 +1729,10 @@ $("resetBtn").onclick=act(async()=>{
  const m=normalize(await get(dp("meta")));
  await patch(dp("meta"),{g:m.g+1});
  await pollMeta(true);
- notice("Room generation changed. Students rejoin after their settings poll.");
+ notice("Room generation changed. Existing records were not deleted.");
 });
-
 $("ackHelpBtn").onclick=act(()=>staffHelp("helping"));
 $("resolveHelpBtn").onclick=act(()=>staffHelp("resolved"));
-$("releaseSeatBtn").onclick=act(staffRelease);
 $("closeZoomBtn").onclick=()=>$("zoom").close();
 $("zoom").addEventListener("close",()=>{
  zoomSeat=null;bind($("zoomVideo"),null);
@@ -2121,18 +1747,15 @@ $("testDBBtn").onclick=act(async()=>{
  const result=await get(room?dp("meta"):"rooms/ordinary-get-probe/d/meta");
  $("report").textContent=
   "GET PASS\n"+JSON.stringify(result,null,2)+
-  "\nThis does not verify signaling writes or TURN.";
+  "\nNo write or deletion test was performed.";
 });
-$("testSignalsBtn").onclick=act(testSignals);
 $("testTURNBtn").onclick=act(testTURN);
 $("reportBtn").onclick=act(async()=>{$("report").textContent=await report();});
 $("downloadBtn").onclick=act(async()=>{
  const text=await report()+"\n\nEVENT LOG\n"+logs.join("\n");
- const url=URL.createObjectURL(new Blob(
-  ["\uFEFF",text],{type:"text/plain;charset=utf-8"}
- ));
+ const url=URL.createObjectURL(new Blob(["\uFEFF",text],{type:"text/plain;charset=utf-8"}));
  const a=document.createElement("a");
- a.href=url;a.download="classroom-fast-help-v29.txt";a.click();
+ a.href=url;a.download="classroom-hierarchy-guard-v30.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 $("homeBtn").onclick=()=>{
@@ -2141,17 +1764,13 @@ $("homeBtn").onclick=()=>{
 };
 
 window.addEventListener("online",networkChanged);
-window.addEventListener("offline",()=>{
- notice("Offline. Approved capture remains while this page stays open.");
-});
+window.addEventListener("offline",()=>notice("Offline. Capture remains while this page stays open."));
 navigator.connection?.addEventListener?.("change",networkChanged);
 document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible"){
   nextMeta=0;nextViewers=0;nextLease=0;nextHelpPoll=0;
-  launch(()=>pollMeta(true));
-  launch(()=>pollViewers(true));
-  launch(leaseLoop);
-  launch(pollHelp);
+  launch(()=>pollMeta(true));launch(()=>pollViewers(true));
+  launch(leaseLoop);launch(pollHelp);
  }
 });
 window.addEventListener("pagehide",()=>{
@@ -2162,6 +1781,7 @@ window.addEventListener("pagehide",()=>{
   closeLinks(source);
  }
  for(const p of receivers.values())closePeer(p);
+ // No unload database writes or deletions.
 });
 window.addEventListener("pageshow",e=>{if(e.persisted)location.reload();});
 
@@ -2171,15 +1791,13 @@ setInterval(render,1000);
 
 $("connectionInfo").textContent=
  DB+"\nDatabase authentication: NONE\n"+
- "Existing v28 database paths and record formats retained\n"+
+ "Existing v28/v29 database paths retained\n"+
  "TURN: 61.238.240.78:3478\n"+
- "TURN username: testuser\n"+
- "Media: relay only\n"+
- "Help: immediate DataChannel + 1-second existing-path fallback\n"+
- "Seat renewal: approximately 18 seconds\n"+
- "Default seat expiry: 120 seconds.";
+ "No DELETE and no PUT null requests\n"+
+ "Signaling records retained to protect sg28\n"+
+ "Stopped seats expire automatically.";
 
-log(UI_VERSION+" ready. Database schema remains v28.");
+log(UI_VERSION+" ready. Essential database hierarchy is never deleted by this client.");
 renderHome();updateTitle();
 
 if(wantedRoom){
