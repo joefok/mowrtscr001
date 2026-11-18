@@ -7,109 +7,39 @@
 <meta name="color-scheme" content="dark">
 <title>Classroom Screens — Ready</title>
 <style>
-:root{
- font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
- color-scheme:dark;background:#101722;color:#edf4ff
-}
-*{box-sizing:border-box}
-body{margin:0}
-button,input,select{
- font:inherit;padding:9px 11px;border:1px solid #5e7593;
- border-radius:7px;background:#142235;color:inherit
-}
-button{cursor:pointer}
-button:hover:not(:disabled){background:#294c70}
-button:disabled{opacity:.5;cursor:not-allowed}
-input[type=number]{width:82px}
-.grow{flex:1;min-width:170px}
-.row,label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.primary{background:#175e96}
-.helpButton{background:#775216;border-color:#d1a64c}
-header{
- position:sticky;top:0;z-index:10;padding:11px 12px;
- background:#101722f5;border-bottom:1px solid #435971;
- display:flex;justify-content:space-between;align-items:center;
- gap:8px;flex-wrap:wrap
-}
-.badge{
- font-size:.74rem;padding:4px 8px;border:1px solid #536c88;
- border-radius:18px
-}
-main{padding:12px;max-width:1800px;margin:auto}
-.panel{
- padding:14px;background:#192638;border:1px solid #435971;
- border-radius:10px;margin-bottom:12px
-}
-#notice{
- padding:11px;background:#213c56;border-left:4px solid #8bccff;
- margin-bottom:12px;white-space:pre-wrap
-}
-#notice.error{background:#472b36;border-color:#ffabab}
-.muted{color:#b8cadc;font-size:.85rem}
-.warning{color:#ffd49b}
-[hidden]{display:none!important}
-h2{font-size:1.1rem}
-h3{font-size:1rem}
-p,li{line-height:1.5}
-#viewport{overflow:auto;padding:3px}
-#grid{display:grid;gap:8px}
-.tile{
- padding:0;text-align:left;overflow:hidden;background:#35414d;
- min-width:0
-}
-.tileHead{
- display:flex;justify-content:space-between;padding:5px 8px;
- font-size:.78rem;gap:4px
-}
-.picture{position:relative;aspect-ratio:16/9;background:#424d59}
-.picture video{width:100%;height:100%;object-fit:contain;display:block}
-.overlay{
- position:absolute;inset:0;display:flex;align-items:center;
- justify-content:center;font-size:.72rem;text-align:center;padding:5px
-}
-.foot{
- padding:5px 7px;font-size:.65rem;white-space:nowrap;
- overflow:hidden;text-overflow:ellipsis
-}
-.tile:not(.live) video{opacity:.18;filter:grayscale(1)}
-.tile.live{border-color:#62c49c}
-.tile.live .overlay{display:none}
-.tile.help{border:2px solid #e9b54d}
-.flag{color:#ffe2a0}
-#admin{
- position:fixed;inset:0 0 0 auto;width:min(96vw,530px);
- z-index:30;overflow:auto;margin:0;border-radius:0
-}
-.roomRow{
- display:flex;justify-content:space-between;gap:8px;
- align-items:center;padding:9px;margin:6px 0;
- border:1px solid #4a627e;border-radius:7px;flex-wrap:wrap
-}
-pre{
- white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;
- overflow:auto;background:#0c1521;padding:10px;
- border-radius:7px;font-size:12px
-}
-dialog{
- width:min(1050px,96vw);max-height:95vh;overflow:auto;
- background:#192638;color:inherit;border:1px solid #8398b4;
- border-radius:10px
-}
-dialog::backdrop{background:#000b}
-#zoomVideo{width:100%;max-height:65vh;background:#3b4754;display:block}
-@media(max-width:750px){
- .tileHead{font-size:.62rem;padding:4px}
- .foot{font-size:.55rem;padding:4px}
- .overlay{font-size:.6rem}
-}
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark;background:#101722;color:#edf4ff}
+*{box-sizing:border-box}body{margin:0}
+button,input,select{font:inherit;padding:8px 10px;border:1px solid #607895;border-radius:7px;background:#142235;color:inherit}
+button{cursor:pointer}button:hover:not(:disabled){background:#294c70}button:disabled{opacity:.5}
+input[type=number]{width:78px}.grow{flex:1;min-width:160px}.row,label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.primary{background:#175e96}.helpButton{background:#775216;border-color:#d1a64c}
+header{position:sticky;top:0;z-index:10;padding:11px;background:#101722f5;border-bottom:1px solid #435971;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{font-size:.74rem;padding:4px 8px;border:1px solid #536c88;border-radius:18px}
+main{padding:12px;max-width:1800px;margin:auto}.panel{padding:14px;background:#192638;border:1px solid #435971;border-radius:10px;margin-bottom:12px}
+#notice{padding:11px;background:#213c56;border-left:4px solid #8bccff;margin-bottom:12px;white-space:pre-wrap}
+#notice.error{background:#472b36;border-color:#ffabab}.muted{color:#b8cadc;font-size:.85rem}.warning{color:#ffd49b}
+[hidden]{display:none!important}h2{font-size:1.1rem}h3{font-size:1rem}p{line-height:1.5}
+#viewport{overflow:auto;padding:3px}#grid{display:grid;gap:8px}
+.tile{padding:0;text-align:left;overflow:hidden;background:#35414d;min-width:0}
+.tileHead{display:flex;justify-content:space-between;padding:5px 8px;font-size:.78rem}
+.picture{position:relative;aspect-ratio:16/9;background:#424d59}.picture video{width:100%;height:100%;object-fit:contain;display:block}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;text-align:center;padding:4px}
+.foot{padding:5px 7px;font-size:.65rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile:not(.live) video{opacity:.18;filter:grayscale(1)}.tile.live{border-color:#62c49c}.tile.live .overlay{display:none}.tile.help{border:2px solid #e9b54d}
+#admin{position:fixed;inset:0 0 0 auto;width:min(96vw,520px);z-index:30;overflow:auto;margin:0;border-radius:0}
+.roomRow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px;margin:6px 0;border:1px solid #4a627e;border-radius:7px;flex-wrap:wrap}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:#0c1521;padding:10px;border-radius:7px;font-size:12px}
+dialog{width:min(1000px,96vw);max-height:95vh;overflow:auto;background:#192638;color:inherit;border:1px solid #8398b4;border-radius:10px}
+dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-height:65vh;background:#3b4754;display:block}
+#pill{font-size:1.25rem;min-width:64px}
+@media(max-width:750px){.tileHead{font-size:.62rem;padding:4px}.foot{font-size:.55rem;padding:4px}.overlay{font-size:.6rem}}
 </style>
 </head>
 <body>
-
 <header>
  <div class="row">
   <b id="heading">Classroom Screens</b>
-  <span class="badge">Hierarchy Guard v30</span>
+  <span class="badge">PATCH guard v32</span>
   <span id="dbBadge" class="badge">Ready</span>
   <span id="roleBadge" class="badge" hidden></span>
  </div>
@@ -117,12 +47,10 @@ dialog::backdrop{background:#000b}
 </header>
 
 <main>
- <div id="notice">Ready. Create a room or open an invitation.</div>
+ <div id="notice">Ready. Create or open a room.</div>
 
  <section id="home" class="panel">
-  <h2 style="margin-top:0">My rooms</h2>
-  <div id="rooms"></div>
-
+  <h2>My rooms</h2><div id="rooms"></div>
   <h3>Create room</h3>
   <div class="row">
    <input id="newName" class="grow" placeholder="Room name" maxlength="60">
@@ -130,92 +58,118 @@ dialog::backdrop{background:#000b}
    <label>Columns <input id="newCols" type="number" value="8" min="1" max="64"></label>
    <button id="createBtn" class="primary">Create</button>
   </div>
-
   <h3>Open invitation</h3>
   <div class="row">
-   <input id="joinInput" class="grow"
-    placeholder="Student, assistant, or teacher invitation">
+   <input id="joinInput" class="grow" placeholder="Paste classroom invitation">
    <button id="joinBtn">Open</button>
   </div>
-
-  <p class="muted">
-   Existing v28/v29 room paths are retained.
-   No browser operation deletes the room, keys, d, meta, or sg28.
-  </p>
+  <p class="muted">Existing paths are retained. This client sends GET and PATCH only.</p>
  </section>
 
  <section id="studentPanel" class="panel" hidden>
-  <h2 id="studentHeading" style="margin-top:0"></h2>
+  <h2 id="studentHeading"></h2>
   <p id="studentStatus">Ready to share.</p>
   <div class="row">
    <button id="shareBtn" class="primary">Start sharing</button>
-   <button id="retryBtn">Reconnect without recapture</button>
-   <button id="helpBtn" class="helpButton">Request help</button>
+   <button id="retryBtn">Reconnect</button>
    <button id="stopBtn">Stop sharing</button>
+  </div>
+
+  <h3>Progress</h3>
+  <div class="row">
+   <button id="pill" title="Hover and scroll, or click">😐</button>
+   <span id="feelingText"></span>
+   <label>Step <input id="step" type="number" min="0" max="9999" value="0"></label>
+   <label>State
+    <select id="workState">
+     <option value="working">Working</option>
+     <option value="finished">Finished</option>
+     <option value="waiting">Waiting</option>
+     <option value="stuck">Stuck</option>
+    </select>
+   </label>
+   <label>Task <input id="task" maxlength="120" placeholder="Optional task"></label>
+   <button id="saveProgressBtn">Save progress</button>
+  </div>
+  <p id="progressStatus" class="muted"></p>
+
+  <h3>Help</h3>
+  <div class="row">
+   <label>Reason
+    <select id="reason">
+     <option value="stuck">Stuck</option>
+     <option value="question">Question</option>
+     <option value="technical">Technical problem</option>
+     <option value="other">Other</option>
+    </select>
+   </label>
+   <input id="detail" class="grow" maxlength="120" placeholder="Optional detail">
+   <button id="helpBtn" class="helpButton">Request help</button>
   </div>
   <p id="helpStatus" class="muted"></p>
   <p class="muted">
-   Keep this page open and prevent sleep.
-   After refresh or browser restart, approve capture again.
-   When sharing stops, the seat expires automatically.
+   Progress can be drafted before sharing. It is written after this page obtains a seat.
+   Screen capture requires a real click and approval after each page restart.
   </p>
-  <details>
-   <summary>Connection progress</summary>
-   <pre id="studentProgress">Ready to share.</pre>
-  </details>
+  <details><summary>Connection progress</summary><pre id="studentProgress"></pre></details>
  </section>
 
  <section id="staffSection" hidden>
-  <div class="row" style="margin-bottom:8px">
+  <div class="row">
    <b id="roomName"></b>
    <span id="gridStatus" class="badge"></span>
    <span id="helpCount" class="badge"></span>
    <span id="cornerBadge" class="badge"></span>
-   <label>View
-    <select id="view">
-     <option value="fit">Fit width</option>
-     <option value="large">Large tiles / scroll</option>
-    </select>
-   </label>
+   <button id="carouselToggle">Show carousel</button>
+   <label>View <select id="view"><option value="fit">Fit width</option><option value="large">Large tiles</option></select></label>
   </div>
+
+  <section id="carousel" class="panel" hidden>
+   <div class="row">
+    <button id="prevBtn">◀ Previous</button>
+    <strong id="carouselTitle"></strong>
+    <button id="nextBtn">Next ▶</button>
+   </div>
+   <video id="carouselVideo" autoplay muted playsinline></video>
+   <p id="carouselDetails"></p>
+   <small class="muted">Scroll over the video to change seat. Existing streams are reused.</small>
+  </section>
+
   <div id="viewport"><div id="grid"></div></div>
+  <section class="panel"><h3>Progress and help</h3><div id="people"></div></section>
  </section>
 </main>
 
 <aside id="admin" class="panel" hidden>
  <div class="row" style="justify-content:space-between">
-  <h2 style="margin:0">Settings & diagnostics</h2>
-  <button id="closeAdminBtn">Close</button>
+  <h2>Settings & diagnostics</h2><button id="closeAdminBtn">Close</button>
  </div>
 
- <h3>Hierarchy protection</h3>
- <pre id="connectionInfo"></pre>
  <p class="warning">
-   This page never deletes keys, d, meta, sg28, or signaling leaves.
-   Old signaling records can accumulate and should be monitored.
-   Database administrators and backend faults remain outside browser control.
-  </p>
+  No database authentication. IP restrictions do not distinguish teachers from students.
+  PATCH-only does not make seat claims atomic or protect against privileged server operations.
+ </p>
 
  <div id="roomLinks" hidden>
   <h3>Invitations</h3>
   <div class="row">
-   <button id="copyStudentBtn">Copy automatic-seat student link</button>
+   <button id="copyStudentBtn">Copy student link</button>
    <button id="copyAssistantBtn">Copy assistant link</button>
    <button id="copyTeacherBtn">Copy teacher link</button>
   </div>
-  <div class="row" style="margin-top:10px">
+  <div class="row">
    <label>Fixed seat <input id="linkSeat" type="number" min="1" max="64" value="1"></label>
    <button id="copySeatBtn">Copy fixed-seat link</button>
   </div>
  </div>
 
  <div id="config" hidden>
-  <h3>Room settings</h3>
+  <h3>Layout & timing</h3>
   <div class="row">
    <label>Name <input id="cfgName" maxlength="60"></label>
    <label>Rows <input id="cfgRows" type="number" min="1" max="64"></label>
    <label>Columns <input id="cfgCols" type="number" min="1" max="64"></label>
-   <label>Seat 1 corner
+   <label>Corner
     <select id="cfgCorner">
      <option value="bottom-right">Bottom right</option>
      <option value="bottom-left">Bottom left</option>
@@ -225,60 +179,39 @@ dialog::backdrop{background:#000b}
    </label>
    <label>Preview
     <select id="cfgWidth">
-     <option value="160">160 × 90</option>
-     <option value="256">256 × 144</option>
-     <option value="320">320 × 180</option>
+     <option value="160">160×90</option>
+     <option value="256">256×144</option>
+     <option value="320">320×180</option>
     </select>
    </label>
    <label>FPS <select id="cfgFPS"><option>1</option><option>2</option></select></label>
-   <label>Seat expiry
-    <input id="cfgTTL" type="number" min="60" max="3600"> seconds
-   </label>
-   <label>Maximum staff viewers
-    <input id="cfgMaxViewers" type="number" min="1" max="8">
-   </label>
-   <label>TURN transport
+   <label>Expiry s <input id="cfgTTL" type="number" min="60" max="3600"></label>
+   <label>Viewers <input id="cfgMax" type="number" min="1" max="8"></label>
+   <label>TURN
     <select id="cfgTransport">
-     <option value="tcp">TCP 3478</option>
-     <option value="udp">UDP 3478</option>
-     <option value="both">UDP + TCP 3478</option>
+     <option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">UDP + TCP</option>
     </select>
    </label>
+   <button id="saveBtn" class="primary">Save</button>
   </div>
-  <p class="muted">
-   TURN endpoint: <strong>61.238.240.78:3478</strong>.
-  </p>
   <div class="row">
-   <button id="saveBtn" class="primary">Save settings</button>
    <button id="reconnectAllBtn">Reconnect streams</button>
-   <button id="resetBtn">Reset seats — automatic rejoin</button>
+   <button id="resetBtn">Reset seats by generation</button>
   </div>
  </div>
 
  <h3>Diagnostics</h3>
  <div class="row">
   <button id="testDBBtn">Test metadata GET</button>
-  <button id="testTURNBtn">Test TURN relay echo</button>
+  <button id="testTURNBtn">Test TURN echo</button>
   <button id="reportBtn">Collect report</button>
   <button id="downloadBtn">Download report</button>
-  <button id="copyCreateBtn">Copy configured create link</button>
+  <button id="copyCreateBtn">Copy create link</button>
   <button id="homeBtn">Home</button>
  </div>
  <pre id="report">No report collected.</pre>
- <details>
-  <summary>Event log</summary>
-  <pre id="log"></pre>
- </details>
-
- <p class="muted">
-   Help uses the existing DataChannel immediately and the existing help
-   database path as a one-second staff fallback.
-   Seat operations are read/write/read checks, not atomic transactions.
-  </p>
- <p class="warning">
-   No database authentication is used. Keep your external IP restrictions.
-   Staff keys are workflow checks, not secure database authorization.
-  </p>
+ <details><summary>Event log</summary><pre id="log"></pre></details>
+ <p class="muted">Signaling leaves are not deleted by this page. Arrange a separately tested server cleanup process.</p>
 </aside>
 
 <dialog id="zoom">
@@ -286,10 +219,10 @@ dialog::backdrop{background:#000b}
   <b id="zoomTitle"></b><button id="closeZoomBtn">Close</button>
  </div>
  <video id="zoomVideo" autoplay muted playsinline></video>
- <p id="zoomStatus" class="muted"></p>
+ <p id="zoomStatus"></p>
  <div class="row">
-  <button id="ackHelpBtn" class="helpButton">I am helping</button>
-  <button id="resolveHelpBtn">Help resolved</button>
+  <button id="ackBtn" class="helpButton">I am helping</button>
+  <button id="resolveBtn">Help resolved</button>
  </div>
 </dialog>
 
@@ -297,93 +230,102 @@ dialog::backdrop{background:#000b}
 "use strict";
 
 /*
- HIERARCHY GUARD V30
-
- Database schema remains v28/v29:
- rooms/R/keys {t,a}
- rooms/R/d/meta
- rooms/R/d/seats/N
- rooms/R/d/viewers/V
- rooms/R/d/help/U
- rooms/R/d/hold/U
- rooms/R/sg28/index/V/U
- rooms/R/sg28/offers/V/U/OFFER_ID
- rooms/R/sg28/answers/U/OFFER_ID
-
- IMPORTANT:
- - This page contains no DELETE request.
- - No PUT null is sent.
- - Existing room, keys, d, meta and sg28 are never replaced as a whole.
- - Room creation writes one new UUID room only.
- - Signaling records are retained to avoid deleting the final sg28 child.
- - Seat expiry is logical; stopped/offline sessions stop renewing.
- - Room reset changes meta.g, not d/seats deletion.
- - Ordinary seat writes are best-effort and NOT atomic.
- - Do not run older cleanup clients against a protected production room.
+ PATCH GUARD V32
+ Existing v28/v31 paths and signaling format retained.
+ No client PUT or DELETE.
+ No null/undefined/empty-object PATCH values.
+ Seat claims/renewals are best-effort and NOT atomic.
+ Browser never deletes sg28 leaves.
 */
 
-const UI_VERSION="classroom-hierarchy-guard-v30";
 const SIGNAL_APP="classroom-low-data-v28";
+const VERSION="classroom-patch-guard-v32";
 const DB="https://default--default.ubcoturneastasia.duckdns.org";
+
+/*
+ Replace only after rotating the coturn server credentials.
+ Browser-delivered static credentials are visible to users.
+*/
 const TURN={
- host:"61.238.240.78",port:3478,
- username:"testuser",password:"testpass"
+ host:"61.238.240.78",
+ port:3478,
+ username:"testuser",
+ password:"testpass"
 };
+
 const Q=new URLSearchParams(location.search);
 const H=new URLSearchParams(location.hash.slice(1));
 const SESSION=crypto.randomUUID();
-const CORNERS=["bottom-right","bottom-left","top-right","top-left"];
 const $=id=>document.getElementById(id);
-const uuid=()=>crypto.randomUUID();
 const now=()=>Date.now();
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const uuid=()=>crypto.randomUUID();
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const jitter=(base,spread)=>base+Math.floor(Math.random()*spread);
+const CORNERS=["bottom-right","bottom-left","top-right","top-left"];
+const EMOJI=["😟","🙁","😐","🙂","😃"];
+const FEEL=["Very stuck","Needs help","Okay","Good","Great"];
+const STATES=["working","finished","waiting","stuck"];
 
 function load(k,d=""){try{return localStorage.getItem(k)??d;}catch{return d;}}
 function save(k,v){try{localStorage.setItem(k,String(v));}catch{}}
-function sess(k,d=""){try{return sessionStorage.getItem(k)??d;}catch{return d;}}
-function setSess(k,v){try{sessionStorage.setItem(k,String(v));}catch{}}
-function validID(v){return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);}
+function sessionGet(k,d=""){try{return sessionStorage.getItem(k)??d;}catch{return d;}}
+function sessionSet(k,v){try{sessionStorage.setItem(k,String(v));}catch{}}
 function isRecord(v){return v!==null&&typeof v==="object"&&!Array.isArray(v);}
 function records(v){
  if(!v||typeof v!=="object")return {};
  return Object.fromEntries(Object.entries(v).filter(([,x])=>isRecord(x)));
 }
-function obj(v){return isRecord(v)?v:{};}
+function validID(v){return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);}
+function text(v,n){return String(v??"").trim().slice(0,n);}
 
-let room="",wantedRoom=Q.get("room")||"";
-let role="student",staff=false,teacherKey="",assistantKey="";
-let viewerID="",viewerLabel="",meta=null,source=null;
-let seats={},viewerMap={},helpMap={},ownHelp=null,ownHold=null,indexMap={};
+/*
+ Reject null, undefined, non-finite numbers and empty objects recursively.
+ Empty strings and zero are intentionally allowed.
+*/
+function guard(value){
+ if(value===null||value===undefined)
+  throw Error("PATCH blocked: null or undefined value.");
+
+ if(typeof value==="number"&&!Number.isFinite(value))
+  throw Error("PATCH blocked: invalid number.");
+
+ if(typeof value==="object"){
+  if(!Array.isArray(value)&&Object.keys(value).length===0)
+   throw Error("PATCH blocked: empty object.");
+
+  for(const child of Object.values(value))guard(child);
+ }
+}
+
+let room="",wanted=Q.get("room")||"",role="student",staff=false;
+let teacherKey="",assistantKey="",viewer="",label="",meta=null,source=null;
+let seats={},viewers={},help={},ownHelp=null,ownHold=null,index={};
+let creating=false,opening=false,lastOpen=0;
 let offset=0,clockKnown=false,bestRTT=Infinity;
 const T=()=>now()+offset;
 
-let creating=false,opening=false,lastOpen=0;
-let metaBusy=false,nextMeta=0,seatsBusy=false,nextSeats=0;
-let viewersBusy=false,nextViewers=0,ownBusy=false,nextOwn=0;
-let leaseBusy=false,nextLease=0,viewerBusy=false,nextViewerWrite=0;
-let indexBusy=false,nextIndex=0,answerPollBusy=false,nextAnswers=0;
-let helpPollBusy=false,nextHelpPoll=0,statsBusy=false,turnBusy=false;
-let zoomSeat=null,pauseUntil=0,lastNetwork=0;
-let idle="Ready to share.",lastError="",dbErrors=0;
-let requestCount=0,responseBytes=0;
-let helpWriteQueue=Promise.resolve();
-let nextBeat=0,nextHelpResend=0;
+let nextMeta=0,nextSeats=0,nextViewers=0,nextOwn=0,nextLease=0;
+let nextViewer=0,nextIndex=0,nextAnswers=0,nextHelp=0,nextBeat=0,nextHelpSend=0;
+let metaBusy=false,seatsBusy=false,viewBusy=false,ownBusy=false,leaseBusy=false;
+let viewerBusy=false,indexBusy=false,answersBusy=false,helpBusy=false,statsBusy=false;
+let zoomSeat=null,carouselSeat=1,feeling=3,feelingTimer=0,progressBusy=false;
+let idle="Ready to share.",dbErrors=0,lastError="";
+let draftTouched=false;
+let helpQueue=Promise.resolve();
 
-const receivers=new Map(),answering=new Set(),offerFetch=new Set();
-const offerRetry=new Map(),tiles=new Map(),logs=[];
-const fastHelp=new Map();
+const receivers=new Map(),answering=new Set(),fetching=new Set(),retry=new Map();
+const tiles=new Map(),fastHelp=new Map(),logs=[];
 
 const rp=p=>`rooms/${room}/${p}`;
 const dp=p=>rp("d/"+p);
 const sp=n=>dp("seats/"+n);
-const indexPath=(v,u)=>rp(`sg28/index/${v}/${u}`);
-const offerPath=(v,u,id)=>rp(`sg28/offers/${v}/${u}/${id}`);
-const answerPath=(u,id)=>rp(`sg28/answers/${u}/${id}`);
+const ix=(v,u)=>rp(`sg28/index/${v}/${u}`);
+const off=(v,u,id)=>rp(`sg28/offers/${v}/${u}/${id}`);
+const ans=(u,id)=>rp(`sg28/answers/${u}/${id}`);
 
 function log(s){
  logs.push(`[${new Date().toISOString()}] ${s}`);
- if(logs.length>400)logs.shift();
+ if(logs.length>300)logs.shift();
  $("log").textContent=logs.slice().reverse().join("\n");
 }
 function notice(s,bad=false){
@@ -394,46 +336,29 @@ function fail(e){
  log("ERROR: "+lastError);notice(lastError,true);
 }
 const act=fn=>(...args)=>Promise.resolve().then(()=>fn(...args)).catch(fail);
-function launch(fn){
- Promise.resolve().then(fn).catch(e=>log("Worker: "+(e?.message||String(e))));
-}
-function updateTitle(){
- if(!meta||!room){
-  document.title=creating?"Classroom Screens — Creating room":"Classroom Screens — Ready";
-  return;
- }
- let state=staff?(role==="teacher"?"Teacher":"Assistant"):"Student";
- if(source){
-  const connected=[...source.links.values()].some(p=>
-   p.active&&p.pc.connectionState==="connected");
-  state=connected?"Student — Sharing":
-   source.seat?"Student — Connecting":"Student — Waiting for seat";
- }
- const title=(meta.name||"Classroom")+" — "+state;
- if(document.title!==title)document.title=title;
- $("heading").textContent=meta.name||"Classroom Screens";
-}
+function launch(fn){Promise.resolve().then(fn).catch(e=>log("Worker: "+e.message));}
 
-/*
- Only GET, PUT of non-null objects, and PATCH of non-null objects.
- No DELETE or PUT null operation exists in this application.
-*/
 async function req(method,path,value){
- if(!["GET","PUT","PATCH"].includes(method))
-  throw Error("Protective client rejected unsupported write method.");
- if(method!=="GET"&&!isRecord(value))
-  throw Error("Protective client rejected null/non-object write.");
+ if(method!=="GET"&&method!=="PATCH")
+  throw Error("Blocked method: "+method);
+
+ if(method==="PATCH"){
+  if(!isRecord(value)||!Object.keys(value).length)
+   throw Error("PATCH blocked: empty or non-object body.");
+  guard(value);
+ }
 
  const safe=path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
  const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),15000);
- const started=now();requestCount++;
+ const started=now();
 
  try{
   const headers={Accept:"application/json"};
-  if(value!==undefined)headers["Content-Type"]="application/json";
+  if(method==="PATCH")headers["Content-Type"]="application/json";
+
   const response=await fetch(DB+"/"+safe+".json",{
    method,headers,
-   body:value===undefined?undefined:JSON.stringify(value),
+   body:method==="PATCH"?JSON.stringify(value):undefined,
    credentials:"omit",cache:"no-store",redirect:"error",
    referrerPolicy:"no-referrer",signal:abort.signal
   });
@@ -447,37 +372,33 @@ async function req(method,path,value){
    }
   }
 
-  const text=await response.text();
-  responseBytes+=new TextEncoder().encode(text).length;
+  const body=await response.text();
   let result=null;
-  if(text){
-   try{result=JSON.parse(text);}
-   catch{throw Error(`${method} ${path}: HTTP ${response.status}, non-JSON response.`);}
+  if(body){
+   try{result=JSON.parse(body);}
+   catch{throw Error(`${method} ${path}: non-JSON HTTP ${response.status}`);}
   }
-  if(!response.ok)
-   throw Error(`${method} ${path}: HTTP ${response.status}: ${
-    typeof result?.error==="string"?result.error:"request rejected"
-   }`);
-  if(typeof result?.error==="string")throw Error(`${method} ${path}: ${result.error}`);
+
+  if(!response.ok||typeof result?.error==="string")
+   throw Error(`${method} ${path}: HTTP ${response.status}: ${result?.error||"rejected"}`);
 
   $("dbBadge").textContent="DB online";
   return result;
  }catch(e){
   dbErrors++;lastError=e.message;$("dbBadge").textContent="DB retrying";
-  if(e.name==="AbortError")throw Error(`${method} ${path}: timeout.`);
+  if(e.name==="AbortError")throw Error("Database timeout.");
   if(e instanceof TypeError)
-   throw Error(`${method} ${path}: fetch failed; check CORS, TLS, IP restrictions and endpoint.`);
+   throw Error("Database fetch failed: check TLS, CORS, IP allowlist and server.");
   throw e;
  }finally{clearTimeout(timer);}
 }
-const get=p=>req("GET",p);
-const put=(p,v)=>req("PUT",p,v);
-const patch=(p,v)=>req("PATCH",p,v);
+const get=path=>req("GET",path);
+const patch=(path,value)=>req("PATCH",path,value);
 
 function defaults(){
  return {
   name:"Classroom",rows:5,cols:8,corner:"bottom-right",
-  w:256,fps:1,ttl:120,port:3478,tr:"tcp",tlsHost:"",
+  w:256,fps:1,ttl:120,port:3478,tr:"tcp",
   fallbackPorts:false,maxViewers:4,g:0,streamRevision:1,at:T()
  };
 }
@@ -485,130 +406,105 @@ function validate(m){
  if(!Number.isInteger(m.rows)||!Number.isInteger(m.cols)||
   m.rows<1||m.cols<1||m.rows*m.cols>64)
   throw Error("Grid must contain 1–64 seats.");
- if(!CORNERS.includes(m.corner)||![160,256,320].includes(m.w)||![1,2].includes(m.fps))
-  throw Error("Invalid layout or preview.");
- if(!Number.isInteger(m.ttl)||m.ttl<60||m.ttl>3600)
-  throw Error("Seat expiry must be 60–3600 seconds.");
- if(!["tcp","udp","both"].includes(m.tr))
-  throw Error("TURN transport must be TCP, UDP, or both.");
- if(!Number.isInteger(m.maxViewers)||m.maxViewers<1||m.maxViewers>8)
-  throw Error("Maximum viewers must be 1–8.");
- if(!Number.isInteger(m.g)||m.g<0)
-  throw Error("Invalid room generation.");
- if(typeof m.name!=="string"||m.name.length>60)
-  throw Error("Invalid room name.");
+ if(!CORNERS.includes(m.corner)||![160,256,320].includes(m.w)||
+  ![1,2].includes(m.fps))throw Error("Invalid layout or preview.");
+ if(!Number.isInteger(m.ttl)||m.ttl<60||m.ttl>3600||
+  !Number.isInteger(m.maxViewers)||m.maxViewers<1||m.maxViewers>8)
+  throw Error("Invalid expiry or viewer limit.");
+ if(!["tcp","udp","both"].includes(m.tr)||!Number.isInteger(m.g)||m.g<0)
+  throw Error("Invalid transport or generation.");
 }
-function normalize(v){
- if(!isRecord(v))throw Error("Room metadata missing.");
- const m={...defaults(),...v};
+function normalize(value){
+ if(!isRecord(value))throw Error("Room metadata missing.");
+ const m={...defaults(),...value};
  if(!["tcp","udp","both"].includes(m.tr))m.tr="tcp";
  validate(m);return m;
 }
-function live(v){
- if(!isRecord(v)||!meta)return false;
- const age=T()-(Number(v.b)||0);
- return Number(v.g||0)===meta.g&&age>=-10000&&age<meta.ttl*1000;
+function live(value){
+ const age=T()-(Number(value?.b)||0);
+ return isRecord(value)&&meta&&Number(value.g||0)===meta.g&&
+  age>=-10000&&age<meta.ttl*1000;
 }
-function owned(v,s){
- return isRecord(v)&&v.u===SESSION&&v.c===s.cid&&
-  v.l===s.leaseID&&Number(v.g||0)===s.g;
+function owns(value,s){
+ return isRecord(value)&&value.u===SESSION&&value.c===s.cid&&
+  value.l===s.lease&&Number(value.g||0)===s.g;
 }
-function captureLive(s){
+function capture(s){
  return source===s&&s?.active&&s.out&&
   s.raw?.getVideoTracks()[0]?.readyState==="live";
+}
+function activeViewers(){
+ return Object.entries(records(viewers))
+  .filter(([,v])=>T()-(Number(v.b)||0)<65000)
+  .sort((a,b)=>(Number(a[1].at)||0)-(Number(b[1].at)||0))
+  .slice(0,meta?.maxViewers||4);
 }
 function pinned(){
  const n=Number(Q.get("seat"));
  return meta&&Number.isInteger(n)&&n>=1&&n<=meta.rows*meta.cols?n:0;
 }
-function activeViewers(){
- return Object.entries(records(viewerMap))
-  .filter(([,v])=>T()-(Number(v.b)||0)<65000)
-  .sort((a,b)=>(Number(a[1].at)||0)-(Number(b[1].at)||0))
-  .slice(0,meta?.maxViewers||4);
-}
-function holdUntil(){
- if(typeof ownHold==="number")return ownHold;
- return isRecord(ownHold)&&Number(ownHold.g||0)===meta?.g?
-  Number(ownHold.until)||0:0;
-}
 function base(){
  const u=new URL(location.href);u.search="";u.hash="";return u;
 }
-function roomLink(e,kind,seat){
- const u=base();
- u.searchParams.set("room",e.id);
- u.searchParams.set("build","30");
- u.searchParams.set("view",$("view").value||"fit");
+function roomLink(e,kind,n){
+ const u=base();u.searchParams.set("room",e.id);u.searchParams.set("build","32");
  if(kind==="student"){
-  u.searchParams.set("start","1");
-  if(seat)u.searchParams.set("seat",seat);
+  u.searchParams.set("start","1");if(n)u.searchParams.set("seat",n);
  }else{
-  const f=kind==="teacher"?{t:e.t}:{a:e.a};
-  if(kind==="teacher"&&e.a)f.a=e.a;
-  u.hash=new URLSearchParams(f).toString();
-  u.searchParams.set("label",kind==="teacher"?"Teacher":"Assistant");
+  const h=kind==="teacher"?{t:e.t}:{a:e.a};
+  if(kind==="teacher"&&e.a)h.a=e.a;
+  u.hash=new URLSearchParams(h).toString();
  }
  return u.href;
 }
 function saved(){
- try{
-  const a=JSON.parse(load("cr-rooms","[]"));
-  return Array.isArray(a)?a.filter(isRecord):[];
- }catch{return [];}
+ try{const x=JSON.parse(load("cr-rooms","[]"));return Array.isArray(x)?x.filter(isRecord):[];}
+ catch{return [];}
 }
 function remember(e){
  const old=saved().find(x=>x.id===e.id)||{},merged={...old,...e};
  if(!e.t&&old.t)merged.t=old.t;
  if(!e.a&&old.a)merged.a=old.a;
- save("cr-rooms",JSON.stringify(
-  [merged,...saved().filter(x=>x.id!==e.id)].slice(0,50)
- ));
+ save("cr-rooms",JSON.stringify([merged,...saved().filter(x=>x.id!==e.id)].slice(0,50)));
 }
-function currentEntry(){
- return {id:room,name:meta?.name,t:teacherKey,a:assistantKey};
-}
+function entry(){return {id:room,name:meta?.name,t:teacherKey,a:assistantKey};}
 function renderHome(){
  $("rooms").replaceChildren();
  const list=saved();
- if(!list.length)$("rooms").textContent="No saved staff rooms on this browser.";
+ if(!list.length)$("rooms").textContent="No saved rooms on this browser.";
  for(const e of list){
   if(!validID(e.id))continue;
   const row=document.createElement("div");row.className="roomRow";
-  const text=document.createElement("span");text.textContent=e.name||"Classroom";
+  const words=document.createElement("span");words.textContent=e.name||"Classroom";
   const buttons=document.createElement("div");buttons.className="row";
   const open=document.createElement("button");open.textContent="Open";
   open.onclick=()=>location.href=roomLink(e,e.t?"teacher":"assistant");
   const forget=document.createElement("button");forget.textContent="Forget";
   forget.onclick=()=>{
-   save("cr-rooms",JSON.stringify(saved().filter(x=>x.id!==e.id)));
-   renderHome();
+   save("cr-rooms",JSON.stringify(saved().filter(x=>x.id!==e.id)));renderHome();
   };
-  buttons.append(open,forget);row.append(text,buttons);$("rooms").append(row);
+  buttons.append(open,forget);row.append(words,buttons);$("rooms").append(row);
  }
 }
 function createSettings(){
  const m={
   ...defaults(),
-  name:(Q.get("name")||$("newName").value.trim()||"Classroom").slice(0,60),
+  name:text(Q.get("name")||$("newName").value||"Classroom",60),
   rows:Number(Q.get("rows")??$("newRows").value),
   cols:Number(Q.get("cols")??$("newCols").value),
   corner:Q.get("corner")||"bottom-right",
   w:Number(Q.get("width")??256),fps:Number(Q.get("fps")??1),
-  ttl:Number(Q.get("ttl")??120),
-  tr:Q.get("transport")||"tcp",
-  maxViewers:Number(Q.get("maxViewers")??4),
-  port:3478,fallbackPorts:false
+  ttl:Number(Q.get("ttl")??120),tr:Q.get("transport")||"tcp",
+  maxViewers:Number(Q.get("maxViewers")??4)
  };
  validate(m);return m;
 }
 function createLink(){
  const m=meta||createSettings(),u=base();
  const values={
-  create:1,build:30,name:m.name,rows:m.rows,cols:m.cols,
-  corner:m.corner,width:m.w,fps:m.fps,ttl:m.ttl,
-  turnPort:3478,transport:m.tr,maxViewers:m.maxViewers,
-  view:$("view").value,label:"Teacher"
+  create:1,build:32,name:m.name,rows:m.rows,cols:m.cols,corner:m.corner,
+  width:m.w,fps:m.fps,ttl:m.ttl,transport:m.tr,
+  maxViewers:m.maxViewers,view:$("view").value
  };
  for(const [k,v]of Object.entries(values))u.searchParams.set(k,v);
  return u.href;
@@ -616,45 +512,47 @@ function createLink(){
 function fillSettings(){
  const fields={
   cfgName:"name",cfgRows:"rows",cfgCols:"cols",cfgCorner:"corner",
-  cfgWidth:"w",cfgFPS:"fps",cfgTTL:"ttl",
-  cfgMaxViewers:"maxViewers",cfgTransport:"tr"
+  cfgWidth:"w",cfgFPS:"fps",cfgTTL:"ttl",cfgMax:"maxViewers",cfgTransport:"tr"
  };
- for(const [id,key]of Object.entries(fields))$(id).value=meta[key];
+ for(const [id,k]of Object.entries(fields))$(id).value=meta[k];
 }
 async function createRoom(){
  if(creating||room)return;
- creating=true;$("createBtn").disabled=true;updateTitle();
+ creating=true;$("createBtn").disabled=true;
+
  try{
   const id=uuid(),t=uuid()+uuid(),a=uuid()+uuid(),m=createSettings();
-  notice("Creating "+m.name+"…");
-  /*
-   This is the only whole-room PUT. It targets a newly generated UUID.
-   Existing rooms are never written at the room root.
-  */
-  await put("rooms/"+id,{keys:{t,a},d:{meta:m}});
+
+  // This check is not an atomic create transaction.
+  if(await get("rooms/"+id+"/d/meta"))
+   throw Error("Generated room already exists; retry.");
+
+  // Only a newly generated room is written at the room root.
+  await patch("rooms/"+id,{keys:{t,a},d:{meta:m}});
   remember({id,name:m.name,t,a});
   location.replace(roomLink({id,t,a},"teacher"));
  }catch(e){
-  creating=false;$("createBtn").disabled=false;updateTitle();throw e;
+  creating=false;$("createBtn").disabled=false;throw e;
  }
 }
 async function openRoom(){
- if(opening||room||!wantedRoom)return;
- if(!validID(wantedRoom))throw Error("Invalid room ID.");
+ if(opening||room||!wanted)return;
+ if(!validID(wanted))throw Error("Invalid room ID.");
  opening=true;lastOpen=now();
 
  try{
-  const id=wantedRoom,m=normalize(await get(`rooms/${id}/d/meta`));
+  const id=wanted,m=normalize(await get(`rooms/${id}/d/meta`));
   const t=H.get("t")||"",a=H.get("a")||"";
   const kind=t?"teacher":a?"assistant":"student";
   let assistant=a;
 
   if(kind!=="student"){
-   const keys=obj(await get(`rooms/${id}/keys`));
-   if((t||a)!==(kind==="teacher"?keys.t:keys.a))
-    throw Error("Invalid staff invitation or unreadable room keys.");
+   const keys=await get(`rooms/${id}/keys`);
+   if(!isRecord(keys)||(t||a)!==(kind==="teacher"?keys.t:keys.a))
+    throw Error("Invalid staff invitation or unreadable keys.");
    if(kind==="teacher")assistant=keys.a||"";
   }
+
   if(kind==="student"&&Q.has("seat")){
    const n=Number(Q.get("seat"));
    if(!Number.isInteger(n)||n<1||n>m.rows*m.cols)
@@ -665,33 +563,29 @@ async function openRoom(){
   teacherKey=t;assistantKey=assistant;
 
   if(staff){
-   viewerID=uuid();
-   viewerLabel=(Q.get("label")||
-    (role==="teacher"?"Teacher":"Assistant")).slice(0,40);
-   remember(currentEntry());
+   viewer=uuid();
+   label=text(Q.get("label")||(role==="teacher"?"Teacher":"Assistant"),40);
+   remember(entry());
   }
 
   $("home").hidden=true;
+  $("studentPanel").hidden=staff;$("staffSection").hidden=!staff;
   $("roleBadge").hidden=false;$("roleBadge").textContent=role;
   $("roomLinks").hidden=!staff;$("config").hidden=role!=="teacher";
   $("copyTeacherBtn").hidden=role!=="teacher";
-  $("studentPanel").hidden=staff;$("staffSection").hidden=!staff;
-  $("studentHeading").textContent=m.name;$("roomName").textContent=m.name;
+  $("roomName").textContent=m.name;$("studentHeading").textContent=m.name;
   if(staff)fillSettings();
 
-  updateTitle();
-  await Promise.all([pollViewers(true),staff?pollSeats(true):Promise.resolve()]);
+  // Draft is local to this tab. It is not proof of ownership of an old seat.
+  if(!staff)restoreDraft();
 
-  if(staff){
-   await renewViewer();
-   nextHelpPoll=0;launch(pollHelp);
-  }
+  await Promise.all([
+   pollViewers(true),
+   staff?pollSeats(true):Promise.resolve()
+  ]);
+  if(staff)await viewerBeat();
 
-  notice(staff?
-   m.name+" is ready. Hierarchy-protection client active.":
-   m.name+" is ready. Click Start sharing.");
-
-  if(!staff&&Q.get("start")==="1")$("shareBtn").focus({preventScroll:true});
+  notice(staff?"Room ready.":"Choose progress or click Start sharing.");
   render();
  }finally{opening=false;}
 }
@@ -700,136 +594,162 @@ async function pollMeta(force=false){
  if(!room||metaBusy||(!force&&now()<nextMeta))return;
  metaBusy=true;nextMeta=now()+jitter(45000,10000);
  try{
-  const next=normalize(await get(dp("meta"))),old=meta;
-  meta=next;
-  if(source&&(old?.w!==meta.w||old?.fps!==meta.fps))
-   for(const p of source.links.values())launch(()=>limitSender(p));
+  const old=meta;meta=normalize(await get(dp("meta")));
   if(source&&source.seat&&source.g!==meta.g)dropLease(source);
-  $("roomName").textContent=meta.name;
-  $("studentHeading").textContent=meta.name;
+  if(source&&(old.w!==meta.w||old.fps!==meta.fps))
+   for(const p of source.links.values())launch(()=>limitSender(p));
   render();
  }catch(e){log("Metadata: "+e.message);}
  finally{metaBusy=false;}
 }
 async function pollSeats(force=false){
- if(!room||seatsBusy||(!force&&now()<nextSeats))return;
- if(!staff&&source?.seat)return;
- seatsBusy=true;nextSeats=now()+jitter(5000,1500);
- try{seats=records(await get(dp("seats")));}
- catch(e){log("Seats: "+e.message);}
+ if(!room||seatsBusy||(!force&&now()<nextSeats)||(!staff&&source?.seat))return;
+ seatsBusy=true;nextSeats=now()+jitter(4000,1200);
+ try{
+  seats=records(await get(dp("seats")));
+  if(!staff&&source?.seat&&seats[source.seat]?.u===SESSION&&!draftTouched)
+   loadProgress(seats[source.seat]);
+ }catch(e){log("Seats: "+e.message);}
  finally{seatsBusy=false;}
 }
 async function pollViewers(force=false){
- if(!room||viewersBusy||(!force&&now()<nextViewers))return;
- viewersBusy=true;nextViewers=now()+jitter(15000,5000);
- try{viewerMap=records(await get(dp("viewers")));}
+ if(!room||viewBusy||(!force&&now()<nextViewers))return;
+ viewBusy=true;nextViewers=now()+jitter(15000,5000);
+ try{viewers=records(await get(dp("viewers")));}
  catch(e){log("Viewers: "+e.message);}
- finally{viewersBusy=false;}
+ finally{viewBusy=false;}
 }
-async function pollOwn(force=false){
- if(staff||!room||ownBusy||(!force&&now()<nextOwn))return;
- ownBusy=true;nextOwn=now()+jitter(18000,4000);
+async function viewerBeat(){
+ if(!staff||viewerBusy||now()<nextViewer)return;
+ viewerBusy=true;nextViewer=now()+jitter(16000,4000);
  try{
-  const [holdRecord,help]=await Promise.all([
-   get(dp("hold/"+SESSION)),get(dp("help/"+SESSION))
-  ]);
-  ownHold=holdRecord;
-  if(isRecord(help)){
-   if(!ownHelp||help.id===ownHelp.id||Number(help.at)>Number(ownHelp.at||0))
-    ownHelp=help;
-  }else if(!source?.helpAt)ownHelp=null;
-  if(source?.helpAt&&ownHelp?.id===source.helpID&&ownHelp.state==="resolved"){
-   source.helpAt=0;source.helpID="";
-   notice("Help resolved by "+(ownHelp.label||"staff")+".");
-  }
- }catch(e){log("Student commands: "+e.message);}
- finally{ownBusy=false;}
-}
-async function renewViewer(){
- if(!staff||viewerBusy||now()<nextViewerWrite)return;
- viewerBusy=true;nextViewerWrite=now()+jitter(18000,4000);
- try{
-  const active=activeViewers().filter(([id])=>id!==viewerID);
-  if(active.length>=meta.maxViewers)throw Error("Maximum active staff viewers reached.");
-  const previous=obj(viewerMap[viewerID]);
+  if(activeViewers().filter(([id])=>id!==viewer).length>=meta.maxViewers)
+   throw Error("Maximum viewers reached.");
   const value={
-   role,label:viewerLabel,at:previous.at||T(),b:T(),
-   app:SIGNAL_APP,session:SESSION
+   role,label,at:viewers[viewer]?.at||T(),b:T(),app:SIGNAL_APP,session:SESSION
   };
-  await put(dp("viewers/"+viewerID),value);
-  viewerMap[viewerID]=value;
- }catch(e){log("Viewer registration: "+e.message);}
+  await patch(dp("viewers/"+viewer),value);
+  viewers[viewer]=value;
+ }catch(e){log("Viewer: "+e.message);}
  finally{viewerBusy=false;}
 }
+async function pollOwn(){
+ if(staff||!room||ownBusy||now()<nextOwn)return;
+ ownBusy=true;nextOwn=now()+jitter(15000,4000);
+ try{
+  const [h,x]=await Promise.all([
+   get(dp("hold/"+SESSION)),get(dp("help/"+SESSION))
+  ]);
+  ownHold=h;
+  if(isRecord(x))ownHelp=x;
+  if(source?.helpID&&ownHelp?.id===source.helpID&&ownHelp.state==="resolved"){
+   source.helpID="";source.helpAt=0;source.helpState=ownHelp;
+  }
+ }catch(e){log("Student status: "+e.message);}
+ finally{ownBusy=false;}
+}
 async function pollHelp(){
- if(!staff||!room||helpPollBusy||now()<nextHelpPoll)return;
- helpPollBusy=true;nextHelpPoll=now()+1000;
- try{helpMap=records(await get(dp("help")));}
- catch(e){log("Help polling: "+e.message);}
- finally{helpPollBusy=false;}
+ if(!staff||!room||helpBusy||now()<nextHelp)return;
+ helpBusy=true;nextHelp=now()+1000;
+ try{help=records(await get(dp("help")));}
+ catch(e){log("Help: "+e.message);}
+ finally{helpBusy=false;}
 }
 
-/*
- No seat deletion is performed. Stop/release causes the lease to expire.
- This avoids a stale read-check-delete deleting another student's lease.
-*/
 function dropLease(s){
- closeLinks(s);s.seat=0;s.leaseID="";s.g=meta?.g||0;nextLease=0;
+ closeLinks(s);s.seat=0;s.lease="";s.g=meta.g;nextLease=0;
 }
-function adopt(s,n,v){
- s.seat=n;s.leaseID=v.l;s.g=Number(v.g)||0;s.pending=null;
- seats[n]=v;nextLease=now()+jitter(16000,4000);
- setSess("cr-v28-seat-"+room,n);
- log("CLAIMED — seat "+n);
+function progressValues(){
+ const step=Math.max(0,Math.min(9999,Math.floor(Number($("step").value)||0)));
+ const state=STATES.includes($("workState").value)?$("workState").value:"working";
+ return {
+  feeling:Math.max(1,Math.min(5,feeling)),
+  feelingAt:T(),step,state,task:text($("task").value,120)
+ };
+}
+function persistDraft(){
+ sessionSet("cr-progress-"+room,JSON.stringify({
+  feeling,step:$("step").value,state:$("workState").value,task:$("task").value
+ }));
+}
+function restoreDraft(){
+ try{
+  const d=JSON.parse(sessionGet("cr-progress-"+room,"{}"));
+  if(!isRecord(d))return;
+  if(Number.isInteger(d.feeling)&&d.feeling>=1&&d.feeling<=5)feeling=d.feeling;
+  if(Number.isInteger(Number(d.step)))$("step").value=Math.max(0,Math.min(9999,Number(d.step)));
+  if(STATES.includes(d.state))$("workState").value=d.state;
+  if(typeof d.task==="string")$("task").value=d.task.slice(0,120);
+  draftTouched=Object.keys(d).length>0;
+ }catch{}
+ showFeeling();
+}
+function loadProgress(value){
+ if(!isRecord(value)||value.u!==SESSION)return;
+ if(Number.isInteger(value.feeling)&&value.feeling>=1&&value.feeling<=5)
+  feeling=value.feeling;
+ if(Number.isInteger(value.step)&&value.step>=0&&value.step<=9999)
+  $("step").value=value.step;
+ if(STATES.includes(value.state))$("workState").value=value.state;
+ if(typeof value.task==="string")$("task").value=value.task.slice(0,120);
+ showFeeling();
+}
+function adopt(s,n,value){
+ s.seat=n;s.lease=value.l;s.g=Number(value.g)||0;s.pending=null;
+ seats[n]=value;nextLease=now()+jitter(16000,4000);
+ save("cr-v32-seat-"+room,n);
+ if(!draftTouched)loadProgress(value);
+ else launch(saveProgress);
+ log("CLAIMED seat "+n);
 }
 async function leaseLoop(){
  const s=source;
- if(!captureLive(s)||leaseBusy||now()<nextLease)return;
+ if(!capture(s)||leaseBusy||now()<nextLease)return;
  leaseBusy=true;
+
  try{
   if(s.pending){
-   const pending=s.pending,current=await get(sp(pending.seat));
-   if(isRecord(current)&&current.u===SESSION&&current.c===s.cid&&
-    current.l===pending.value.l&&Number(current.g||0)===meta.g)
-    adopt(s,pending.seat,current);
+   const x=await get(sp(s.pending.n));
+   if(isRecord(x)&&x.u===SESSION&&x.c===s.cid&&
+    x.l===s.pending.v.l&&Number(x.g||0)===meta.g)
+    adopt(s,s.pending.n,x);
    else s.pending=null;
   }
-  if(!captureLive(s))return;
+  if(!capture(s))return;
 
-  const until=Math.max(pauseUntil,holdUntil());
+  const until=isRecord(ownHold)&&Number(ownHold.g||0)===meta.g?
+   Number(ownHold.until)||0:0;
+
   if(T()<until){
    if(s.seat)dropLease(s);
-   s.phase=`Waiting for seat release (${Math.ceil((until-T())/1000)}s)`;
+   s.phase=`Waiting ${Math.ceil((until-T())/1000)}s`;
    nextLease=now()+4000;return;
   }
-
   if(s.seat&&s.g!==meta.g)dropLease(s);
 
   if(s.seat){
    const n=s.seat,current=await get(sp(n));
-   if(!captureLive(s))return;
-   if(!owned(current,s)){dropLease(s);return;}
+   if(!capture(s))return;
+   if(!owns(current,s)){dropLease(s);return;}
 
-   /*
-    Read/write/read is best-effort, not atomic.
-    No metadata, room, key or signaling ancestor is modified here.
-   */
-   const updated={...current,b:T(),g:meta.g};
-   await put(sp(n),updated);
-   const verified=await get(sp(n));
-   if(!captureLive(s))return;
-   if(!owned(verified,s)){dropLease(s);return;}
-   seats[n]=verified;nextLease=now()+jitter(16000,4000);return;
+   // Partial PATCH preserves optional fields; ownership check is not atomic.
+   await patch(sp(n),{b:T(),g:meta.g});
+   const checked=await get(sp(n));
+   if(!owns(checked,s)){dropLease(s);return;}
+
+   seats[n]=checked;
+   if(!draftTouched)loadProgress(checked);
+   nextLease=now()+jitter(16000,4000);
+   return;
   }
 
   await pollSeats(true);
   const cap=meta.rows*meta.cols,pin=pinned();
-  const preferred=Number(sess("cr-v28-seat-"+room))||0;
-  let choices=[];
+  const preferred=Number(load("cr-v32-seat-"+room))||0;
+  let choices=pin?[pin]:
+   Array.from({length:cap},(_,i)=>i+1).filter(n=>!live(seats[n]));
 
-  if(pin)choices=[pin];
-  else{
-   for(let n=1;n<=cap;n++)if(!live(seats[n]))choices.push(n);
+  if(!pin){
    for(let i=choices.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
     [choices[i],choices[j]]=[choices[j],choices[i]];
@@ -840,72 +760,126 @@ async function leaseLoop(){
 
   let count=0;
   for(const n of choices){
-   if(!captureLive(s)||++count>4)break;
-   await sleep(100+Math.random()*350);
+   if(!capture(s)||++count>4)break;
+   await sleep(jitter(100,350));
    if(live(await get(sp(n))))continue;
 
-   const value={u:SESSION,c:s.cid,l:uuid(),g:meta.g,b:T(),at:T()};
-   s.pending={seat:n,value};
-   await put(sp(n),value);
-   await sleep(250+Math.random()*250);
-   const verified=await get(sp(n));
+   /*
+    New owner explicitly resets sticky progress fields.
+    This is not an atomic claim.
+   */
+   const value={
+    u:SESSION,c:s.cid,l:uuid(),g:meta.g,b:T(),at:T(),
+    feeling:3,feelingAt:T(),step:0,state:"working",task:""
+   };
 
-   if(!captureLive(s))return;
-   if(isRecord(verified)&&verified.u===SESSION&&
-    verified.c===s.cid&&verified.l===value.l){
-    adopt(s,n,verified);return;
+   s.pending={n,v:value};
+   await patch(sp(n),value);
+   await sleep(jitter(250,250));
+   const checked=await get(sp(n));
+
+   if(!capture(s))return;
+   if(isRecord(checked)&&checked.u===SESSION&&
+    checked.c===s.cid&&checked.l===value.l){
+    adopt(s,n,checked);return;
    }
-
-   s.pending=null;log("Seat conflict detected; retrying.");
+   s.pending=null;
   }
 
-  s.phase=pin?`Waiting for fixed seat ${pin}`:"Waiting for a free seat";
+  s.phase=pin?`Waiting for seat ${pin}`:"Waiting for a free seat";
   nextLease=now()+jitter(4000,2000);
 
  }catch(e){
-  if(captureLive(s))s.phase="Seat/database retry: "+e.message;
-  log("Lease: "+e.message);
-  nextLease=now()+jitter(5000,3000);
+  if(capture(s))s.phase="Seat retry: "+e.message;
+  log("Lease: "+e.message);nextLease=now()+jitter(5000,3000);
  }finally{leaseBusy=false;}
 }
+async function saveProgress(){
+ persistDraft();draftTouched=true;
+ const s=source;
 
-function rtcConfig(){
- const transport=meta?.tr||"tcp",urls=[];
- if(["udp","both"].includes(transport))
+ if(!s?.seat){
+  $("progressStatus").textContent="Draft saved in this tab; it will be sent after a seat is claimed.";
+  return;
+ }
+ if(progressBusy)return;
+ progressBusy=true;
+
+ try{
+  const n=s.seat,current=await get(sp(n));
+  if(!owns(current,s)){
+   dropLease(s);throw Error("Seat changed; progress was not sent.");
+  }
+
+  /*
+   This pre-check does not prevent a concurrent owner change.
+   A transaction/server-owned lease is required for that guarantee.
+  */
+  await patch(sp(n),progressValues());
+  const checked=await get(sp(n));
+  if(!owns(checked,s)){
+   dropLease(s);throw Error("Seat changed during progress update.");
+  }
+  seats[n]=checked;draftTouched=false;
+  $("progressStatus").textContent="Progress saved.";
+ }finally{progressBusy=false;}
+}
+function showFeeling(){
+ $("pill").textContent=EMOJI[feeling-1];
+ $("feelingText").textContent=FEEL[feeling-1];
+}
+function scheduleFeeling(){
+ draftTouched=true;persistDraft();showFeeling();
+ clearTimeout(feelingTimer);
+ feelingTimer=setTimeout(()=>launch(saveProgress),300);
+}
+$("pill").onclick=()=>{
+ feeling=feeling%5+1;scheduleFeeling();
+};
+$("pill").addEventListener("wheel",e=>{
+ e.preventDefault();
+ feeling=Math.max(1,Math.min(5,feeling+(e.deltaY>0?-1:1)));
+ scheduleFeeling();
+},{passive:false});
+for(const id of ["step","workState","task"]){
+ $(id).addEventListener("change",()=>{
+  draftTouched=true;persistDraft();
+ });
+}
+
+function rtc(){
+ const urls=[];
+ if(["udp","both"].includes(meta.tr))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=udp`);
- if(["tcp","both"].includes(transport))
+ if(["tcp","both"].includes(meta.tr))
   urls.push(`turn:${TURN.host}:${TURN.port}?transport=tcp`);
  return {
   iceServers:[{urls,username:TURN.username,credential:TURN.password}],
-  iceTransportPolicy:"relay",
-  bundlePolicy:"max-bundle",
-  rtcpMuxPolicy:"require",
-  iceCandidatePoolSize:0
+  iceTransportPolicy:"relay",bundlePolicy:"max-bundle",
+  rtcpMuxPolicy:"require",iceCandidatePoolSize:0
  };
 }
 function checkSDP(type,sdp){
  if(!["offer","answer"].includes(type)||typeof sdp!=="string"||sdp.length>100000)
-  throw Error("Invalid or oversized SDP.");
- const candidates=sdp.split(/\r?\n/).filter(l=>l.startsWith("a=candidate:"));
- if(!candidates.some(l=>/\styp relay(?:\s|$)/.test(l)))
-  throw Error("No TURN relay candidate from 61.238.240.78:3478.");
- if(candidates.some(l=>!/\styp relay(?:\s|$)/.test(l)))
-  throw Error("Unexpected non-relay candidate.");
+  throw Error("Invalid SDP.");
+ const candidates=sdp.split(/\r?\n/).filter(x=>x.startsWith("a=candidate:"));
+ if(!candidates.some(x=>/\styp relay(?:\s|$)/.test(x))||
+  candidates.some(x=>!/\styp relay(?:\s|$)/.test(x)))
+  throw Error("Relay candidate required.");
 }
-function makePeer(name,receiver=false){
- const pc=new RTCPeerConnection(rtcConfig());
+function peer(name,receiver=false){
+ const pc=new RTCPeerConnection(rtc());
  const p={
-  pc,name,receiver,active:true,created:now(),connectedAt:0,badSince:0,
+  pc,name,receiver,active:true,created:now(),connected:0,bad:0,
   dc:null,track:null,sender:null,stream:null,id:"",
   phase:"Preparing",error:"",answered:false,applying:false,
-  lastBeat:0,remote:null,frames:0,bytes:0,lastFrame:0,stats:"",
-  nextAnswer:0,helpAck:false
+  lastBeat:0,remote:null,frames:0,bytes:0,lastFrame:0,stats:""
  };
- pc.onicecandidateerror=e=>log(name+`: ICE ${e.errorCode} ${e.errorText||""}`);
+ pc.onicecandidateerror=e=>log(`${name}: ICE ${e.errorCode} ${e.errorText||""}`);
  pc.onconnectionstatechange=()=>{
   const state=pc.connectionState;
-  if(state==="connected"){p.connectedAt=now();p.badSince=0;}
-  else if(["failed","disconnected"].includes(state))p.badSince||=now();
+  if(state==="connected"){p.connected=now();p.bad=0;}
+  else if(["failed","disconnected"].includes(state))p.bad||=now();
   log(name+": "+state);
  };
  return p;
@@ -922,121 +896,95 @@ function closeLinks(s=source){
  s.links.clear();s.retry.clear();
 }
 async function gather(p,type){
- const description=type==="offer"?
-  await p.pc.createOffer():await p.pc.createAnswer();
- p.phase="Gathering TURN";
- await p.pc.setLocalDescription(description);
- const deadline=now()+60000;
+ const description=type==="offer"?await p.pc.createOffer():await p.pc.createAnswer();
+ p.phase="Gathering TURN";await p.pc.setLocalDescription(description);
+ const end=now()+60000;
  while(p.pc.iceGatheringState!=="complete"){
   if(!p.active)throw Error("Connection superseded.");
-  if(now()>deadline)throw Error("TURN gathering timed out.");
+  if(now()>end)throw Error("TURN gathering timed out.");
   await sleep(100);
  }
- const sdp=p.pc.localDescription.sdp;
- checkSDP(type,sdp);return sdp;
+ const sdp=p.pc.localDescription.sdp;checkSDP(type,sdp);return sdp;
 }
 async function remote(p,type,sdp){
  checkSDP(type,sdp);
  if(!p.active)throw Error("Connection superseded.");
  await p.pc.setRemoteDescription({type,sdp});
 }
-function send(p,d){
+function send(p,value){
  if(p?.active&&p.dc?.readyState==="open"){
-  try{p.dc.send(JSON.stringify(d));return true;}catch{}
+  try{p.dc.send(JSON.stringify(value));return true;}catch{}
  }
  return false;
-}
-function setFastHelp(id,record){
- fastHelp.set(id,{record,expires:now()+15000});
- render();
-}
-function effectiveHelp(id){
- const fast=fastHelp.get(id);
- if(fast&&fast.expires>now())return fast.record;
- if(fast)fastHelp.delete(id);
- return helpMap[id]||null;
 }
 function helpActive(h){
  return isRecord(h)&&Number(h.g||0)===meta.g&&
   h.state!=="resolved"&&h.state!=="cancelled";
 }
-function helpText(h){
+function effectiveHelp(id){
+ const f=fastHelp.get(id);
+ if(f&&f.expires>now())return f.value;
+ if(f)fastHelp.delete(id);
+ return help[id]||null;
+}
+function helpLabel(h){
  if(!helpActive(h))return "";
- return h.state==="helping"?`${h.label||"Staff"} is helping`:"Help requested";
+ return `${h.state==="helping"?(h.label||"Staff")+" is helping":"Help requested"}`+
+  `${h.reason?" · "+h.reason:""}${h.detail?" · "+h.detail:""}`;
 }
-function currentHelpRecord(){
- const s=source;
- if(!s?.helpAt||!s.helpID)return null;
- return {id:s.helpID,g:meta.g,seat:s.seat,at:s.helpAt,state:"requested"};
-}
-function sendHelpToPeer(p){
- const record=currentHelpRecord();
- if(record)send(p,{type:"help-request",record});
-}
-function broadcastHelp(record){
- if(!source)return;
- for(const p of source.links.values())send(p,{type:"help-request",record});
-}
-function broadcastCancel(id){
- if(!source||!id)return;
- for(const p of source.links.values())send(p,{type:"help-cancel",id,g:meta.g});
-}
-function sendPeerHelpState(id,type,record){
- const p=receivers.get(id);
- if(p)send(p,{type,id:record.id,label:viewerLabel,g:meta.g});
+function setFast(id,value){
+ fastHelp.set(id,{value,expires:now()+15000});render();
 }
 function attach(p,dc){
  p.dc=dc;
  dc.onopen=()=>{
   p.lastBeat=now();
-  if(!p.receiver){
-   if(p.answered)send(p,{type:"answer-applied",id:p.id});
-   sendHelpToPeer(p);
+  if(!p.receiver&&source?.helpID){
+   send(p,{type:"help-request",record:{
+    id:source.helpID,g:meta.g,seat:source.seat,at:source.helpAt,
+    state:"requested",reason:source.helpReason,detail:source.helpDetail
+   }});
   }
  };
  dc.onmessage=e=>{
   if(typeof e.data!=="string"||e.data.length>10000)return;
   try{
    const d=JSON.parse(e.data);
+
    if(d.type==="beat"){
     p.lastBeat=now();p.remote=d;send(p,{type:"ack"});return;
    }
    if(d.type==="ack"){p.lastBeat=now();return;}
-   if(d.type==="answer-applied"&&p.receiver&&d.id===p.id){
-    p.lastBeat=now();return;
-   }
+
    if(p.receiver&&d.type==="help-request"){
-    const r=d.record,lease=seats[p.seat];
-    if(!isRecord(r)||!validID(r.id)||Number(r.g)!==meta.g||
-     Number(r.seat)!==Number(p.seat)||!Number.isFinite(Number(r.at))||
-     !live(lease)||lease.u!==p.person||lease.l!==p.leaseID)return;
-    const record={id:r.id,g:meta.g,seat:p.seat,at:Number(r.at),state:"requested"};
-    setFastHelp(p.person,record);
-    send(p,{type:"help-received",id:record.id});
-    log("FAST HELP — seat "+p.seat);return;
+    const h=d.record,lease=seats[p.seat];
+    if(!isRecord(h)||!validID(h.id)||Number(h.g)!==meta.g||
+     Number(h.seat)!==p.seat||!live(lease)||
+     lease.u!==p.person||lease.l!==p.lease)return;
+
+    setFast(p.person,{
+     id:h.id,g:meta.g,seat:p.seat,at:Number(h.at)||T(),
+     state:"requested",reason:text(h.reason,40),detail:text(h.detail,120)
+    });
+    send(p,{type:"help-received",id:h.id});return;
    }
+
    if(p.receiver&&d.type==="help-cancel"){
-    const current=effectiveHelp(p.person);
-    if(current?.id===d.id)setFastHelp(p.person,{...current,state:"cancelled"});
+    const h=effectiveHelp(p.person);
+    if(h?.id===d.id)setFast(p.person,{...h,state:"cancelled"});
     return;
    }
-   if(!p.receiver&&d.type==="help-received"){
-    if(source?.helpID===d.id)p.helpAck=true;
-    return;
+
+   if(!p.receiver&&d.type==="help-received"&&source?.helpID===d.id){
+    p.helpAck=true;return;
    }
-   if(!p.receiver&&d.type==="help-helping"){
-    if(source?.helpID===d.id){
-     source.helpState={id:d.id,state:"helping",label:String(d.label||"Staff").slice(0,40)};
-     render();
-    }
-    return;
+   if(!p.receiver&&d.type==="help-helping"&&source?.helpID===d.id){
+    source.helpState={state:"helping",label:text(d.label||"Staff",40)};
+    render();return;
    }
-   if(!p.receiver&&d.type==="help-resolved"){
-    if(source?.helpID===d.id){
-     source.helpState={id:d.id,state:"resolved",label:String(d.label||"Staff").slice(0,40)};
-     source.helpAt=0;source.helpID="";
-     notice("Help resolved by "+source.helpState.label+".");render();
-    }
+   if(!p.receiver&&d.type==="help-resolved"&&source?.helpID===d.id){
+    source.helpState={state:"resolved",label:text(d.label||"Staff",40)};
+    source.helpID="";source.helpAt=0;render();
    }
   }catch{}
  };
@@ -1044,43 +992,32 @@ function attach(p,dc){
 async function limitSender(p){
  if(!p.active||!p.sender)return;
  try{
-  const parameters=p.sender.getParameters();
-  if(!parameters.encodings?.length)parameters.encodings=[{}];
-  for(const e of parameters.encodings){e.maxBitrate=150000;e.maxFramerate=meta.fps;}
-  parameters.degradationPreference="maintain-resolution";
-  await p.sender.setParameters(parameters);
- }catch(e){log("Encoder target: "+e.message);}
+  const x=p.sender.getParameters();
+  if(!x.encodings?.length)x.encodings=[{}];
+  for(const e of x.encodings){e.maxBitrate=150000;e.maxFramerate=meta.fps;}
+  x.degradationPreference="maintain-resolution";
+  await p.sender.setParameters(x);
+ }catch(e){log("Sender: "+e.message);}
 }
 function badPeer(p){
  const state=p.pc.connectionState;
  return !p.active||state==="failed"||
-  (state==="disconnected"&&p.badSince&&now()-p.badSince>15000)||
+  (state==="disconnected"&&p.bad&&now()-p.bad>15000)||
   (p.lastBeat&&now()-p.lastBeat>60000)||
-  (!p.answered&&now()-p.created>120000)||
-  (p.answered&&state!=="connected"&&now()-p.created>120000);
+  (!p.answered&&now()-p.created>120000);
 }
-function target(s,id){
- return [
-  s.cid,s.leaseID,s.g,s.seat,id,
-  meta.streamRevision||0,meta.tr,TURN.host,TURN.port
- ].join("|");
+function target(s,v){
+ return [s.cid,s.lease,s.g,s.seat,v,meta.streamRevision||0,meta.tr].join("|");
 }
 function current(s,p){
- return captureLive(s)&&p.active&&s.links.get(p.viewer)===p&&s.seat>0&&
-  p.target===target(s,p.viewer)&&T()>=Math.max(pauseUntil,holdUntil())&&
-  activeViewers().some(([id])=>id===p.viewer);
+ return capture(s)&&p.active&&s.links.get(p.viewer)===p&&s.seat>0&&
+  p.target===target(s,p.viewer)&&activeViewers().some(([id])=>id===p.viewer);
 }
-
-/* Signaling writes use existing v28/v29 paths; no signaling deletion. */
-async function buildOffer(s,id,v){
- s.building.add(id);s.retry.set(id,now()+8000);
- let p;
+async function build(s,id,v){
+ s.building.add(id);s.retry.set(id,now()+8000);let p;
  try{
-  p=makePeer(`Seat ${s.seat} → ${v.label||"Staff"}`);
-  Object.assign(p,{
-   id:uuid(),viewer:id,seat:s.seat,target:target(s,id),
-   cid:s.cid,leaseID:s.leaseID,g:s.g
-  });
+  p=peer(`Seat ${s.seat} → ${v.label||"Staff"}`);
+  Object.assign(p,{id:uuid(),viewer:id,seat:s.seat,target:target(s,id)});
   s.links.set(id,p);
   p.track=s.out.getVideoTracks()[0].clone();
   try{p.track.contentHint="detail";}catch{}
@@ -1088,377 +1025,387 @@ async function buildOffer(s,id,v){
    direction:"sendonly",streams:[new MediaStream([p.track])]
   }).sender;
   attach(p,p.pc.createDataChannel("classroom",{ordered:true}));
-
   const sdp=await gather(p,"offer");
   if(!current(s,p))return;
   await limitSender(p);
 
-  p.phase="Publishing offer";
-  await put(offerPath(id,SESSION,p.id),{
-   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.leaseID,g:s.g,sdp,b:T()
+  await patch(off(id,SESSION,p.id),{
+   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.lease,g:s.g,sdp,b:T()
   });
   if(!current(s,p))return;
 
-  await put(indexPath(id,SESSION),{
-   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.leaseID,g:s.g,b:T()
+  await patch(ix(id,SESSION),{
+   app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.lease,g:s.g,b:T()
   });
-  if(!current(s,p))return;
-
-  p.phase="Offer published — waiting for answer";
-  p.published=true;p.nextAnswer=0;
-  log("OFFER PUBLISHED — seat "+s.seat);
+  p.phase="Offer published";p.published=true;
  }catch(e){
   if(p){p.error=e.message;closePeer(p);}
-  s.retry.set(id,now()+8000);log("Offer: "+e.message);
+  log("Offer: "+e.message);
  }finally{
   s.building.delete(id);
   if(p&&!current(s,p))closePeer(p);
  }
 }
 function studentPeers(){
- const s=source;
- if(!captureLive(s)||!s.seat)return;
- const until=Math.max(pauseUntil,holdUntil());
- if(T()<until){
-  s.phase=`Waiting to rejoin (${Math.ceil((until-T())/1000)}s)`;
-  nextLease=0;return;
- }
- const active=activeViewers(),ids=new Set(active.map(([id])=>id));
+ const s=source;if(!capture(s)||!s.seat)return;
+ const list=activeViewers(),ids=new Set(list.map(([id])=>id));
+
  for(const [id,p]of s.links){
   if(!ids.has(id)||p.target!==target(s,id)||badPeer(p)){
    closePeer(p);s.links.delete(id);
   }
  }
- for(const [id,v]of active){
+ for(const [id,v]of list){
   if(!s.links.has(id)&&!s.building.has(id)&&s.building.size<2&&
-   (s.retry.get(id)||0)<now())launch(()=>buildOffer(s,id,v));
+   (s.retry.get(id)||0)<now())launch(()=>build(s,id,v));
  }
  const count=[...s.links.values()].filter(p=>
   p.active&&p.pc.connectionState==="connected").length;
- s.phase=active.length?
-  `Seat ${s.seat}: ${count}/${active.length} viewers connected`:
-  `Seat ${s.seat}: waiting for staff viewer`;
+ s.phase=`Seat ${s.seat}: ${count}/${list.length} viewers connected`;
 }
 async function pollAnswers(){
  const s=source;
- if(!captureLive(s)||answerPollBusy||now()<nextAnswers)return;
+ if(!capture(s)||answersBusy||now()<nextAnswers)return;
  const waiting=[...s.links.values()].filter(p=>
-  p.active&&p.published&&!p.answered&&!p.applying&&now()>=p.nextAnswer
- );
+  p.active&&p.published&&!p.answered&&!p.applying);
  if(!waiting.length)return;
- answerPollBusy=true;nextAnswers=now()+jitter(2500,1000);
+
+ answersBusy=true;nextAnswers=now()+jitter(2500,1000);
  try{
   await Promise.all(waiting.map(async p=>{
    try{
-    p.nextAnswer=now()+jitter(2500,1000);
-    const answer=await get(answerPath(SESSION,p.id));
-    if(!isRecord(answer)||answer.id!==p.id||answer.viewer!==p.viewer||
-     !current(s,p)||p.answered||p.applying)return;
-    p.applying=true;p.phase="Applying answer";
-    await remote(p,"answer",answer.sdp);
-    if(current(s,p)){
-     p.answered=true;p.phase="Answer applied — connecting";
-     await limitSender(p);
-     log("ANSWER APPLIED — seat "+s.seat);
-    }
+    const a=await get(ans(SESSION,p.id));
+    if(!isRecord(a)||a.id!==p.id||a.viewer!==p.viewer||!current(s,p))return;
+    p.applying=true;
+    await remote(p,"answer",a.sdp);
+    if(current(s,p)){p.answered=true;p.phase="Connecting";await limitSender(p);}
    }catch(e){
-    p.error=e.message;log("Answer: "+e.message);
+    p.error=e.message;
     if(p.pc.signalingState==="closed")closePeer(p);
    }finally{p.applying=false;}
   }));
- }finally{answerPollBusy=false;}
+ }finally{answersBusy=false;}
 }
-async function pollIndex(force=false){
- if(!staff||!room||!viewerID||indexBusy||(!force&&now()<nextIndex))return;
- if(!activeViewers().some(([id])=>id===viewerID))return;
+async function pollIndex(){
+ if(!staff||!room||!viewer||indexBusy||now()<nextIndex||
+  !activeViewers().some(([id])=>id===viewer))return;
+
  indexBusy=true;nextIndex=now()+jitter(4000,1500);
- try{
-  indexMap=records(await get(rp("sg28/index/"+viewerID)));
-  scanOffers();
- }catch(e){log("Offer index: "+e.message);}
+ try{index=records(await get(rp("sg28/index/"+viewer)));scanOffers();}
+ catch(e){log("Offer index: "+e.message);}
  finally{indexBusy=false;}
 }
 function scanOffers(){
- if(!staff)return;
  const liveIDs=new Set();
- for(const [number,lease]of Object.entries(records(seats))){
+
+ for(const [n,lease]of Object.entries(records(seats))){
   if(!live(lease))continue;
   liveIDs.add(lease.u);
-  const idx=indexMap[lease.u],old=receivers.get(lease.u);
-  if(old&&(old.leaseID!==lease.l||badPeer(old)||(idx&&old.id!==idx.id))){
+  const i=index[lease.u],old=receivers.get(lease.u);
+
+  if(old&&(old.lease!==lease.l||badPeer(old)||(i&&old.id!==i.id))){
    closePeer(old);receivers.delete(lease.u);
   }
+
   const existing=receivers.get(lease.u);
-  if(existing?.active&&existing.id===idx?.id)continue;
-  if(!isRecord(idx)||idx.app!==SIGNAL_APP||!validID(idx.id)||
-   Number(idx.seat)!==Number(number)||idx.c!==lease.c||
-   idx.l!==lease.l||Number(idx.g||0)!==meta.g)continue;
-  if(answering.has(lease.u)||offerFetch.has(lease.u)||
-   (offerRetry.get(lease.u)||0)>now()||answering.size>=8)continue;
-  launch(()=>fetchAndAnswer(lease.u,idx));
+  if(existing?.active&&existing.id===i?.id)continue;
+
+  if(!isRecord(i)||i.app!==SIGNAL_APP||!validID(i.id)||
+   Number(i.seat)!==Number(n)||i.c!==lease.c||i.l!==lease.l||
+   Number(i.g||0)!==meta.g)continue;
+
+  if(answering.has(lease.u)||fetching.has(lease.u)||
+   (retry.get(lease.u)||0)>now()||answering.size>=8)continue;
+
+  launch(()=>fetchAnswer(lease.u,i));
  }
- for(const [id,p]of receivers)
+
+ for(const [id,p]of receivers){
   if(!liveIDs.has(id)){closePeer(p);receivers.delete(id);}
+ }
 }
-async function fetchAndAnswer(id,idx){
- if(offerFetch.has(id)||answering.has(id))return;
- offerFetch.add(id);
+async function fetchAnswer(id,i){
+ if(fetching.has(id)||answering.has(id))return;
+ fetching.add(id);let p;
+
  try{
-  const offer=await get(offerPath(viewerID,id,idx.id));
-  if(!isRecord(offer)||offer.id!==idx.id||offer.app!==SIGNAL_APP)
-   throw Error("Offer missing or incompatible.");
-  const lease=seats[offer.seat];
-  if(!live(lease)||lease.u!==id||lease.l!==offer.l)return;
-  await answerOffer(id,offer);
- }catch(e){
-  offerRetry.set(id,now()+8000);log("Offer fetch: "+e.message);
- }finally{offerFetch.delete(id);}
-}
-async function answerOffer(id,offer){
- if(answering.has(id))return;
- answering.add(id);let p;
- try{
-  checkSDP("offer",offer.sdp);
-  p=makePeer("Receiving seat "+offer.seat,true);
+  const offer=await get(off(viewer,id,i.id));
+  const lease=seats[offer?.seat];
+  if(!isRecord(offer)||offer.app!==SIGNAL_APP||offer.id!==i.id||
+   !live(lease)||lease.u!==id||lease.l!==offer.l)return;
+
+  answering.add(id);
+  p=peer("Receiving seat "+offer.seat,true);
   Object.assign(p,{
-   id:offer.id,person:id,seat:Number(offer.seat),
-   leaseID:offer.l,cid:offer.c
+   id:offer.id,person:id,seat:Number(offer.seat),lease:offer.l
   });
   receivers.set(id,p);
+
   p.pc.ontrack=e=>{
-   if(p.active&&e.track.kind==="video")p.stream=new MediaStream([e.track]);
+   if(p.active&&e.track.kind==="video")
+    p.stream=new MediaStream([e.track]);
   };
   p.pc.ondatachannel=e=>attach(p,e.channel);
+
   await remote(p,"offer",offer.sdp);
   const sdp=await gather(p,"answer");
-  const lease=seats[p.seat];
-  if(!p.active||!live(lease)||lease.u!==id||lease.l!==p.leaseID)
+
+  if(!p.active||!live(seats[p.seat])||seats[p.seat].l!==p.lease)
    throw Error("Offer superseded.");
-  p.phase="Publishing answer";
-  await put(answerPath(id,p.id),{
-   app:SIGNAL_APP,id:p.id,viewer:viewerID,sdp,b:T()
+
+  await patch(ans(id,p.id),{
+   app:SIGNAL_APP,id:p.id,viewer,sdp,b:T()
   });
-  p.answered=true;p.phase="Answer published — connecting";
-  offerRetry.delete(id);
-  log("ANSWER PUBLISHED — seat "+p.seat);
+  p.answered=true;p.phase="Answer published";
+
  }catch(e){
-  offerRetry.set(id,now()+8000);
+  retry.set(id,now()+8000);
   if(p){
    p.error=e.message;closePeer(p);
    if(receivers.get(id)===p)receivers.delete(id);
   }
   log("Answer: "+e.message);
- }finally{answering.delete(id);}
+ }finally{
+  fetching.delete(id);answering.delete(id);
+ }
 }
 
-/* Direct user activation: no await before getDisplayMedia. */
 async function startSharing(){
  if(source)return;
  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
-  notice("HTTPS and a supported desktop browser are required.",true);return;
+  notice("HTTPS and screen capture are required.",true);return;
  }
+
  const s={
-  active:true,cid:uuid(),seat:0,leaseID:"",g:meta.g,pending:null,
-  raw:null,video:null,canvas:null,out:null,timer:null,draws:0,
-  phase:"Requesting permission",links:new Map(),building:new Set(),retry:new Map(),
-  helpAt:0,helpID:"",helpState:null
+  active:true,cid:uuid(),seat:0,lease:"",g:meta.g,pending:null,
+  raw:null,video:null,out:null,timer:null,draws:0,
+  phase:"Requesting permission",
+  links:new Map(),building:new Set(),retry:new Map(),
+  helpID:"",helpAt:0,helpReason:"",helpDetail:"",helpState:null
  };
- source=s;let permission;
+ source=s;
+ let permission;
+
  try{
+  // Must occur directly in the student click handler.
   permission=navigator.mediaDevices.getDisplayMedia({
    video:{frameRate:{ideal:2,max:5}},audio:false
   });
- }catch(e){
-  source=null;idle="Capture was not approved.";
-  notice(e.message,true);render();return;
- }
+ }catch(e){source=null;fail(e);return;}
+
  try{
   s.raw=await permission;
   if(!s.active){s.raw.getTracks().forEach(t=>t.stop());return;}
+
   s.raw.getVideoTracks()[0].addEventListener("ended",()=>{
-   if(source===s)launch(()=>stopSharing("Capture ended by the browser."));
+   if(source===s)launch(()=>stopSharing("Capture ended."));
   },{once:true});
+
   s.video=document.createElement("video");
   s.video.muted=true;s.video.autoplay=true;s.video.playsInline=true;
   s.video.srcObject=s.raw;await s.video.play();
   if(!s.active)return;
 
-  s.canvas=document.createElement("canvas");
-  const ctx=s.canvas.getContext("2d",{alpha:false});
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d",{alpha:false});
   if(!ctx)throw Error("Canvas unavailable.");
-  s.canvas.width=meta.w;s.canvas.height=Math.round(meta.w*9/16);
-  s.out=s.canvas.captureStream(0);
-  let output=s.out.getVideoTracks()[0];
-  if(!output)throw Error("Canvas capture unavailable.");
-  if(typeof output.requestFrame!=="function"){
+
+  canvas.width=meta.w;canvas.height=Math.round(meta.w*9/16);
+  s.out=canvas.captureStream(0);
+  let track=s.out.getVideoTracks()[0];
+  if(!track)throw Error("Canvas capture unavailable.");
+
+  if(typeof track.requestFrame!=="function"){
    s.out.getTracks().forEach(t=>t.stop());
-   s.out=s.canvas.captureStream(2);output=s.out.getVideoTracks()[0];
+   s.out=canvas.captureStream(2);track=s.out.getVideoTracks()[0];
   }
 
-  const draw=()=>{
+  function draw(){
    if(!s.active)return;
    const w=meta.w,h=Math.round(w*9/16);
-   if(s.canvas.width!==w||s.canvas.height!==h){s.canvas.width=w;s.canvas.height=h;}
+   if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
    ctx.fillStyle="#000";ctx.fillRect(0,0,w,h);
    const vw=s.video.videoWidth,vh=s.video.videoHeight;
    if(vw&&vh&&s.video.readyState>=2){
     const k=Math.min(w/vw,h/vh),dw=vw*k,dh=vh*k;
     ctx.drawImage(s.video,(w-dw)/2,(h-dh)/2,dw,dh);s.draws++;
    }
-   try{output.requestFrame?.();}catch{}
+   try{track.requestFrame?.();}catch{}
    s.timer=setTimeout(draw,1000/meta.fps);
-  };
-  draw();s.phase="Capture approved — claiming seat";
-  notice("Capture approved. Keep this page open.");
+  }
+  draw();
+  s.phase="Capture approved — claiming seat";
   nextLease=0;launch(leaseLoop);
+
  }catch(e){await stopSharing(e.message);}
  finally{render();}
 }
-async function stopSharing(reason="Sharing stopped. Seat will expire automatically."){
+async function stopSharing(reason="Sharing stopped; seat will expire."){
  const s=source;if(!s)return;
- if(s.helpID)broadcastCancel(s.helpID);
+
+ if(s.helpID){
+  for(const p of s.links.values())send(p,{type:"help-cancel",id:s.helpID});
+  launch(()=>patch(dp("help/"+SESSION),{state:"cancelled"}));
+ }
 
  s.active=false;source=null;clearTimeout(s.timer);
  s.raw?.getTracks().forEach(t=>t.stop());
  s.out?.getTracks().forEach(t=>t.stop());
  if(s.video){s.video.pause();s.video.srcObject=null;}
  closeLinks(s);idle=reason;notice(reason);render();
-
- /*
-  No seat/help/signaling deletion. Existing records expire or become inactive.
-  A cancelled help record is a non-null update to the same leaf.
- */
- if(s.helpID){
-  const cancelled={
-   id:s.helpID,g:s.g,seat:s.seat,at:s.helpAt,state:"cancelled"
-  };
-  try{await put(dp("help/"+SESSION),cancelled);}
-  catch(e){log("Help cancellation: "+e.message);}
- }
 }
-function queueHelpWrite(fn){
- const job=helpWriteQueue.catch(()=>{}).then(fn);
- helpWriteQueue=job;return job;
+
+function queueHelp(fn){
+ const promise=helpQueue.catch(()=>{}).then(fn);
+ helpQueue=promise;return promise;
 }
 async function toggleHelp(){
- const s=source;if(!captureLive(s)||!s.seat)return;
+ const s=source;if(!capture(s)||!s.seat)return;
 
  if(s.helpID){
-  const record={
-   id:s.helpID,g:meta.g,seat:s.seat,at:s.helpAt,state:"cancelled"
-  };
-  broadcastCancel(s.helpID);
-  s.helpID="";s.helpAt=0;s.helpState=null;ownHelp=record;render();
-  await queueHelpWrite(()=>put(dp("help/"+SESSION),record));
+  const id=s.helpID;
+  for(const p of s.links.values())send(p,{type:"help-cancel",id});
+  s.helpID="";s.helpAt=0;s.helpState=null;
+  if(ownHelp)ownHelp={...ownHelp,state:"cancelled"};
+  render();
+  await queueHelp(()=>patch(dp("help/"+SESSION),{state:"cancelled"}));
   return;
  }
 
- const record={id:uuid(),g:meta.g,seat:s.seat,at:T(),state:"requested"};
- s.helpID=record.id;s.helpAt=record.at;s.helpState=null;ownHelp=record;
- for(const p of s.links.values())p.helpAck=false;
+ const h={
+  id:uuid(),g:meta.g,seat:s.seat,at:T(),state:"requested",
+  reason:$("reason").value,detail:text($("detail").value,120),
+  label:"",resolvedAt:0
+ };
+ s.helpID=h.id;s.helpAt=h.at;s.helpReason=h.reason;
+ s.helpDetail=h.detail;s.helpState=null;ownHelp=h;
 
- broadcastHelp(record);render();notice("Help requested.");
-
- try{await queueHelpWrite(()=>put(dp("help/"+SESSION),record));}
- catch(e){
-  log("Help persistence: "+e.message);
-  notice("Help sent to connected staff, but database persistence failed.",true);
+ for(const p of s.links.values()){
+  p.helpAck=false;send(p,{type:"help-request",record:h});
  }
+ render();
+
+ try{await queueHelp(()=>patch(dp("help/"+SESSION),h));}
+ catch(e){notice("Live help sent, but database persistence failed: "+e.message,true);}
 }
 async function staffHelp(state){
- const n=zoomSeat,lease=seats[n];
+ const lease=seats[zoomSeat];
  if(!staff||!live(lease))return;
- const current=effectiveHelp(lease.u);
- if(!helpActive(current))return;
+ const h=effectiveHelp(lease.u);
+ if(!helpActive(h))return;
 
- const updated={...current,state,label:viewerLabel};
+ const updated={...h,state,label};
  if(state==="resolved")updated.resolvedAt=T();
- setFastHelp(lease.u,updated);
- sendPeerHelpState(
-  lease.u,state==="resolved"?"help-resolved":"help-helping",updated
- );
+ setFast(lease.u,updated);
 
- try{
-  const stored=await get(dp("help/"+lease.u));
-  if(isRecord(stored)&&stored.id===current.id){
-   await put(dp("help/"+lease.u),{
-    ...stored,state,label:viewerLabel,
-    ...(state==="resolved"?{resolvedAt:T()}:{})
-   });
-  }else{
-   log("Help response sent live; matching database record not yet available.");
-  }
- }catch(e){log("Help response persistence: "+e.message);}
+ const p=receivers.get(lease.u);
+ if(p)send(p,{
+  type:state==="resolved"?"help-resolved":"help-helping",
+  id:h.id,label
+ });
+
+ const stored=await get(dp("help/"+lease.u));
+ if(isRecord(stored)&&stored.id===h.id){
+  const changes={state,label};
+  if(state==="resolved")changes.resolvedAt=T();
+  await patch(dp("help/"+lease.u),changes);
+ }
 }
 
 function bind(video,stream){
  stream||=null;if(video.srcObject===stream)return;
- video.srcObject=stream;
- if(stream)video.play().catch(e=>{
-  if(e.name!=="AbortError")log("Playback: "+e.message);
- });
-}
-function mediaState(p){
- if(!p)return {live:false,text:"Waiting for offer",detail:""};
- if(!p.active)return {live:false,text:"Reconnecting",detail:p.error};
- const state=p.pc.connectionState;
- if(state!=="connected")
-  return {live:false,text:p.phase,detail:p.error||"ICE: "+p.pc.iceConnectionState};
- if(p.lastBeat&&now()-p.lastBeat>45000)
-  return {live:false,text:"Heartbeat delayed",detail:""};
- if(p.receiver){
-  if(!p.stream)return {live:false,text:"Connected — no video track",detail:""};
-  if(!p.lastFrame)return {live:false,text:"Connected — waiting for frames",detail:`${p.bytes} bytes`};
-  if(now()-p.lastFrame>30000)
-   return {live:false,text:"No recent frames",detail:"Static source or stalled capture"};
- }
- return {live:true,text:"Live",detail:`${p.frames} frames · ${Math.round(p.bytes/1024)} KiB`};
+ video.srcObject=stream;if(stream)video.play().catch(()=>{});
 }
 function tileFor(n){
  if(tiles.has(n))return tiles.get(n);
- const el=document.createElement("button");el.type="button";el.className="tile";
+ const el=document.createElement("button");el.className="tile";el.type="button";
  const head=document.createElement("div");head.className="tileHead";
  const title=document.createElement("span");title.textContent="Seat "+n;
- const flag=document.createElement("span");flag.className="flag";head.append(title,flag);
- const picture=document.createElement("div");picture.className="picture";
+ const flag=document.createElement("span");head.append(title,flag);
+ const pic=document.createElement("div");pic.className="picture";
  const video=document.createElement("video");
  video.autoplay=true;video.muted=true;video.playsInline=true;
  const overlay=document.createElement("div");overlay.className="overlay";
  const foot=document.createElement("div");foot.className="foot";
- picture.append(video,overlay);el.append(head,picture,foot);
- el.onclick=()=>{zoomSeat=n;updateZoom();if(!$("zoom").open)$("zoom").showModal();};
- const tile={el,video,overlay,foot,flag};
- tiles.set(n,tile);$("grid").append(el);return tile;
+ pic.append(video,overlay);el.append(head,pic,foot);
+ el.onclick=()=>{
+  zoomSeat=n;updateZoom();if(!$("zoom").open)$("zoom").showModal();
+ };
+ const t={el,video,overlay,foot,flag};
+ tiles.set(n,t);$("grid").append(el);return t;
+}
+function media(p){
+ if(!p)return {on:false,text:"Waiting for offer"};
+ if(p.pc.connectionState!=="connected")
+  return {on:false,text:p.phase||p.pc.connectionState};
+ if(!p.stream)return {on:false,text:"Waiting for video track"};
+ if(!p.lastFrame)return {on:false,text:"Waiting for frames"};
+ if(now()-p.lastFrame>30000)return {on:false,text:"Static or stalled"};
+ return {on:true,text:"Live"};
+}
+function seatInfo(n){
+ const lease=seats[n];
+ if(!live(lease))return "Free or expired";
+ const h=effectiveHelp(lease.u);
+ const f=Number(lease.feeling)||3;
+ return `Seat ${n} · ${FEEL[f-1]||"Okay"} · step ${Number(lease.step)||0} · `+
+  `${text(lease.state||"working",40)}${lease.task?" · "+text(lease.task,120):""}`+
+  `${helpActive(h)?" · "+helpLabel(h):""}`;
+}
+function renderPeople(){
+ const box=$("people");box.replaceChildren();
+ const entries=Object.entries(records(seats))
+  .filter(([,s])=>live(s))
+  .sort((a,b)=>(Number(a[1].feeling)||3)-(Number(b[1].feeling)||3)||
+   (Number(a[1].step)||0)-(Number(b[1].step)||0));
+
+ if(!entries.length){box.textContent="No active students.";return;}
+ for(const [n]of entries){
+  const row=document.createElement("div");row.className="roomRow";
+  row.textContent=seatInfo(Number(n));box.append(row);
+ }
+}
+function renderCarousel(){
+ if($("carousel").hidden||!meta)return;
+ const cap=meta.rows*meta.cols;
+ carouselSeat=Math.max(1,Math.min(cap,carouselSeat));
+ const lease=seats[carouselSeat];
+ const p=live(lease)?receivers.get(lease.u):null;
+ $("carouselTitle").textContent="Seat "+carouselSeat;
+ $("carouselDetails").textContent=seatInfo(carouselSeat);
+ bind($("carouselVideo"),p?.stream);
 }
 function render(){
- updateTitle();if(!room||!meta)return;
+ if(!room||!meta){document.title="Classroom Screens — Ready";return;}
+ $("heading").textContent=meta.name;
+ document.title=meta.name+" — "+
+  (staff?(role==="teacher"?"Teacher":"Assistant"):
+   source?"Student — Sharing":"Student — Ready");
 
  if(!staff){
-  const s=source;
-  $("studentStatus").textContent=s?s.phase:idle;
-  $("shareBtn").disabled=!!s;$("stopBtn").disabled=!s;
-  $("retryBtn").disabled=!s;$("helpBtn").disabled=!captureLive(s)||!s.seat;
-  $("helpBtn").textContent=s?.helpID?"Cancel help":"Request help";
+  $("studentStatus").textContent=source?.phase||idle;
+  $("shareBtn").disabled=!!source;
+  $("stopBtn").disabled=!source;
+  $("retryBtn").disabled=!source;
+  $("helpBtn").disabled=!capture(source)||!source.seat;
+  $("helpBtn").textContent=source?.helpID?"Cancel help":"Request help";
 
-  if(s?.helpState?.state==="helping")
-   $("helpStatus").textContent=s.helpState.label+" is helping you.";
-  else if(s?.helpID)$("helpStatus").textContent="Help requested. Keep this page open.";
-  else if(ownHelp?.state==="resolved")
-   $("helpStatus").textContent="Help resolved by "+(ownHelp.label||"staff")+".";
-  else $("helpStatus").textContent="";
+  // Progress controls remain usable before capture as a local draft.
+  $("pill").disabled=false;
+  $("saveProgressBtn").disabled=false;
 
-  $("studentProgress").textContent=s?[
-   `Version: ${UI_VERSION}`,
-   `Capture: ${s.raw?.getVideoTracks()[0]?.readyState||"pending"}`,
-   `Canvas draws: ${s.draws}`,
-   `Seat: ${s.seat||"not assigned"}`,
-   `Active viewers: ${activeViewers().length}`,
-   `Help: ${s.helpID?"requested":"not requested"}`,
-   ...[...s.links.values()].map(p=>
-    `${p.name}\n  ${p.phase}\n  answer applied=${p.answered}\n`+
-    `  ICE=${p.pc.iceConnectionState}; connection=${p.pc.connectionState}\n`+
-    `  help acknowledgment=${p.helpAck}\n  ${p.error||""}`)
-  ].join("\n\n"):idle;
+  $("helpStatus").textContent=
+   source?.helpState?.state==="helping"?`${source.helpState.label} is helping`:
+   source?.helpState?.state==="resolved"?"Help resolved":
+   source?.helpID?"Help requested":"";
+
+  $("studentProgress").textContent=source?[
+   `Capture: ${source.raw?.getVideoTracks()[0]?.readyState||"pending"}`,
+   `Seat: ${source.seat||"waiting"}`,
+   `Canvas draws: ${source.draws}`,
+   ...[...source.links.values()].map(p=>
+    `${p.name}: ${p.phase}; ${p.pc.connectionState}; ${p.error}`)
+  ].join("\n"):"Not sharing.";
   return;
  }
 
@@ -1466,230 +1413,187 @@ function render(){
  $("grid").style.gridTemplateColumns=
   `repeat(${meta.cols},${large?"minmax(220px,1fr)":"minmax(0,1fr)"})`;
  $("grid").style.minWidth=large?meta.cols*228+"px":"0";
- $("cornerBadge").textContent="Seat 1: "+meta.corner.replace("-"," ");
- for(const [n,t]of tiles)
+
+ for(const [n,t]of tiles){
   if(n>cap){bind(t.video,null);t.el.remove();tiles.delete(n);}
+ }
 
  let occupied=0,liveCount=0,helps=0;
  for(let n=1;n<=cap;n++){
-  const tile=tileFor(n),lease=seats[n],fresh=live(lease);
+  const t=tileFor(n),lease=seats[n],fresh=live(lease);
+  const p=fresh?receivers.get(lease.u):null;
+  const h=fresh?effectiveHelp(lease.u):null;
   const row=Math.floor((n-1)/meta.cols),col=(n-1)%meta.cols;
-  tile.el.style.gridRow=String(meta.corner.startsWith("bottom")?meta.rows-row:row+1);
-  tile.el.style.gridColumn=String(meta.corner.endsWith("right")?meta.cols-col:col+1);
 
-  const peer=fresh?receivers.get(lease.u):null;
-  const help=fresh?effectiveHelp(lease.u):null;
-  let state={live:false,text:"Free",detail:""};
+  t.el.style.gridRow=String(meta.corner.startsWith("bottom")?meta.rows-row:row+1);
+  t.el.style.gridColumn=String(meta.corner.endsWith("right")?meta.cols-col:col+1);
 
-  if(fresh){
-   occupied++;state=mediaState(peer);
-   if(!peer&&indexMap[lease.u])state.detail="Offer indexed; connecting or retrying";
-   else if(!peer)state.detail="Waiting for student offer";
-  }else if(lease)state.detail="Expired — reusable";
+  const state=fresh?media(p):{on:false,text:"Free"};
+  if(fresh)occupied++;
+  if(state.on)liveCount++;
+  if(helpActive(h))helps++;
 
-  if(state.live)liveCount++;
-  if(helpActive(help))helps++;
+  t.el.classList.toggle("live",state.on);
+  t.el.classList.toggle("help",!!(fresh&&helpActive(h)));
+  t.flag.textContent=fresh&&helpActive(h)?"Help!":
+   fresh?(EMOJI[(Number(lease.feeling)||3)-1]||""):"";
+  t.overlay.textContent=state.text;
+  t.foot.textContent=fresh?seatInfo(n):"";
 
-  tile.el.classList.toggle("live",state.live);
-  tile.el.classList.toggle("help",!!(fresh&&helpActive(help)));
-  tile.flag.textContent=fresh&&helpActive(help)?
-   (help.state==="helping"?"Helping":"Help!"):"";
-  tile.overlay.textContent=state.text;
-  tile.foot.textContent=helpActive(help)?helpText(help):state.detail;
-  tile.el.title=state.text+"\n"+(helpActive(help)?helpText(help):state.detail);
-  bind(tile.video,peer?.stream);
+  // Detach grid playback while carousel is open. Connections remain active.
+  bind(t.video,$("carousel").hidden?p?.stream:null);
  }
+
  $("gridStatus").textContent=
-  `${occupied} seated · ${liveCount} live · ${activeViewers().length}/${meta.maxViewers} viewers`;
- $("helpCount").textContent=`${helps} help request${helps===1?"":"s"}`;
- updateZoom();
+  `${occupied} seated · ${liveCount} live · ${activeViewers().length} viewers`;
+ $("helpCount").textContent=`${helps} help`;
+ $("cornerBadge").textContent="Seat 1: "+meta.corner.replace("-"," ");
+
+ renderCarousel();renderPeople();updateZoom();
 }
 function updateZoom(){
  if(zoomSeat===null||!meta)return;
  const lease=seats[zoomSeat],fresh=live(lease);
- const peer=fresh?receivers.get(lease.u):null;
- const state=mediaState(peer),help=fresh?effectiveHelp(lease.u):null;
+ const p=fresh?receivers.get(lease.u):null;
+ const h=fresh?effectiveHelp(lease.u):null;
  $("zoomTitle").textContent=meta.name+" — Seat "+zoomSeat;
- $("zoomStatus").textContent=fresh?
-  state.text+". "+state.detail+(helpActive(help)?" · "+helpText(help):""):
-  "Seat is free or expired.";
- bind($("zoomVideo"),peer?.stream);
- $("ackHelpBtn").disabled=!fresh||!helpActive(help);
- $("resolveHelpBtn").disabled=!fresh||!helpActive(help);
-}
-async function readStats(p){
- const stats=await p.pc.getStats();let frames=0,bytes=0;
- const lines=[
-  `${p.name}: ${p.pc.connectionState}; ICE=${p.pc.iceConnectionState}; DC=${p.dc?.readyState||"none"}`
- ];
- stats.forEach(r=>{
-  if(r.type==="candidate-pair"&&r.nominated){
-   const local=stats.get(r.localCandidateId);
-   const remoteCandidate=stats.get(r.remoteCandidateId);
-   lines.push(
-    `Pair=${r.state}; local=${local?.candidateType}/${local?.protocol}; `+
-    `remote=${remoteCandidate?.candidateType}/${remoteCandidate?.protocol}`
-   );
-  }
-  if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
-  if(p.receiver&&r.type==="inbound-rtp"){frames+=r.framesDecoded||0;bytes+=r.bytesReceived||0;}
-  if(!p.receiver&&r.type==="outbound-rtp"){frames+=r.framesEncoded||0;bytes+=r.bytesSent||0;}
- });
- if(frames>p.frames)p.lastFrame=now();
- p.frames=frames;p.bytes=bytes;
- p.stats=lines.join("\n")+`\nFrames=${frames}; bytes=${bytes}`;
+ $("zoomStatus").textContent=seatInfo(zoomSeat);
+ bind($("zoomVideo"),p?.stream);
+ $("ackBtn").disabled=!fresh||!helpActive(h);
+ $("resolveBtn").disabled=!fresh||!helpActive(h);
 }
 async function statsWorker(){
- if(statsBusy||!meta)return;statsBusy=true;
+ if(statsBusy)return;statsBusy=true;
  try{
   const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
-  await Promise.all(list.filter(p=>p.active).map(p=>readStats(p).catch(()=>{})));
- }finally{statsBusy=false;render();}
+  await Promise.all(list.filter(p=>p.active).map(async p=>{
+   try{
+    const stats=await p.pc.getStats();let frames=0,bytes=0;
+    stats.forEach(r=>{
+     if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
+     if(p.receiver&&r.type==="inbound-rtp"){
+      frames+=r.framesDecoded||0;bytes+=r.bytesReceived||0;
+     }
+     if(!p.receiver&&r.type==="outbound-rtp"){
+      frames+=r.framesEncoded||0;bytes+=r.bytesSent||0;
+     }
+    });
+    if(frames>p.frames)p.lastFrame=now();
+    p.frames=frames;p.bytes=bytes;
+    p.stats=`frames=${frames}; bytes=${bytes}; ICE=${p.pc.iceConnectionState}`;
+   }catch{}
+  }));
+ }finally{statsBusy=false;}
 }
 async function testTURN(){
- if(turnBusy)return;
- turnBusy=true;$("testTURNBtn").disabled=true;
  let a,b;
  try{
-  notice("Testing TURN relay echo through 61.238.240.78:3478…");
-  a=makePeer("TURN test A");b=makePeer("TURN test B");
-  const token="relay-"+uuid();let echo=false;
+  a=peer("TURN A");b=peer("TURN B");
+  let echo=false;const token=uuid();
   b.pc.ondatachannel=e=>{
    b.dc=e.channel;b.dc.onmessage=m=>{if(m.data===token)b.dc.send(token);};
   };
-  a.dc=a.pc.createDataChannel("turn-test");
+  a.dc=a.pc.createDataChannel("test");
   a.dc.onmessage=e=>{if(e.data===token)echo=true;};
-  const offer=await gather(a,"offer");await remote(b,"offer",offer);
-  const answer=await gather(b,"answer");await remote(a,"answer",answer);
-  const deadline=now()+30000;
-  while(!echo&&now()<deadline){
+
+  await remote(b,"offer",await gather(a,"offer"));
+  await remote(a,"answer",await gather(b,"answer"));
+
+  const end=now()+30000;
+  while(!echo&&now()<end){
    if(a.dc.readyState==="open")a.dc.send(token);
    await sleep(400);
   }
-  if(!echo)throw Error("No echoed relay message. Allocation alone is not a pass.");
-  await readStats(a);await readStats(b);
-  $("report").textContent="TURN RELAY ECHO: PASS\n\n"+a.stats+"\n\n"+b.stats;
-  notice("TURN relay echo passed for this browser/network path.");
- }catch(e){
-  $("report").textContent="TURN RELAY ECHO FAILED:\n"+e.message;fail(e);
- }finally{
-  closePeer(a);closePeer(b);turnBusy=false;$("testTURNBtn").disabled=false;
- }
+  if(!echo)throw Error("Relay echo timed out.");
+  notice("TURN relay echo passed for this browser path.");
+ }finally{closePeer(a);closePeer(b);}
 }
 async function report(){
- const config=rtcConfig();
- config.iceServers=config.iceServers.map(s=>({...s,credential:"[omitted]"}));
  const lines=[
-  UI_VERSION,
-  `Signal compatibility tag=${SIGNAL_APP}`,
-  new Date().toISOString(),
-  navigator.userAgent,
-  "Database: "+DB,
-  "Database authentication: NONE",
+  VERSION,new Date().toISOString(),navigator.userAgent,
   `Room=${room}; role=${role}; session=${SESSION}`,
-  `Requests since load=${requestCount}; decoded response bytes=${responseBytes}`,
-  "Decoded bytes exclude compression and HTTP/TLS overhead.",
-  `Database errors=${dbErrors}; last error=${lastError}`,
-  `Server Date readable=${clockKnown}; offset=${Math.round(offset)}ms`,
-  "ICE configuration: "+JSON.stringify(config),
-  `Viewer=${viewerID}; active viewers=${activeViewers().length}`,
-  `Capture=${!!source}; seat=${source?.seat||0}; draws=${source?.draws||0}`,
-  `Help request active=${!!source?.helpID}`,
-  "Protection: no DELETE or PUT null operations in this client.",
-  "Signaling records are retained; monitor growth.",
-  "Compatibility seat writes are not atomic.",
-  "Keys, TURN credential and SDP omitted."
+  `DB errors=${dbErrors}; last=${lastError}`,
+  `Server Date readable=${clockKnown}`,
+  `TURN=${TURN.host}:${TURN.port}; relay only`,
+  `Capture=${!!source}; seat=${source?.seat||0}`,
+  `Seats=${Object.keys(seats).length}; viewers=${activeViewers().length}`,
+  "GET/PATCH only; no null writes.",
+  "Seat claims are not atomic. SDP and keys omitted."
  ];
  const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
- for(const p of list){
-  if(p.active)try{await readStats(p);}catch{}
-  lines.push(p.name,p.phase,p.error,p.stats);
- }
+ for(const p of list)lines.push(p.name,p.phase,p.error,p.stats);
  return lines.join("\n\n");
 }
-function networkChanged(){
- if(now()-lastNetwork<1500)return;
- lastNetwork=now();log("Network changed — reconnecting.");
- closeLinks();nextLease=0;nextMeta=0;nextViewers=0;nextIndex=0;
- for(const p of receivers.values())closePeer(p);
- receivers.clear();offerRetry.clear();
-}
+
 function maintenance(){
  if(!room){
-  if(wantedRoom&&!opening&&now()-lastOpen>10000)
-   launch(async()=>{try{await openRoom();}catch(e){log("Open retry: "+e.message);}});
+  if(wanted&&!opening&&now()-lastOpen>10000)launch(openRoom);
   return;
  }
-
- launch(pollMeta);
- launch(pollViewers);
+ launch(pollMeta);launch(pollViewers);
 
  if(staff){
-  launch(pollSeats);
-  launch(renewViewer);
-  launch(pollIndex);
-  launch(pollHelp);
+  launch(pollSeats);launch(viewerBeat);launch(pollIndex);launch(pollHelp);
  }else{
   if(source&&!source.seat)launch(pollSeats);
-  launch(pollOwn);
-  launch(leaseLoop);
-  studentPeers();
-  launch(pollAnswers);
+  launch(pollOwn);launch(leaseLoop);studentPeers();launch(pollAnswers);
 
-  if(now()>=nextBeat){
+  if(source&&now()>=nextBeat){
    nextBeat=now()+jitter(10000,2000);
-   const track=source?.raw?.getVideoTracks()[0];
-   if(track)for(const p of source.links.values())send(p,{
-    type:"beat",captureState:track.readyState,
-    muted:track.muted,draws:source.draws
+   const t=source.raw?.getVideoTracks()[0];
+   if(t)for(const p of source.links.values())send(p,{
+    type:"beat",captureState:t.readyState,muted:t.muted,draws:source.draws
    });
   }
 
-  if(source?.helpID&&now()>=nextHelpResend){
-   nextHelpResend=now()+2000;
-   const record=currentHelpRecord();
-   if(record)for(const p of source.links.values())
-    if(!p.helpAck)send(p,{type:"help-request",record});
+  if(source?.helpID&&now()>=nextHelpSend){
+   nextHelpSend=now()+2000;
+   const h={
+    id:source.helpID,g:meta.g,seat:source.seat,at:source.helpAt,
+    state:"requested",reason:source.helpReason,detail:source.helpDetail
+   };
+   for(const p of source.links.values())
+    if(!p.helpAck)send(p,{type:"help-request",record:h});
   }
  }
- render();
+}
+async function copy(value){
+ await navigator.clipboard.writeText(value);notice("Link copied.");
 }
 
-/* Controls */
-async function copy(text){await navigator.clipboard.writeText(text);notice("Link copied.");}
 $("createBtn").onclick=act(createRoom);
 $("joinBtn").onclick=act(()=>{
  const u=new URL($("joinInput").value.trim());
- if(!validID(u.searchParams.get("room")))throw Error("Invalid room invitation.");
- const dest=base();dest.search=u.search;dest.hash=u.hash;
- dest.searchParams.set("build","30");location.href=dest.href;
+ if(!validID(u.searchParams.get("room")))throw Error("Invalid invitation.");
+ const destination=base();
+ destination.search=u.search;destination.hash=u.hash;
+ destination.searchParams.set("build","32");
+ location.href=destination.href;
 });
 $("menuBtn").onclick=()=>$("admin").hidden=!$("admin").hidden;
 $("closeAdminBtn").onclick=()=>$("admin").hidden=true;
 
-/* Direct real-user click. */
+// Preserve real user activation for getDisplayMedia.
 $("shareBtn").onclick=()=>void startSharing();
-
-$("retryBtn").onclick=()=>{
- closeLinks();nextLease=0;nextAnswers=0;nextViewers=0;
- notice("Reconnecting while retaining approved capture.");
-};
 $("stopBtn").onclick=act(()=>stopSharing());
+$("retryBtn").onclick=()=>{closeLinks();nextLease=0;nextAnswers=0;nextViewers=0;};
+$("saveProgressBtn").onclick=act(saveProgress);
 $("helpBtn").onclick=act(toggleHelp);
-$("copyStudentBtn").onclick=act(()=>copy(roomLink(currentEntry(),"student")));
+
+$("copyStudentBtn").onclick=act(()=>copy(roomLink(entry(),"student")));
 $("copyAssistantBtn").onclick=act(()=>{
  if(!assistantKey)throw Error("Assistant invitation unavailable.");
- return copy(roomLink(currentEntry(),"assistant"));
+ return copy(roomLink(entry(),"assistant"));
 });
 $("copyTeacherBtn").onclick=act(()=>{
- if(role!=="teacher")throw Error("Teacher invitation required.");
- return copy(roomLink(currentEntry(),"teacher"));
+ if(role!=="teacher")throw Error("Teacher only.");
+ return copy(roomLink(entry(),"teacher"));
 });
 $("copySeatBtn").onclick=act(()=>{
  const n=Number($("linkSeat").value);
  if(!meta||!Number.isInteger(n)||n<1||n>meta.rows*meta.cols)
   throw Error("Invalid seat.");
- return copy(roomLink(currentEntry(),"student",n));
+ return copy(roomLink(entry(),"student",n));
 });
 $("copyCreateBtn").onclick=act(()=>copy(createLink()));
 
@@ -1697,46 +1601,61 @@ $("saveBtn").onclick=act(async()=>{
  if(role!=="teacher")throw Error("Teacher only.");
  const current=normalize(await get(dp("meta")));
  const settings={
-  name:$("cfgName").value.trim()||current.name,
+  name:text($("cfgName").value||current.name,60),
   rows:Number($("cfgRows").value),cols:Number($("cfgCols").value),
   corner:$("cfgCorner").value,w:Number($("cfgWidth").value),
   fps:Number($("cfgFPS").value),ttl:Number($("cfgTTL").value),
-  maxViewers:Number($("cfgMaxViewers").value),
-  tr:$("cfgTransport").value,port:3478,fallbackPorts:false
+  maxViewers:Number($("cfgMax").value),tr:$("cfgTransport").value,
+  port:3478,fallbackPorts:false
  };
  validate({...current,...settings});
+
  const highest=Math.max(
   0,...Object.entries(records(seats))
    .filter(([,v])=>live(v)).map(([n])=>Number(n))
  );
  if(highest>settings.rows*settings.cols)
-  throw Error("Active seats outside new grid; wait for expiry or reset first.");
+  throw Error("Active seats exist outside the new grid.");
+
  await patch(dp("meta"),{
   ...settings,streamRevision:(current.streamRevision||1)+1
  });
- await pollMeta(true);fillSettings();remember(currentEntry());
- notice("Settings saved. Students receive changes on their next settings poll.");
+ await pollMeta(true);fillSettings();remember(entry());notice("Settings saved.");
 });
 $("reconnectAllBtn").onclick=act(async()=>{
  if(role!=="teacher")throw Error("Teacher only.");
  const m=normalize(await get(dp("meta")));
  await patch(dp("meta"),{streamRevision:(m.streamRevision||1)+1});
- notice("Students reconnect when they receive the settings revision.");
+ notice("Reconnect requested.");
 });
 $("resetBtn").onclick=act(async()=>{
- if(role!=="teacher")throw Error("Teacher only.");
- if(!confirm("Invalidate seats? Approved captures automatically rejoin."))return;
+ if(role!=="teacher"||!confirm("Invalidate current leases? Students automatically rejoin."))return;
  const m=normalize(await get(dp("meta")));
  await patch(dp("meta"),{g:m.g+1});
- await pollMeta(true);
- notice("Room generation changed. Existing records were not deleted.");
+ await pollMeta(true);notice("Generation changed; no records deleted.");
 });
-$("ackHelpBtn").onclick=act(()=>staffHelp("helping"));
-$("resolveHelpBtn").onclick=act(()=>staffHelp("resolved"));
+
+$("ackBtn").onclick=act(()=>staffHelp("helping"));
+$("resolveBtn").onclick=act(()=>staffHelp("resolved"));
 $("closeZoomBtn").onclick=()=>$("zoom").close();
-$("zoom").addEventListener("close",()=>{
- zoomSeat=null;bind($("zoomVideo"),null);
-});
+$("zoom").addEventListener("close",()=>{zoomSeat=null;bind($("zoomVideo"),null);});
+
+$("carouselToggle").onclick=()=>{
+ $("carousel").hidden=!$("carousel").hidden;render();
+};
+$("prevBtn").onclick=()=>{
+ carouselSeat=carouselSeat<=1?meta.rows*meta.cols:carouselSeat-1;renderCarousel();
+};
+$("nextBtn").onclick=()=>{
+ carouselSeat=carouselSeat>=meta.rows*meta.cols?1:carouselSeat+1;renderCarousel();
+};
+$("carouselVideo").addEventListener("wheel",e=>{
+ e.preventDefault();
+ carouselSeat=e.deltaY>0?
+  (carouselSeat>=meta.rows*meta.cols?1:carouselSeat+1):
+  (carouselSeat<=1?meta.rows*meta.cols:carouselSeat-1);
+ renderCarousel();
+},{passive:false});
 
 $("view").value=["fit","large"].includes(Q.get("view"))?
  Q.get("view"):load("cr-view","fit");
@@ -1744,36 +1663,39 @@ if(!["fit","large"].includes($("view").value))$("view").value="fit";
 $("view").onchange=()=>{save("cr-view",$("view").value);render();};
 
 $("testDBBtn").onclick=act(async()=>{
- const result=await get(room?dp("meta"):"rooms/ordinary-get-probe/d/meta");
- $("report").textContent=
-  "GET PASS\n"+JSON.stringify(result,null,2)+
-  "\nNo write or deletion test was performed.";
+ $("report").textContent=JSON.stringify(
+  await get(room?dp("meta"):"rooms/ordinary-get-probe/d/meta"),null,2
+ );
 });
 $("testTURNBtn").onclick=act(testTURN);
 $("reportBtn").onclick=act(async()=>{$("report").textContent=await report();});
 $("downloadBtn").onclick=act(async()=>{
- const text=await report()+"\n\nEVENT LOG\n"+logs.join("\n");
- const url=URL.createObjectURL(new Blob(["\uFEFF",text],{type:"text/plain;charset=utf-8"}));
+ const result=await report()+"\n\n"+logs.join("\n");
+ const url=URL.createObjectURL(new Blob(["\uFEFF",result],{
+  type:"text/plain;charset=utf-8"
+ }));
  const a=document.createElement("a");
- a.href=url;a.download="classroom-hierarchy-guard-v30.txt";a.click();
+ a.href=url;a.download="classroom-patch-v32.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 $("homeBtn").onclick=()=>{
- if(source&&!confirm("Stop sharing and return home?"))return;
+ if(source&&!confirm("Stop sharing?"))return;
  location.href=base().href;
 };
 
-window.addEventListener("online",networkChanged);
-window.addEventListener("offline",()=>notice("Offline. Capture remains while this page stays open."));
+function networkChanged(){
+ closeLinks();nextLease=0;nextMeta=0;nextViewers=0;nextIndex=0;
+ for(const p of receivers.values())closePeer(p);
+ receivers.clear();
+}
+addEventListener("online",networkChanged);
 navigator.connection?.addEventListener?.("change",networkChanged);
 document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible"){
-  nextMeta=0;nextViewers=0;nextLease=0;nextHelpPoll=0;
-  launch(()=>pollMeta(true));launch(()=>pollViewers(true));
-  launch(leaseLoop);launch(pollHelp);
+  nextMeta=0;nextViewers=0;nextLease=0;nextHelp=0;
  }
 });
-window.addEventListener("pagehide",()=>{
+addEventListener("pagehide",()=>{
  if(source){
   source.active=false;clearTimeout(source.timer);
   source.raw?.getTracks().forEach(t=>t.stop());
@@ -1781,30 +1703,18 @@ window.addEventListener("pagehide",()=>{
   closeLinks(source);
  }
  for(const p of receivers.values())closePeer(p);
- // No unload database writes or deletions.
 });
-window.addEventListener("pageshow",e=>{if(e.persisted)location.reload();});
+addEventListener("pageshow",e=>{if(e.persisted)location.reload();});
 
 setInterval(maintenance,500);
 setInterval(()=>launch(statsWorker),5000);
 setInterval(render,1000);
 
-$("connectionInfo").textContent=
- DB+"\nDatabase authentication: NONE\n"+
- "Existing v28/v29 database paths retained\n"+
- "TURN: 61.238.240.78:3478\n"+
- "No DELETE and no PUT null requests\n"+
- "Signaling records retained to protect sg28\n"+
- "Stopped seats expire automatically.";
+showFeeling();renderHome();
+log(VERSION+" ready; GET/PATCH guard enabled.");
 
-log(UI_VERSION+" ready. Essential database hierarchy is never deleted by this client.");
-renderHome();updateTitle();
-
-if(wantedRoom){
- openRoom().catch(e=>{fail(e);$("admin").hidden=false;});
-}else if(Q.get("create")==="1"){
- createRoom().catch(e=>{fail(e);$("admin").hidden=false;});
-}
+if(wanted)openRoom().catch(fail);
+else if(Q.get("create")==="1")createRoom().catch(fail);
 </script>
 </body>
 </html>
