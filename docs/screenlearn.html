@@ -6,69 +6,245 @@
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark">
 <title>Classroom Screens — Ready</title>
+
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark;background:#101722;color:#edf4ff}
-*{box-sizing:border-box}body{margin:0}
-button,input,select{font:inherit;padding:8px 10px;border:1px solid #607895;border-radius:7px;background:#142235;color:inherit}
-button{cursor:pointer}button:hover:not(:disabled){background:#294c70}button:disabled{opacity:.5}
-input[type=number]{width:78px}.grow{flex:1;min-width:160px}.row,label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.primary{background:#175e96}.helpButton{background:#775216;border-color:#d1a64c}
-header{position:sticky;top:0;z-index:10;padding:11px;background:#101722f5;border-bottom:1px solid #435971;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
-.badge{font-size:.74rem;padding:4px 8px;border:1px solid #536c88;border-radius:18px}
-main{padding:12px;max-width:1800px;margin:auto}.panel{padding:14px;background:#192638;border:1px solid #435971;border-radius:10px;margin-bottom:12px}
-#notice{padding:11px;background:#213c56;border-left:4px solid #8bccff;margin-bottom:12px;white-space:pre-wrap}
-#notice.error{background:#472b36;border-color:#ffabab}.muted{color:#b8cadc;font-size:.85rem}.warning{color:#ffd49b}
-[hidden]{display:none!important}h2{font-size:1.1rem}h3{font-size:1rem}p{line-height:1.5}
-#viewport{overflow:auto;padding:3px}#grid{display:grid;gap:8px}
-.tile{padding:0;text-align:left;overflow:hidden;background:#35414d;min-width:0}
-.tileHead{display:flex;justify-content:space-between;padding:5px 8px;font-size:.78rem}
-.picture{position:relative;aspect-ratio:16/9;background:#424d59}.picture video{width:100%;height:100%;object-fit:contain;display:block}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;text-align:center;padding:4px}
-.foot{padding:5px 7px;font-size:.65rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tile:not(.live) video{opacity:.18;filter:grayscale(1)}.tile.live{border-color:#62c49c}.tile.live .overlay{display:none}.tile.help{border:2px solid #e9b54d}
-#admin{position:fixed;inset:0 0 0 auto;width:min(96vw,520px);z-index:30;overflow:auto;margin:0;border-radius:0}
-.roomRow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px;margin:6px 0;border:1px solid #4a627e;border-radius:7px;flex-wrap:wrap}
-pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:#0c1521;padding:10px;border-radius:7px;font-size:12px}
-dialog{width:min(1000px,96vw);max-height:95vh;overflow:auto;background:#192638;color:inherit;border:1px solid #8398b4;border-radius:10px}
-dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-height:65vh;background:#3b4754;display:block}
+:root{
+ font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+ color-scheme:dark;
+ background:#101722;
+ color:#edf4ff;
+}
+*{box-sizing:border-box}
+body{margin:0}
+
+button,input,select{
+ font:inherit;
+ color:inherit;
+ background:#142235;
+ border:1px solid #607895;
+ border-radius:7px;
+ padding:8px 10px;
+}
+button{cursor:pointer}
+button:hover:not(:disabled){background:#294c70}
+button:disabled{opacity:.5;cursor:not-allowed}
+input[type=number]{width:78px}
+.grow{flex:1;min-width:150px}
+.primary{background:#175e96}
+.helpButton{background:#775216;border-color:#d1a64c}
+.row,label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+[hidden]{display:none!important}
+.muted{color:#b8cadc;font-size:.86rem}
+.warning{color:#ffd49b}
+.badge{
+ border:1px solid #536c88;
+ border-radius:18px;
+ padding:4px 8px;
+ font-size:.75rem;
+}
+h2{font-size:1.1rem}
+h3{font-size:1rem}
+p{line-height:1.45}
+
+#menuBtn{
+ position:fixed;
+ right:10px;
+ top:10px;
+ z-index:20;
+ min-width:44px;
+ background:#1c3550;
+}
+
+main{
+ max-width:1800px;
+ margin:auto;
+ padding:12px;
+ padding-top:58px;
+}
+
+.surface{
+ padding:12px;
+ margin-bottom:10px;
+ border:1px solid #435971;
+ border-radius:9px;
+ background:#192638;
+}
+
+#viewport{overflow:auto;padding:3px}
+#grid{display:grid;gap:8px}
+
+.tile{
+ padding:0;
+ min-width:0;
+ overflow:hidden;
+ text-align:left;
+ background:#35414d;
+}
+.tileHead{
+ display:flex;
+ justify-content:space-between;
+ gap:4px;
+ padding:5px 8px;
+ font-size:.78rem;
+}
+.picture{
+ position:relative;
+ aspect-ratio:16/9;
+ background:#424d59;
+}
+.picture video{
+ display:block;
+ width:100%;
+ height:100%;
+ object-fit:contain;
+}
+.overlay{
+ position:absolute;
+ inset:0;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ text-align:center;
+ padding:4px;
+ font-size:.72rem;
+}
+.foot{
+ padding:5px 7px;
+ font-size:.65rem;
+ white-space:nowrap;
+ overflow:hidden;
+ text-overflow:ellipsis;
+}
+.tile:not(.live) video{opacity:.18;filter:grayscale(1)}
+.tile.live{border-color:#62c49c}
+.tile.live .overlay{display:none}
+.tile.help{border:2px solid #e9b54d}
+
+#admin{
+ position:fixed;
+ z-index:40;
+ inset:0 0 0 auto;
+ width:min(96vw,530px);
+ overflow:auto;
+ border-left:1px solid #536c88;
+ background:#192638;
+ padding:12px;
+}
+
+#admin header{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:8px;
+ flex-wrap:wrap;
+ padding-bottom:10px;
+ border-bottom:1px solid #435971;
+}
+
+#notice{
+ padding:10px;
+ margin:10px 0;
+ background:#213c56;
+ border-left:4px solid #8bccff;
+ white-space:pre-wrap;
+}
+#notice.error{
+ background:#472b36;
+ border-color:#ffabab;
+}
+
+.panel{
+ padding:12px;
+ background:#182435;
+ border:1px solid #435971;
+ border-radius:9px;
+}
+
+.roomRow{
+ display:flex;
+ justify-content:space-between;
+ gap:8px;
+ align-items:center;
+ padding:9px;
+ margin:6px 0;
+ border:1px solid #4a627e;
+ border-radius:7px;
+ flex-wrap:wrap;
+}
+
+pre{
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+ max-height:360px;
+ overflow:auto;
+ background:#0c1521;
+ padding:10px;
+ border-radius:7px;
+ font-size:12px;
+}
+
+dialog{
+ width:min(1000px,96vw);
+ max-height:95vh;
+ overflow:auto;
+ background:#192638;
+ color:inherit;
+ border:1px solid #8398b4;
+ border-radius:10px;
+}
+dialog::backdrop{background:#000b}
+#zoomVideo,#carouselVideo{
+ display:block;
+ width:100%;
+ max-height:65vh;
+ background:#3b4754;
+}
 #pill{font-size:1.25rem;min-width:64px}
-@media(max-width:750px){.tileHead{font-size:.62rem;padding:4px}.foot{font-size:.55rem;padding:4px}.overlay{font-size:.6rem}}
+
+@media(max-width:750px){
+ .tileHead{font-size:.62rem;padding:4px}
+ .foot{font-size:.55rem;padding:4px}
+ .overlay{font-size:.6rem}
+}
 </style>
 </head>
+
 <body>
-<header>
- <div class="row">
-  <b id="heading">Classroom Screens</b>
-  <span class="badge">PATCH guard v32</span>
-  <span id="dbBadge" class="badge">Ready</span>
-  <span id="roleBadge" class="badge" hidden></span>
- </div>
- <button id="menuBtn">☰ Settings</button>
-</header>
+
+<!-- This button remains visible so the collapsed admin area can be opened. -->
+<button id="menuBtn" aria-controls="admin" aria-expanded="false" title="Open settings">
+ ☰
+</button>
 
 <main>
- <div id="notice">Ready. Create or open a room.</div>
+ <section id="home" class="surface">
+  <h2>My rooms</h2>
+  <div id="rooms"></div>
 
- <section id="home" class="panel">
-  <h2>My rooms</h2><div id="rooms"></div>
   <h3>Create room</h3>
   <div class="row">
    <input id="newName" class="grow" placeholder="Room name" maxlength="60">
-   <label>Rows <input id="newRows" type="number" value="5" min="1" max="64"></label>
-   <label>Columns <input id="newCols" type="number" value="8" min="1" max="64"></label>
+   <label>Rows
+    <input id="newRows" type="number" value="5" min="1" max="64">
+   </label>
+   <label>Columns
+    <input id="newCols" type="number" value="8" min="1" max="64">
+   </label>
    <button id="createBtn" class="primary">Create</button>
   </div>
+
   <h3>Open invitation</h3>
   <div class="row">
    <input id="joinInput" class="grow" placeholder="Paste classroom invitation">
    <button id="joinBtn">Open</button>
   </div>
-  <p class="muted">Existing paths are retained. This client sends GET and PATCH only.</p>
+  <p class="muted">Open ☰ for settings and diagnostics.</p>
  </section>
 
- <section id="studentPanel" class="panel" hidden>
+ <section id="studentPanel" class="surface" hidden>
   <h2 id="studentHeading"></h2>
   <p id="studentStatus">Ready to share.</p>
+
   <div class="row">
    <button id="shareBtn" class="primary">Start sharing</button>
    <button id="retryBtn">Reconnect</button>
@@ -77,9 +253,11 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
 
   <h3>Progress</h3>
   <div class="row">
-   <button id="pill" title="Hover and scroll, or click">😐</button>
+   <button id="pill" title="Click or scroll to change feeling">😐</button>
    <span id="feelingText"></span>
-   <label>Step <input id="step" type="number" min="0" max="9999" value="0"></label>
+   <label>Step
+    <input id="step" type="number" min="0" max="9999" value="0">
+   </label>
    <label>State
     <select id="workState">
      <option value="working">Working</option>
@@ -88,7 +266,7 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
      <option value="stuck">Stuck</option>
     </select>
    </label>
-   <label>Task <input id="task" maxlength="120" placeholder="Optional task"></label>
+   <input id="task" class="grow" maxlength="120" placeholder="Optional task">
    <button id="saveProgressBtn">Save progress</button>
   </div>
   <p id="progressStatus" class="muted"></p>
@@ -107,11 +285,16 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
    <button id="helpBtn" class="helpButton">Request help</button>
   </div>
   <p id="helpStatus" class="muted"></p>
+
   <p class="muted">
-   Progress can be drafted before sharing. It is written after this page obtains a seat.
-   Screen capture requires a real click and approval after each page restart.
+   Keep this page open and prevent sleep. After refresh or browser restart,
+   approve screen capture again.
   </p>
-  <details><summary>Connection progress</summary><pre id="studentProgress"></pre></details>
+
+  <details>
+   <summary>Connection progress</summary>
+   <pre id="studentProgress"></pre>
+  </details>
  </section>
 
  <section id="staffSection" hidden>
@@ -121,10 +304,15 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
    <span id="helpCount" class="badge"></span>
    <span id="cornerBadge" class="badge"></span>
    <button id="carouselToggle">Show carousel</button>
-   <label>View <select id="view"><option value="fit">Fit width</option><option value="large">Large tiles</option></select></label>
+   <label>View
+    <select id="view">
+     <option value="fit">Fit width</option>
+     <option value="large">Large tiles</option>
+    </select>
+   </label>
   </div>
 
-  <section id="carousel" class="panel" hidden>
+  <section id="carousel" class="surface" hidden>
    <div class="row">
     <button id="prevBtn">◀ Previous</button>
     <strong id="carouselTitle"></strong>
@@ -132,91 +320,118 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
    </div>
    <video id="carouselVideo" autoplay muted playsinline></video>
    <p id="carouselDetails"></p>
-   <small class="muted">Scroll over the video to change seat. Existing streams are reused.</small>
+   <small class="muted">
+    Scroll over the video to change seat. Existing streams are reused.
+   </small>
   </section>
 
   <div id="viewport"><div id="grid"></div></div>
-  <section class="panel"><h3>Progress and help</h3><div id="people"></div></section>
+
+  <section class="surface">
+   <h3>Progress and help</h3>
+   <div id="people"></div>
+  </section>
  </section>
 </main>
 
-<aside id="admin" class="panel" hidden>
- <div class="row" style="justify-content:space-between">
-  <h2>Settings & diagnostics</h2><button id="closeAdminBtn">Close</button>
- </div>
-
- <p class="warning">
-  No database authentication. IP restrictions do not distinguish teachers from students.
-  PATCH-only does not make seat claims atomic or protect against privileged server operations.
- </p>
-
- <div id="roomLinks" hidden>
-  <h3>Invitations</h3>
+<!-- Header, notice and .panel are all inside the collapsed admin area. -->
+<aside id="admin" hidden>
+ <header>
   <div class="row">
-   <button id="copyStudentBtn">Copy student link</button>
-   <button id="copyAssistantBtn">Copy assistant link</button>
-   <button id="copyTeacherBtn">Copy teacher link</button>
+   <b>Classroom Screens</b>
+   <span class="badge">v33</span>
+   <span id="adminRole" class="badge">Ready</span>
   </div>
-  <div class="row">
-   <label>Fixed seat <input id="linkSeat" type="number" min="1" max="64" value="1"></label>
-   <button id="copySeatBtn">Copy fixed-seat link</button>
-  </div>
- </div>
+  <button id="closeAdminBtn">Close</button>
+ </header>
 
- <div id="config" hidden>
-  <h3>Layout & timing</h3>
-  <div class="row">
-   <label>Name <input id="cfgName" maxlength="60"></label>
-   <label>Rows <input id="cfgRows" type="number" min="1" max="64"></label>
-   <label>Columns <input id="cfgCols" type="number" min="1" max="64"></label>
-   <label>Corner
-    <select id="cfgCorner">
-     <option value="bottom-right">Bottom right</option>
-     <option value="bottom-left">Bottom left</option>
-     <option value="top-right">Top right</option>
-     <option value="top-left">Top left</option>
-    </select>
-   </label>
-   <label>Preview
-    <select id="cfgWidth">
-     <option value="160">160×90</option>
-     <option value="256">256×144</option>
-     <option value="320">320×180</option>
-    </select>
-   </label>
-   <label>FPS <select id="cfgFPS"><option>1</option><option>2</option></select></label>
-   <label>Expiry s <input id="cfgTTL" type="number" min="60" max="3600"></label>
-   <label>Viewers <input id="cfgMax" type="number" min="1" max="8"></label>
-   <label>TURN
-    <select id="cfgTransport">
-     <option value="tcp">TCP</option><option value="udp">UDP</option><option value="both">UDP + TCP</option>
-    </select>
-   </label>
-   <button id="saveBtn" class="primary">Save</button>
-  </div>
-  <div class="row">
-   <button id="reconnectAllBtn">Reconnect streams</button>
-   <button id="resetBtn">Reset seats by generation</button>
-  </div>
- </div>
+ <div id="notice" role="status">Ready.</div>
 
- <h3>Diagnostics</h3>
- <div class="row">
-  <button id="testDBBtn">Test metadata GET</button>
-  <button id="testTURNBtn">Test TURN echo</button>
-  <button id="reportBtn">Collect report</button>
-  <button id="downloadBtn">Download report</button>
-  <button id="copyCreateBtn">Copy create link</button>
-  <button id="homeBtn">Home</button>
+ <div class="panel">
+  <h2>Settings & diagnostics</h2>
+
+  <p class="warning">
+   Database authentication is not used. External IP restrictions are
+   essential. PATCH-only writes do not make seat claims atomic.
+  </p>
+
+  <div id="roomLinks" hidden>
+   <h3>Invitations</h3>
+   <div class="row">
+    <button id="copyStudentBtn">Copy student link</button>
+    <button id="copyAssistantBtn">Copy assistant link</button>
+    <button id="copyTeacherBtn">Copy teacher link</button>
+   </div>
+   <div class="row" style="margin-top:8px">
+    <label>Fixed seat
+     <input id="linkSeat" type="number" min="1" max="64" value="1">
+    </label>
+    <button id="copySeatBtn">Copy fixed-seat link</button>
+   </div>
+  </div>
+
+  <div id="config" hidden>
+   <h3>Layout & timing</h3>
+   <div class="row">
+    <label>Name <input id="cfgName" maxlength="60"></label>
+    <label>Rows <input id="cfgRows" type="number" min="1" max="64"></label>
+    <label>Columns <input id="cfgCols" type="number" min="1" max="64"></label>
+    <label>Corner
+     <select id="cfgCorner">
+      <option value="bottom-right">Bottom right</option>
+      <option value="bottom-left">Bottom left</option>
+      <option value="top-right">Top right</option>
+      <option value="top-left">Top left</option>
+     </select>
+    </label>
+    <label>Preview
+     <select id="cfgWidth">
+      <option value="160">160×90</option>
+      <option value="256">256×144</option>
+      <option value="320">320×180</option>
+     </select>
+    </label>
+    <label>FPS <select id="cfgFPS"><option>1</option><option>2</option></select></label>
+    <label>Expiry s <input id="cfgTTL" type="number" min="60" max="3600"></label>
+    <label>Viewers <input id="cfgMax" type="number" min="1" max="8"></label>
+    <label>TURN
+     <select id="cfgTransport">
+      <option value="tcp">TCP</option>
+      <option value="udp">UDP</option>
+      <option value="both">UDP + TCP</option>
+     </select>
+    </label>
+    <button id="saveBtn" class="primary">Save</button>
+   </div>
+   <div class="row" style="margin-top:8px">
+    <button id="reconnectAllBtn">Reconnect streams</button>
+    <button id="resetBtn">Reset seats by generation</button>
+   </div>
+  </div>
+
+  <h3>Diagnostics</h3>
+  <div class="row">
+   <button id="testDBBtn">Test metadata GET</button>
+   <button id="testTURNBtn">Test TURN echo</button>
+   <button id="reportBtn">Collect report</button>
+   <button id="downloadBtn">Download report</button>
+   <button id="copyCreateBtn">Copy create link</button>
+   <button id="homeBtn">Home</button>
+  </div>
+  <pre id="report">No report collected.</pre>
+  <details><summary>Event log</summary><pre id="log"></pre></details>
+
+  <p class="muted">
+   Signaling leaves are not deleted by this page. A separately tested server
+   cleanup process is required to prevent indefinite growth.
+  </p>
  </div>
- <pre id="report">No report collected.</pre>
- <details><summary>Event log</summary><pre id="log"></pre></details>
- <p class="muted">Signaling leaves are not deleted by this page. Arrange a separately tested server cleanup process.</p>
 </aside>
 
 <dialog id="zoom">
  <div class="row" style="justify-content:space-between">
-  <b id="zoomTitle"></b><button id="closeZoomBtn">Close</button>
+  <b id="zoomTitle"></b>
+  <button id="closeZoomBtn">Close</button>
  </div>
  <video id="zoomVideo" autoplay muted playsinline></video>
  <p id="zoomStatus"></p>
@@ -230,21 +445,21 @@ dialog::backdrop{background:#000b}#zoomVideo,#carouselVideo{width:100%;max-heigh
 "use strict";
 
 /*
- PATCH GUARD V32
- Existing v28/v31 paths and signaling format retained.
- No client PUT or DELETE.
- No null/undefined/empty-object PATCH values.
- Seat claims/renewals are best-effort and NOT atomic.
- Browser never deletes sg28 leaves.
+ Classroom simplified layout v33.
+
+ Database paths and sg28 format remain the same as v32.
+ GET/PATCH only. No null or empty-object writes.
+ No browser-side deletion of signaling or room hierarchy.
+ Compatibility seat claims are not atomic.
 */
 
+const VERSION="classroom-simplified-v33";
 const SIGNAL_APP="classroom-low-data-v28";
-const VERSION="classroom-patch-guard-v32";
 const DB="https://default--default.ubcoturneastasia.duckdns.org";
 
 /*
- Replace only after rotating the coturn server credentials.
- Browser-delivered static credentials are visible to users.
+ Static TURN credentials are visible to users of the page.
+ Rotate on the TURN server and in this file together when required.
 */
 const TURN={
  host:"61.238.240.78",
@@ -261,38 +476,46 @@ const now=()=>Date.now();
 const uuid=()=>crypto.randomUUID();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const jitter=(base,spread)=>base+Math.floor(Math.random()*spread);
+
 const CORNERS=["bottom-right","bottom-left","top-right","top-left"];
 const EMOJI=["😟","🙁","😐","🙂","😃"];
 const FEEL=["Very stuck","Needs help","Okay","Good","Great"];
 const STATES=["working","finished","waiting","stuck"];
 
-function load(k,d=""){try{return localStorage.getItem(k)??d;}catch{return d;}}
-function save(k,v){try{localStorage.setItem(k,String(v));}catch{}}
-function sessionGet(k,d=""){try{return sessionStorage.getItem(k)??d;}catch{return d;}}
-function sessionSet(k,v){try{sessionStorage.setItem(k,String(v));}catch{}}
-function isRecord(v){return v!==null&&typeof v==="object"&&!Array.isArray(v);}
+function load(k,d=""){
+ try{return localStorage.getItem(k)??d;}catch{return d;}
+}
+function save(k,v){
+ try{localStorage.setItem(k,String(v));}catch{}
+}
+function sessionGet(k,d=""){
+ try{return sessionStorage.getItem(k)??d;}catch{return d;}
+}
+function sessionSet(k,v){
+ try{sessionStorage.setItem(k,String(v));}catch{}
+}
+function isRecord(v){
+ return v!==null&&typeof v==="object"&&!Array.isArray(v);
+}
 function records(v){
  if(!v||typeof v!=="object")return {};
- return Object.fromEntries(Object.entries(v).filter(([,x])=>isRecord(x)));
+ return Object.fromEntries(
+  Object.entries(v).filter(([,value])=>isRecord(value))
+ );
 }
-function validID(v){return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);}
+function validID(v){
+ return typeof v==="string"&&/^[A-Za-z0-9_-]{6,80}$/.test(v);
+}
 function text(v,n){return String(v??"").trim().slice(0,n);}
 
-/*
- Reject null, undefined, non-finite numbers and empty objects recursively.
- Empty strings and zero are intentionally allowed.
-*/
 function guard(value){
  if(value===null||value===undefined)
   throw Error("PATCH blocked: null or undefined value.");
-
  if(typeof value==="number"&&!Number.isFinite(value))
   throw Error("PATCH blocked: invalid number.");
-
  if(typeof value==="object"){
   if(!Array.isArray(value)&&Object.keys(value).length===0)
    throw Error("PATCH blocked: empty object.");
-
   for(const child of Object.values(value))guard(child);
  }
 }
@@ -300,6 +523,7 @@ function guard(value){
 let room="",wanted=Q.get("room")||"",role="student",staff=false;
 let teacherKey="",assistantKey="",viewer="",label="",meta=null,source=null;
 let seats={},viewers={},help={},ownHelp=null,ownHold=null,index={};
+
 let creating=false,opening=false,lastOpen=0;
 let offset=0,clockKnown=false,bestRTT=Infinity;
 const T=()=>now()+offset;
@@ -309,12 +533,16 @@ let nextViewer=0,nextIndex=0,nextAnswers=0,nextHelp=0,nextBeat=0,nextHelpSend=0;
 let metaBusy=false,seatsBusy=false,viewBusy=false,ownBusy=false,leaseBusy=false;
 let viewerBusy=false,indexBusy=false,answersBusy=false,helpBusy=false,statsBusy=false;
 let zoomSeat=null,carouselSeat=1,feeling=3,feelingTimer=0,progressBusy=false;
-let idle="Ready to share.",dbErrors=0,lastError="";
-let draftTouched=false;
+let idle="Ready to share.",dbErrors=0,lastError="",draftTouched=false;
 let helpQueue=Promise.resolve();
 
-const receivers=new Map(),answering=new Set(),fetching=new Set(),retry=new Map();
-const tiles=new Map(),fastHelp=new Map(),logs=[];
+const receivers=new Map();
+const answering=new Set();
+const fetching=new Set();
+const retry=new Map();
+const tiles=new Map();
+const fastHelp=new Map();
+const logs=[];
 
 const rp=p=>`rooms/${room}/${p}`;
 const dp=p=>rp("d/"+p);
@@ -329,14 +557,21 @@ function log(s){
  $("log").textContent=logs.slice().reverse().join("\n");
 }
 function notice(s,bad=false){
- $("notice").textContent=s;$("notice").classList.toggle("error",bad);
+ $("notice").textContent=s;
+ $("notice").classList.toggle("error",bad);
 }
 function fail(e){
  lastError=e?.message||String(e);
- log("ERROR: "+lastError);notice(lastError,true);
+ log("ERROR: "+lastError);
+ notice(lastError,true);
+
+ // Errors remain accessible even though the notice is collapsed.
+ if(!room)$("admin").hidden=false;
 }
 const act=fn=>(...args)=>Promise.resolve().then(()=>fn(...args)).catch(fail);
-function launch(fn){Promise.resolve().then(fn).catch(e=>log("Worker: "+e.message));}
+function launch(fn){
+ Promise.resolve().then(fn).catch(e=>log("Worker: "+e.message));
+}
 
 async function req(method,path,value){
  if(method!=="GET"&&method!=="PATCH")
@@ -348,20 +583,23 @@ async function req(method,path,value){
   guard(value);
  }
 
- const safe=path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
- const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),15000);
+ const abort=new AbortController();
+ const timer=setTimeout(()=>abort.abort(),15000);
  const started=now();
 
  try{
   const headers={Accept:"application/json"};
   if(method==="PATCH")headers["Content-Type"]="application/json";
 
-  const response=await fetch(DB+"/"+safe+".json",{
-   method,headers,
-   body:method==="PATCH"?JSON.stringify(value):undefined,
-   credentials:"omit",cache:"no-store",redirect:"error",
-   referrerPolicy:"no-referrer",signal:abort.signal
-  });
+  const response=await fetch(
+   DB+"/"+path.split("/").filter(Boolean).map(encodeURIComponent).join("/")+".json",
+   {
+    method,headers,
+    body:method==="PATCH"?JSON.stringify(value):undefined,
+    credentials:"omit",cache:"no-store",redirect:"error",
+    referrerPolicy:"no-referrer",signal:abort.signal
+   }
+  );
 
   const ended=now(),date=response.headers.get("Date");
   if(date){
@@ -372,18 +610,17 @@ async function req(method,path,value){
    }
   }
 
-  const body=await response.text();
-  let result=null;
+  const body=await response.text();let result=null;
   if(body){
    try{result=JSON.parse(body);}
    catch{throw Error(`${method} ${path}: non-JSON HTTP ${response.status}`);}
   }
-
   if(!response.ok||typeof result?.error==="string")
    throw Error(`${method} ${path}: HTTP ${response.status}: ${result?.error||"rejected"}`);
 
   $("dbBadge").textContent="DB online";
   return result;
+
  }catch(e){
   dbErrors++;lastError=e.message;$("dbBadge").textContent="DB retrying";
   if(e.name==="AbortError")throw Error("Database timeout.");
@@ -436,7 +673,7 @@ function capture(s){
 function activeViewers(){
  return Object.entries(records(viewers))
   .filter(([,v])=>T()-(Number(v.b)||0)<65000)
-  .sort((a,b)=>(Number(a[1].at)||0)-(Number(b[1].at)||0))
+  .sort((a,b)=>(a[1].at||0)-(b[1].at||0))
   .slice(0,meta?.maxViewers||4);
 }
 function pinned(){
@@ -447,7 +684,7 @@ function base(){
  const u=new URL(location.href);u.search="";u.hash="";return u;
 }
 function roomLink(e,kind,n){
- const u=base();u.searchParams.set("room",e.id);u.searchParams.set("build","32");
+ const u=base();u.searchParams.set("room",e.id);u.searchParams.set("build","33");
  if(kind==="student"){
   u.searchParams.set("start","1");if(n)u.searchParams.set("seat",n);
  }else{
@@ -458,8 +695,10 @@ function roomLink(e,kind,n){
  return u.href;
 }
 function saved(){
- try{const x=JSON.parse(load("cr-rooms","[]"));return Array.isArray(x)?x.filter(isRecord):[];}
- catch{return [];}
+ try{
+  const x=JSON.parse(load("cr-rooms","[]"));
+  return Array.isArray(x)?x.filter(isRecord):[];
+ }catch{return [];}
 }
 function remember(e){
  const old=saved().find(x=>x.id===e.id)||{},merged={...old,...e};
@@ -467,11 +706,14 @@ function remember(e){
  if(!e.a&&old.a)merged.a=old.a;
  save("cr-rooms",JSON.stringify([merged,...saved().filter(x=>x.id!==e.id)].slice(0,50)));
 }
-function entry(){return {id:room,name:meta?.name,t:teacherKey,a:assistantKey};}
+function entry(){
+ return {id:room,name:meta?.name,t:teacherKey,a:assistantKey};
+}
 function renderHome(){
  $("rooms").replaceChildren();
  const list=saved();
  if(!list.length)$("rooms").textContent="No saved rooms on this browser.";
+
  for(const e of list){
   if(!validID(e.id))continue;
   const row=document.createElement("div");row.className="roomRow";
@@ -481,7 +723,8 @@ function renderHome(){
   open.onclick=()=>location.href=roomLink(e,e.t?"teacher":"assistant");
   const forget=document.createElement("button");forget.textContent="Forget";
   forget.onclick=()=>{
-   save("cr-rooms",JSON.stringify(saved().filter(x=>x.id!==e.id)));renderHome();
+   save("cr-rooms",JSON.stringify(saved().filter(x=>x.id!==e.id)));
+   renderHome();
   };
   buttons.append(open,forget);row.append(words,buttons);$("rooms").append(row);
  }
@@ -493,8 +736,10 @@ function createSettings(){
   rows:Number(Q.get("rows")??$("newRows").value),
   cols:Number(Q.get("cols")??$("newCols").value),
   corner:Q.get("corner")||"bottom-right",
-  w:Number(Q.get("width")??256),fps:Number(Q.get("fps")??1),
-  ttl:Number(Q.get("ttl")??120),tr:Q.get("transport")||"tcp",
+  w:Number(Q.get("width")??256),
+  fps:Number(Q.get("fps")??1),
+  ttl:Number(Q.get("ttl")??120),
+  tr:Q.get("transport")||"tcp",
   maxViewers:Number(Q.get("maxViewers")??4)
  };
  validate(m);return m;
@@ -502,7 +747,7 @@ function createSettings(){
 function createLink(){
  const m=meta||createSettings(),u=base();
  const values={
-  create:1,build:32,name:m.name,rows:m.rows,cols:m.cols,corner:m.corner,
+  create:1,build:33,name:m.name,rows:m.rows,cols:m.cols,corner:m.corner,
   width:m.w,fps:m.fps,ttl:m.ttl,transport:m.tr,
   maxViewers:m.maxViewers,view:$("view").value
  };
@@ -512,7 +757,8 @@ function createLink(){
 function fillSettings(){
  const fields={
   cfgName:"name",cfgRows:"rows",cfgCols:"cols",cfgCorner:"corner",
-  cfgWidth:"w",cfgFPS:"fps",cfgTTL:"ttl",cfgMax:"maxViewers",cfgTransport:"tr"
+  cfgWidth:"w",cfgFPS:"fps",cfgTTL:"ttl",
+  cfgMax:"maxViewers",cfgTransport:"tr"
  };
  for(const [id,k]of Object.entries(fields))$(id).value=meta[k];
 }
@@ -523,11 +769,11 @@ async function createRoom(){
  try{
   const id=uuid(),t=uuid()+uuid(),a=uuid()+uuid(),m=createSettings();
 
-  // This check is not an atomic create transaction.
+  // This read is not an atomic create transaction.
   if(await get("rooms/"+id+"/d/meta"))
    throw Error("Generated room already exists; retry.");
 
-  // Only a newly generated room is written at the room root.
+  // One PATCH to a newly generated room, containing keys and metadata.
   await patch("rooms/"+id,{keys:{t,a},d:{meta:m}});
   remember({id,name:m.name,t,a});
   location.replace(roomLink({id,t,a},"teacher"));
@@ -571,18 +817,14 @@ async function openRoom(){
   $("home").hidden=true;
   $("studentPanel").hidden=staff;$("staffSection").hidden=!staff;
   $("roleBadge").hidden=false;$("roleBadge").textContent=role;
+  $("adminRole").textContent=role;
   $("roomLinks").hidden=!staff;$("config").hidden=role!=="teacher";
   $("copyTeacherBtn").hidden=role!=="teacher";
   $("roomName").textContent=m.name;$("studentHeading").textContent=m.name;
   if(staff)fillSettings();
-
-  // Draft is local to this tab. It is not proof of ownership of an old seat.
   if(!staff)restoreDraft();
 
-  await Promise.all([
-   pollViewers(true),
-   staff?pollSeats(true):Promise.resolve()
-  ]);
+  await Promise.all([pollViewers(true),staff?pollSeats(true):Promise.resolve()]);
   if(staff)await viewerBeat();
 
   notice(staff?"Room ready.":"Choose progress or click Start sharing.");
@@ -625,8 +867,10 @@ async function viewerBeat(){
  try{
   if(activeViewers().filter(([id])=>id!==viewer).length>=meta.maxViewers)
    throw Error("Maximum viewers reached.");
+
   const value={
-   role,label,at:viewers[viewer]?.at||T(),b:T(),app:SIGNAL_APP,session:SESSION
+   role,label,at:viewers[viewer]?.at||T(),b:T(),
+   app:SIGNAL_APP,session:SESSION
   };
   await patch(dp("viewers/"+viewer),value);
   viewers[viewer]=value;
@@ -637,11 +881,11 @@ async function pollOwn(){
  if(staff||!room||ownBusy||now()<nextOwn)return;
  ownBusy=true;nextOwn=now()+jitter(15000,4000);
  try{
-  const [h,x]=await Promise.all([
+  const [holdRecord,helpRecord]=await Promise.all([
    get(dp("hold/"+SESSION)),get(dp("help/"+SESSION))
   ]);
-  ownHold=h;
-  if(isRecord(x))ownHelp=x;
+  ownHold=holdRecord;
+  if(isRecord(helpRecord))ownHelp=helpRecord;
   if(source?.helpID&&ownHelp?.id===source.helpID&&ownHelp.state==="resolved"){
    source.helpID="";source.helpAt=0;source.helpState=ownHelp;
   }
@@ -677,7 +921,8 @@ function restoreDraft(){
   const d=JSON.parse(sessionGet("cr-progress-"+room,"{}"));
   if(!isRecord(d))return;
   if(Number.isInteger(d.feeling)&&d.feeling>=1&&d.feeling<=5)feeling=d.feeling;
-  if(Number.isInteger(Number(d.step)))$("step").value=Math.max(0,Math.min(9999,Number(d.step)));
+  if(Number.isInteger(Number(d.step)))
+   $("step").value=Math.max(0,Math.min(9999,Number(d.step)));
   if(STATES.includes(d.state))$("workState").value=d.state;
   if(typeof d.task==="string")$("task").value=d.task.slice(0,120);
   draftTouched=Object.keys(d).length>0;
@@ -697,9 +942,11 @@ function loadProgress(value){
 function adopt(s,n,value){
  s.seat=n;s.lease=value.l;s.g=Number(value.g)||0;s.pending=null;
  seats[n]=value;nextLease=now()+jitter(16000,4000);
- save("cr-v32-seat-"+room,n);
+ save("cr-v33-seat-"+room,n);
+
  if(!draftTouched)loadProgress(value);
  else launch(saveProgress);
+
  log("CLAIMED seat "+n);
 }
 async function leaseLoop(){
@@ -725,6 +972,7 @@ async function leaseLoop(){
    s.phase=`Waiting ${Math.ceil((until-T())/1000)}s`;
    nextLease=now()+4000;return;
   }
+
   if(s.seat&&s.g!==meta.g)dropLease(s);
 
   if(s.seat){
@@ -732,7 +980,6 @@ async function leaseLoop(){
    if(!capture(s))return;
    if(!owns(current,s)){dropLease(s);return;}
 
-   // Partial PATCH preserves optional fields; ownership check is not atomic.
    await patch(sp(n),{b:T(),g:meta.g});
    const checked=await get(sp(n));
    if(!owns(checked,s)){dropLease(s);return;}
@@ -745,7 +992,7 @@ async function leaseLoop(){
 
   await pollSeats(true);
   const cap=meta.rows*meta.cols,pin=pinned();
-  const preferred=Number(load("cr-v32-seat-"+room))||0;
+  const preferred=Number(load("cr-v33-seat-"+room))||0;
   let choices=pin?[pin]:
    Array.from({length:cap},(_,i)=>i+1).filter(n=>!live(seats[n]));
 
@@ -764,10 +1011,6 @@ async function leaseLoop(){
    await sleep(jitter(100,350));
    if(live(await get(sp(n))))continue;
 
-   /*
-    New owner explicitly resets sticky progress fields.
-    This is not an atomic claim.
-   */
    const value={
     u:SESSION,c:s.cid,l:uuid(),g:meta.g,b:T(),at:T(),
     feeling:3,feelingAt:T(),step:0,state:"working",task:""
@@ -799,7 +1042,8 @@ async function saveProgress(){
  const s=source;
 
  if(!s?.seat){
-  $("progressStatus").textContent="Draft saved in this tab; it will be sent after a seat is claimed.";
+  $("progressStatus").textContent=
+   "Draft saved in this tab; it will be sent after a seat is claimed.";
   return;
  }
  if(progressBusy)return;
@@ -811,15 +1055,13 @@ async function saveProgress(){
    dropLease(s);throw Error("Seat changed; progress was not sent.");
   }
 
-  /*
-   This pre-check does not prevent a concurrent owner change.
-   A transaction/server-owned lease is required for that guarantee.
-  */
+  // The pre-check is not an atomic transaction.
   await patch(sp(n),progressValues());
   const checked=await get(sp(n));
   if(!owns(checked,s)){
    dropLease(s);throw Error("Seat changed during progress update.");
   }
+
   seats[n]=checked;draftTouched=false;
   $("progressStatus").textContent="Progress saved.";
  }finally{progressBusy=false;}
@@ -833,18 +1075,14 @@ function scheduleFeeling(){
  clearTimeout(feelingTimer);
  feelingTimer=setTimeout(()=>launch(saveProgress),300);
 }
-$("pill").onclick=()=>{
- feeling=feeling%5+1;scheduleFeeling();
-};
+$("pill").onclick=()=>{feeling=feeling%5+1;scheduleFeeling();};
 $("pill").addEventListener("wheel",e=>{
  e.preventDefault();
  feeling=Math.max(1,Math.min(5,feeling+(e.deltaY>0?-1:1)));
  scheduleFeeling();
 },{passive:false});
 for(const id of ["step","workState","task"]){
- $(id).addEventListener("change",()=>{
-  draftTouched=true;persistDraft();
- });
+ $(id).addEventListener("change",()=>{draftTouched=true;persistDraft();});
 }
 
 function rtc(){
@@ -896,15 +1134,16 @@ function closeLinks(s=source){
  s.links.clear();s.retry.clear();
 }
 async function gather(p,type){
- const description=type==="offer"?await p.pc.createOffer():await p.pc.createAnswer();
- p.phase="Gathering TURN";await p.pc.setLocalDescription(description);
+ const d=type==="offer"?await p.pc.createOffer():await p.pc.createAnswer();
+ p.phase="Gathering TURN";await p.pc.setLocalDescription(d);
  const end=now()+60000;
  while(p.pc.iceGatheringState!=="complete"){
   if(!p.active)throw Error("Connection superseded.");
   if(now()>end)throw Error("TURN gathering timed out.");
   await sleep(100);
  }
- const sdp=p.pc.localDescription.sdp;checkSDP(type,sdp);return sdp;
+ const sdp=p.pc.localDescription.sdp;
+ checkSDP(type,sdp);return sdp;
 }
 async function remote(p,type,sdp){
  checkSDP(type,sdp);
@@ -922,21 +1161,22 @@ function helpActive(h){
   h.state!=="resolved"&&h.state!=="cancelled";
 }
 function effectiveHelp(id){
- const f=fastHelp.get(id);
- if(f&&f.expires>now())return f.value;
- if(f)fastHelp.delete(id);
+ const fast=fastHelp.get(id);
+ if(fast&&fast.expires>now())return fast.value;
+ if(fast)fastHelp.delete(id);
  return help[id]||null;
 }
 function helpLabel(h){
- if(!helpActive(h))return "";
- return `${h.state==="helping"?(h.label||"Staff")+" is helping":"Help requested"}`+
-  `${h.reason?" · "+h.reason:""}${h.detail?" · "+h.detail:""}`;
+ return helpActive(h)?
+  `${h.state==="helping"?(h.label||"Staff")+" is helping":"Help requested"}`+
+  `${h.reason?" · "+h.reason:""}${h.detail?" · "+h.detail:""}`:"";
 }
 function setFast(id,value){
  fastHelp.set(id,{value,expires:now()+15000});render();
 }
 function attach(p,dc){
  p.dc=dc;
+
  dc.onopen=()=>{
   p.lastBeat=now();
   if(!p.receiver&&source?.helpID){
@@ -946,8 +1186,10 @@ function attach(p,dc){
    }});
   }
  };
+
  dc.onmessage=e=>{
   if(typeof e.data!=="string"||e.data.length>10000)return;
+
   try{
    const d=JSON.parse(e.data);
 
@@ -966,7 +1208,8 @@ function attach(p,dc){
      id:h.id,g:meta.g,seat:p.seat,at:Number(h.at)||T(),
      state:"requested",reason:text(h.reason,40),detail:text(h.detail,120)
     });
-    send(p,{type:"help-received",id:h.id});return;
+    send(p,{type:"help-received",id:h.id});
+    return;
    }
 
    if(p.receiver&&d.type==="help-cancel"){
@@ -1000,9 +1243,9 @@ async function limitSender(p){
  }catch(e){log("Sender: "+e.message);}
 }
 function badPeer(p){
- const state=p.pc.connectionState;
- return !p.active||state==="failed"||
-  (state==="disconnected"&&p.bad&&now()-p.bad>15000)||
+ const c=p.pc.connectionState;
+ return !p.active||c==="failed"||
+  (c==="disconnected"&&p.bad&&now()-p.bad>15000)||
   (p.lastBeat&&now()-p.lastBeat>60000)||
   (!p.answered&&now()-p.created>120000);
 }
@@ -1038,6 +1281,7 @@ async function build(s,id,v){
    app:SIGNAL_APP,id:p.id,seat:s.seat,c:s.cid,l:s.lease,g:s.g,b:T()
   });
   p.phase="Offer published";p.published=true;
+
  }catch(e){
   if(p){p.error=e.message;closePeer(p);}
   log("Offer: "+e.message);
@@ -1066,6 +1310,7 @@ function studentPeers(){
 async function pollAnswers(){
  const s=source;
  if(!capture(s)||answersBusy||now()<nextAnswers)return;
+
  const waiting=[...s.links.values()].filter(p=>
   p.active&&p.published&&!p.answered&&!p.applying);
  if(!waiting.length)return;
@@ -1078,7 +1323,9 @@ async function pollAnswers(){
     if(!isRecord(a)||a.id!==p.id||a.viewer!==p.viewer||!current(s,p))return;
     p.applying=true;
     await remote(p,"answer",a.sdp);
-    if(current(s,p)){p.answered=true;p.phase="Connecting";await limitSender(p);}
+    if(current(s,p)){
+     p.answered=true;p.phase="Connecting";await limitSender(p);
+    }
    }catch(e){
     p.error=e.message;
     if(p.pc.signalingState==="closed")closePeer(p);
@@ -1091,13 +1338,13 @@ async function pollIndex(){
   !activeViewers().some(([id])=>id===viewer))return;
 
  indexBusy=true;nextIndex=now()+jitter(4000,1500);
- try{index=records(await get(rp("sg28/index/"+viewer)));scanOffers();}
- catch(e){log("Offer index: "+e.message);}
+ try{
+  index=records(await get(rp("sg28/index/"+viewer)));scanOffers();
+ }catch(e){log("Offer index: "+e.message);}
  finally{indexBusy=false;}
 }
 function scanOffers(){
  const liveIDs=new Set();
-
  for(const [n,lease]of Object.entries(records(seats))){
   if(!live(lease))continue;
   liveIDs.add(lease.u);
@@ -1129,16 +1376,13 @@ async function fetchAnswer(id,i){
  fetching.add(id);let p;
 
  try{
-  const offer=await get(off(viewer,id,i.id));
-  const lease=seats[offer?.seat];
-  if(!isRecord(offer)||offer.app!==SIGNAL_APP||offer.id!==i.id||
-   !live(lease)||lease.u!==id||lease.l!==offer.l)return;
+  const o=await get(off(viewer,id,i.id)),lease=seats[o?.seat];
+  if(!isRecord(o)||o.app!==SIGNAL_APP||o.id!==i.id||
+   !live(lease)||lease.u!==id||lease.l!==o.l)return;
 
   answering.add(id);
-  p=peer("Receiving seat "+offer.seat,true);
-  Object.assign(p,{
-   id:offer.id,person:id,seat:Number(offer.seat),lease:offer.l
-  });
+  p=peer("Receiving seat "+o.seat,true);
+  Object.assign(p,{id:o.id,person:id,seat:Number(o.seat),lease:o.l});
   receivers.set(id,p);
 
   p.pc.ontrack=e=>{
@@ -1147,7 +1391,7 @@ async function fetchAnswer(id,i){
   };
   p.pc.ondatachannel=e=>attach(p,e.channel);
 
-  await remote(p,"offer",offer.sdp);
+  await remote(p,"offer",o.sdp);
   const sdp=await gather(p,"answer");
 
   if(!p.active||!live(seats[p.seat])||seats[p.seat].l!==p.lease)
@@ -1173,7 +1417,8 @@ async function fetchAnswer(id,i){
 async function startSharing(){
  if(source)return;
  if(!isSecureContext||!navigator.mediaDevices?.getDisplayMedia){
-  notice("HTTPS and screen capture are required.",true);return;
+  notice("HTTPS and screen capture are required.",true);
+  $("admin").hidden=false;return;
  }
 
  const s={
@@ -1187,7 +1432,7 @@ async function startSharing(){
  let permission;
 
  try{
-  // Must occur directly in the student click handler.
+  // Direct user activation: no await or network request first.
   permission=navigator.mediaDevices.getDisplayMedia({
    video:{frameRate:{ideal:2,max:5}},audio:false
   });
@@ -1233,8 +1478,8 @@ async function startSharing(){
    try{track.requestFrame?.();}catch{}
    s.timer=setTimeout(draw,1000/meta.fps);
   }
-  draw();
-  s.phase="Capture approved — claiming seat";
+
+  draw();s.phase="Capture approved — claiming seat";
   nextLease=0;launch(leaseLoop);
 
  }catch(e){await stopSharing(e.message);}
@@ -1254,10 +1499,8 @@ async function stopSharing(reason="Sharing stopped; seat will expire."){
  if(s.video){s.video.pause();s.video.srcObject=null;}
  closeLinks(s);idle=reason;notice(reason);render();
 }
-
 function queueHelp(fn){
- const promise=helpQueue.catch(()=>{}).then(fn);
- helpQueue=promise;return promise;
+ const p=helpQueue.catch(()=>{}).then(fn);helpQueue=p;return p;
 }
 async function toggleHelp(){
  const s=source;if(!capture(s)||!s.seat)return;
@@ -1277,6 +1520,7 @@ async function toggleHelp(){
   reason:$("reason").value,detail:text($("detail").value,120),
   label:"",resolvedAt:0
  };
+
  s.helpID=h.id;s.helpAt=h.at;s.helpReason=h.reason;
  s.helpDetail=h.detail;s.helpState=null;ownHelp=h;
 
@@ -1286,7 +1530,9 @@ async function toggleHelp(){
  render();
 
  try{await queueHelp(()=>patch(dp("help/"+SESSION),h));}
- catch(e){notice("Live help sent, but database persistence failed: "+e.message,true);}
+ catch(e){
+  notice("Live help sent, but database persistence failed: "+e.message,true);
+ }
 }
 async function staffHelp(state){
  const lease=seats[zoomSeat];
@@ -1313,8 +1559,10 @@ async function staffHelp(state){
 }
 
 function bind(video,stream){
- stream||=null;if(video.srcObject===stream)return;
- video.srcObject=stream;if(stream)video.play().catch(()=>{});
+ stream||=null;
+ if(video.srcObject===stream)return;
+ video.srcObject=stream;
+ if(stream)video.play().catch(()=>{});
 }
 function tileFor(n){
  if(tiles.has(n))return tiles.get(n);
@@ -1322,17 +1570,17 @@ function tileFor(n){
  const head=document.createElement("div");head.className="tileHead";
  const title=document.createElement("span");title.textContent="Seat "+n;
  const flag=document.createElement("span");head.append(title,flag);
- const pic=document.createElement("div");pic.className="picture";
+ const picture=document.createElement("div");picture.className="picture";
  const video=document.createElement("video");
  video.autoplay=true;video.muted=true;video.playsInline=true;
  const overlay=document.createElement("div");overlay.className="overlay";
  const foot=document.createElement("div");foot.className="foot";
- pic.append(video,overlay);el.append(head,pic,foot);
+ picture.append(video,overlay);el.append(head,picture,foot);
  el.onclick=()=>{
   zoomSeat=n;updateZoom();if(!$("zoom").open)$("zoom").showModal();
  };
- const t={el,video,overlay,foot,flag};
- tiles.set(n,t);$("grid").append(el);return t;
+ const tile={el,video,overlay,foot,flag};
+ tiles.set(n,tile);$("grid").append(el);return tile;
 }
 function media(p){
  if(!p)return {on:false,text:"Waiting for offer"};
@@ -1344,12 +1592,11 @@ function media(p){
  return {on:true,text:"Live"};
 }
 function seatInfo(n){
- const lease=seats[n];
- if(!live(lease))return "Free or expired";
- const h=effectiveHelp(lease.u);
- const f=Number(lease.feeling)||3;
+ const lease=seats[n];if(!live(lease))return "Free or expired";
+ const h=effectiveHelp(lease.u),f=Number(lease.feeling)||3;
  return `Seat ${n} · ${FEEL[f-1]||"Okay"} · step ${Number(lease.step)||0} · `+
-  `${text(lease.state||"working",40)}${lease.task?" · "+text(lease.task,120):""}`+
+  `${text(lease.state||"working",40)}`+
+  `${lease.task?" · "+text(lease.task,120):""}`+
   `${helpActive(h)?" · "+helpLabel(h):""}`;
 }
 function renderPeople(){
@@ -1369,14 +1616,16 @@ function renderCarousel(){
  if($("carousel").hidden||!meta)return;
  const cap=meta.rows*meta.cols;
  carouselSeat=Math.max(1,Math.min(cap,carouselSeat));
- const lease=seats[carouselSeat];
- const p=live(lease)?receivers.get(lease.u):null;
+ const lease=seats[carouselSeat],p=live(lease)?receivers.get(lease.u):null;
  $("carouselTitle").textContent="Seat "+carouselSeat;
  $("carouselDetails").textContent=seatInfo(carouselSeat);
  bind($("carouselVideo"),p?.stream);
 }
 function render(){
- if(!room||!meta){document.title="Classroom Screens — Ready";return;}
+ if(!room||!meta){
+  document.title="Classroom Screens — Ready";return;
+ }
+
  $("heading").textContent=meta.name;
  document.title=meta.name+" — "+
   (staff?(role==="teacher"?"Teacher":"Assistant"):
@@ -1389,10 +1638,8 @@ function render(){
   $("retryBtn").disabled=!source;
   $("helpBtn").disabled=!capture(source)||!source.seat;
   $("helpBtn").textContent=source?.helpID?"Cancel help":"Request help";
-
-  // Progress controls remain usable before capture as a local draft.
-  $("pill").disabled=false;
   $("saveProgressBtn").disabled=false;
+  $("pill").disabled=false;
 
   $("helpStatus").textContent=
    source?.helpState?.state==="helping"?`${source.helpState.label} is helping`:
@@ -1419,6 +1666,7 @@ function render(){
  }
 
  let occupied=0,liveCount=0,helps=0;
+
  for(let n=1;n<=cap;n++){
   const t=tileFor(n),lease=seats[n],fresh=live(lease);
   const p=fresh?receivers.get(lease.u):null;
@@ -1440,7 +1688,6 @@ function render(){
   t.overlay.textContent=state.text;
   t.foot.textContent=fresh?seatInfo(n):"";
 
-  // Detach grid playback while carousel is open. Connections remain active.
   bind(t.video,$("carousel").hidden?p?.stream:null);
  }
 
@@ -1468,8 +1715,8 @@ async function statsWorker(){
   const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
   await Promise.all(list.filter(p=>p.active).map(async p=>{
    try{
-    const stats=await p.pc.getStats();let frames=0,bytes=0;
-    stats.forEach(r=>{
+    const reports=await p.pc.getStats();let frames=0,bytes=0;
+    reports.forEach(r=>{
      if(r.isRemote||(r.kind||r.mediaType)!=="video")return;
      if(p.receiver&&r.type==="inbound-rtp"){
       frames+=r.framesDecoded||0;bytes+=r.bytesReceived||0;
@@ -1517,8 +1764,8 @@ async function report(){
   `TURN=${TURN.host}:${TURN.port}; relay only`,
   `Capture=${!!source}; seat=${source?.seat||0}`,
   `Seats=${Object.keys(seats).length}; viewers=${activeViewers().length}`,
-  "GET/PATCH only; no null writes.",
-  "Seat claims are not atomic. SDP and keys omitted."
+  "GET/PATCH only; no null writes. Seat claims are not atomic.",
+  "SDP, room keys and TURN credentials omitted."
  ];
  const list=staff?[...receivers.values()]:source?[...source.links.values()]:[];
  for(const p of list)lines.push(p.name,p.phase,p.error,p.stats);
@@ -1530,6 +1777,7 @@ function maintenance(){
   if(wanted&&!opening&&now()-lastOpen>10000)launch(openRoom);
   return;
  }
+
  launch(pollMeta);launch(pollViewers);
 
  if(staff){
@@ -1540,9 +1788,9 @@ function maintenance(){
 
   if(source&&now()>=nextBeat){
    nextBeat=now()+jitter(10000,2000);
-   const t=source.raw?.getVideoTracks()[0];
-   if(t)for(const p of source.links.values())send(p,{
-    type:"beat",captureState:t.readyState,muted:t.muted,draws:source.draws
+   const track=source.raw?.getVideoTracks()[0];
+   if(track)for(const p of source.links.values())send(p,{
+    type:"beat",captureState:track.readyState,muted:track.muted,draws:source.draws
    });
   }
 
@@ -1557,8 +1805,17 @@ function maintenance(){
   }
  }
 }
+
 async function copy(value){
  await navigator.clipboard.writeText(value);notice("Link copied.");
+}
+function openAdmin(){
+ $("admin").hidden=false;
+ $("menuBtn").setAttribute("aria-expanded","true");
+}
+function closeAdmin(){
+ $("admin").hidden=true;
+ $("menuBtn").setAttribute("aria-expanded","false");
 }
 
 $("createBtn").onclick=act(createRoom);
@@ -1567,16 +1824,20 @@ $("joinBtn").onclick=act(()=>{
  if(!validID(u.searchParams.get("room")))throw Error("Invalid invitation.");
  const destination=base();
  destination.search=u.search;destination.hash=u.hash;
- destination.searchParams.set("build","32");
+ destination.searchParams.set("build","33");
  location.href=destination.href;
 });
-$("menuBtn").onclick=()=>$("admin").hidden=!$("admin").hidden;
-$("closeAdminBtn").onclick=()=>$("admin").hidden=true;
+$("menuBtn").onclick=()=>{
+ if($("admin").hidden)openAdmin();else closeAdmin();
+};
+$("closeAdminBtn").onclick=closeAdmin;
 
-// Preserve real user activation for getDisplayMedia.
+// Direct real-user click.
 $("shareBtn").onclick=()=>void startSharing();
 $("stopBtn").onclick=act(()=>stopSharing());
-$("retryBtn").onclick=()=>{closeLinks();nextLease=0;nextAnswers=0;nextViewers=0;};
+$("retryBtn").onclick=()=>{
+ closeLinks();nextLease=0;nextAnswers=0;nextViewers=0;
+};
 $("saveProgressBtn").onclick=act(saveProgress);
 $("helpBtn").onclick=act(toggleHelp);
 
@@ -1615,12 +1876,13 @@ $("saveBtn").onclick=act(async()=>{
    .filter(([,v])=>live(v)).map(([n])=>Number(n))
  );
  if(highest>settings.rows*settings.cols)
-  throw Error("Active seats exist outside the new grid.");
+  throw Error("Active seats outside the new grid.");
 
  await patch(dp("meta"),{
   ...settings,streamRevision:(current.streamRevision||1)+1
  });
- await pollMeta(true);fillSettings();remember(entry());notice("Settings saved.");
+ await pollMeta(true);fillSettings();remember(entry());
+ notice("Settings saved.");
 });
 $("reconnectAllBtn").onclick=act(async()=>{
  if(role!=="teacher")throw Error("Teacher only.");
@@ -1629,16 +1891,17 @@ $("reconnectAllBtn").onclick=act(async()=>{
  notice("Reconnect requested.");
 });
 $("resetBtn").onclick=act(async()=>{
- if(role!=="teacher"||!confirm("Invalidate current leases? Students automatically rejoin."))return;
+ if(role!=="teacher"||!confirm("Invalidate current leases? Students rejoin."))return;
  const m=normalize(await get(dp("meta")));
  await patch(dp("meta"),{g:m.g+1});
  await pollMeta(true);notice("Generation changed; no records deleted.");
 });
-
 $("ackBtn").onclick=act(()=>staffHelp("helping"));
 $("resolveBtn").onclick=act(()=>staffHelp("resolved"));
 $("closeZoomBtn").onclick=()=>$("zoom").close();
-$("zoom").addEventListener("close",()=>{zoomSeat=null;bind($("zoomVideo"),null);});
+$("zoom").addEventListener("close",()=>{
+ zoomSeat=null;bind($("zoomVideo"),null);
+});
 
 $("carouselToggle").onclick=()=>{
  $("carousel").hidden=!$("carousel").hidden;render();
@@ -1675,7 +1938,7 @@ $("downloadBtn").onclick=act(async()=>{
   type:"text/plain;charset=utf-8"
  }));
  const a=document.createElement("a");
- a.href=url;a.download="classroom-patch-v32.txt";a.click();
+ a.href=url;a.download="classroom-simplified-v33.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 $("homeBtn").onclick=()=>{
@@ -1711,7 +1974,7 @@ setInterval(()=>launch(statsWorker),5000);
 setInterval(render,1000);
 
 showFeeling();renderHome();
-log(VERSION+" ready; GET/PATCH guard enabled.");
+log(VERSION+" ready; header, notice and panel are collapsed in admin.");
 
 if(wanted)openRoom().catch(fail);
 else if(Q.get("create")==="1")createRoom().catch(fail);
