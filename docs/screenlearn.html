@@ -6,52 +6,199 @@
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark">
 <title>Classroom Screens — Ready</title>
+
 <style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:dark;background:#101722;color:#edf4ff}
-*{box-sizing:border-box}body{margin:0}
-button,input,select{font:inherit;color:inherit;background:#142235;border:1px solid #607895;border-radius:7px;padding:8px 10px}
-button{cursor:pointer}button:hover:not(:disabled){background:#294c70}button:disabled{opacity:.5;cursor:not-allowed}
-input[type=number]{width:80px}.grow{flex:1;min-width:150px}
-.row,label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.primary{background:#175e96}.helpButton{background:#775216;border-color:#d1a64c}
-[hidden]{display:none!important}.muted{color:#b8cadc;font-size:.86rem}.warning{color:#ffd49b}
-.badge{border:1px solid #536c88;border-radius:18px;padding:4px 8px;font-size:.75rem}
-h2{font-size:1.1rem}h3{font-size:1rem}p{line-height:1.45}
-#menuBtn{position:fixed;right:10px;top:10px;z-index:20;min-width:44px;background:#1c3550}
-main{max-width:1800px;margin:auto;padding:58px 12px 12px}
-.surface{padding:12px;margin-bottom:10px;border:1px solid #435971;border-radius:9px;background:#192638}
-#viewport{overflow:auto;padding:3px}#grid{display:grid;gap:8px}
-.tile{padding:0;min-width:0;overflow:hidden;text-align:left;background:#35414d}
-.tileHead{display:flex;justify-content:space-between;gap:4px;padding:5px 8px;font-size:.78rem}
-.picture{position:relative;aspect-ratio:16/9;background:#424d59}
-.picture video{display:block;width:100%;height:100%;object-fit:contain}
-.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px;font-size:.72rem}
-.foot{padding:5px 7px;font-size:.65rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tile:not(.live) video{opacity:.18;filter:grayscale(1)}
-.tile.live{border-color:#62c49c}.tile.live .overlay{display:none}
-.tile.help{border:2px solid #e9b54d}
-#admin{position:fixed;z-index:40;inset:0 0 0 auto;width:min(96vw,530px);overflow:auto;border-left:1px solid #536c88;background:#192638;padding:12px}
-#admin header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid #435971}
-#notice{padding:10px;margin:10px 0;background:#213c56;border-left:4px solid #8bccff;white-space:pre-wrap}
-#notice.error{background:#472b36;border-color:#ffabab}
-.panel{padding:12px;background:#182435;border:1px solid #435971;border-radius:9px}
-.roomRow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:9px;margin:6px 0;border:1px solid #4a627e;border-radius:7px;flex-wrap:wrap}
-pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:#0c1521;padding:10px;border-radius:7px;font-size:12px}
-dialog{width:min(1000px,96vw);max-height:95vh;overflow:auto;background:#192638;color:inherit;border:1px solid #8398b4;border-radius:10px}
-dialog::backdrop{background:#000b}
-#zoomVideo,#carouselVideo{display:block;width:100%;max-height:65vh;background:#3b4754}
-#pill{font-size:1.25rem;min-width:64px}
-@media(max-width:750px){
- .tileHead{font-size:.62rem;padding:4px}
- .foot{font-size:.55rem;padding:4px}
- .overlay{font-size:.6rem}
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+  background: #101722;
+  color: #edf4ff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+button, input, select {
+  font: inherit;
+  color: inherit;
+  background: #142235;
+  border: 1px solid #607895;
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: #294c70; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input[type=number] { width: 80px; }
+.grow { flex: 1; min-width: 150px; }
+.primary { background: #175e96; }
+.helpButton { background: #775216; border-color: #d1a64c; }
+.row, label { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+[hidden] { display: none !important; }
+.muted { color: #b8cadc; font-size: .86rem; }
+.warning { color: #ffd49b; }
+.badge {
+  border: 1px solid #536c88;
+  border-radius: 18px;
+  padding: 4px 8px;
+  font-size: .75rem;
+}
+h2 { font-size: 1.1rem; }
+h3 { font-size: 1rem; }
+p { line-height: 1.45; }
+
+#menuBtn {
+  position: fixed;
+  right: 10px;
+  top: 10px;
+  z-index: 20;
+  min-width: 44px;
+  background: #1c3550;
+}
+main {
+  max-width: 1800px;
+  margin: auto;
+  padding: 58px 12px 12px;
+}
+.surface {
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #435971;
+  border-radius: 9px;
+  background: #192638;
+}
+#viewport { overflow: auto; padding: 3px; }
+#grid { display: grid; gap: 8px; }
+.tile {
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  background: #35414d;
+}
+.tileHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 5px 8px;
+  font-size: .78rem;
+}
+.picture {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #424d59;
+}
+.picture video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  font-size: .72rem;
+}
+.foot {
+  padding: 5px 7px;
+  font-size: .65rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile:not(.live) video { opacity: .18; filter: grayscale(1); }
+.tile.live { border-color: #62c49c; }
+.tile.live .overlay { display: none; }
+.tile.help { border: 2px solid #e9b54d; }
+
+#admin {
+  position: fixed;
+  z-index: 40;
+  inset: 0 0 0 auto;
+  width: min(96vw, 530px);
+  overflow: auto;
+  border-left: 1px solid #536c88;
+  background: #192638;
+  padding: 12px;
+}
+#admin header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #435971;
+}
+#notice {
+  padding: 10px;
+  margin: 10px 0;
+  background: #213c56;
+  border-left: 4px solid #8bccff;
+  white-space: pre-wrap;
+}
+#notice.error { background: #472b36; border-color: #ffabab; }
+.panel {
+  padding: 12px;
+  background: #182435;
+  border: 1px solid #435971;
+  border-radius: 9px;
+}
+.roomRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 9px;
+  margin: 6px 0;
+  border: 1px solid #4a627e;
+  border-radius: 7px;
+  flex-wrap: wrap;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 360px;
+  overflow: auto;
+  background: #0c1521;
+  padding: 10px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+dialog {
+  width: min(1000px,96vw);
+  max-height: 95vh;
+  overflow: auto;
+  background: #192638;
+  color: inherit;
+  border: 1px solid #8398b4;
+  border-radius: 10px;
+}
+dialog::backdrop { background: #000b; }
+#zoomVideo,#carouselVideo {
+  display: block;
+  width: 100%;
+  max-height: 65vh;
+  background: #3b4754;
+}
+#pill { font-size: 1.25rem; min-width: 64px; }
+
+@media(max-width:750px) {
+  .tileHead { font-size: .62rem; padding: 4px; }
+  .foot { font-size: .55rem; padding: 4px; }
+  .overlay { font-size: .6rem; }
 }
 </style>
 </head>
 
 <body>
 
-<button id="menuBtn" aria-controls="admin" aria-expanded="false" title="Open settings">☰</button>
+<button id="menuBtn" aria-controls="admin" aria-expanded="false"
+ title="Open settings">☰</button>
 
 <main>
  <section id="home" class="surface">
@@ -121,7 +268,6 @@ dialog::backdrop{background:#000b}
    Keep this page open and prevent sleep. After refresh or browser restart,
    approve screen capture again.
   </p>
-
   <details>
    <summary>Connection progress</summary>
    <pre id="studentProgress"></pre>
@@ -151,12 +297,15 @@ dialog::backdrop{background:#000b}
    </div>
    <video id="carouselVideo" autoplay muted playsinline></video>
    <p id="carouselDetails"></p>
-   <small class="muted">Scroll over the video to change seat. Existing streams are reused.</small>
+   <small class="muted">
+    Scroll over the video to change seat. Existing streams are reused.
+   </small>
   </section>
 
   <div id="viewport"><div id="grid"></div></div>
 
-  <section class="surface">
+  <!-- Hidden as requested; kept for the existing renderPeople() function. -->
+  <section hidden>
    <h3>Progress and help</h3>
    <div id="people"></div>
   </section>
@@ -166,9 +315,8 @@ dialog::backdrop{background:#000b}
 <aside id="admin" hidden>
  <header>
   <div class="row">
-   <!-- Restored ID: JavaScript can safely update this heading. -->
    <b id="heading">Classroom Screens</b>
-   <span class="badge">v35</span>
+   <span class="badge">v36</span>
    <span id="dbBadge" class="badge">Ready</span>
    <span id="roleBadge" class="badge" hidden></span>
   </div>
@@ -179,7 +327,6 @@ dialog::backdrop{background:#000b}
 
  <div class="panel">
   <h2>Settings & diagnostics</h2>
-
   <p class="warning">
    Database authentication is not used. External IP restrictions are
    essential. PATCH-only writes do not make seat claims atomic.
@@ -193,9 +340,7 @@ dialog::backdrop{background:#000b}
     <button id="copyTeacherBtn">Copy teacher link</button>
    </div>
    <div class="row" style="margin-top:8px">
-    <label>Fixed seat
-     <input id="linkSeat" type="number" min="1" max="64" value="1">
-    </label>
+    <label>Fixed seat <input id="linkSeat" type="number" min="1" max="64" value="1"></label>
     <button id="copySeatBtn">Copy fixed-seat link</button>
    </div>
   </div>
@@ -233,7 +378,6 @@ dialog::backdrop{background:#000b}
     </label>
     <button id="saveBtn" class="primary">Save</button>
    </div>
-
    <div class="row" style="margin-top:8px">
     <button id="reconnectAllBtn">Reconnect streams</button>
     <button id="resetBtn">Reset seats by generation</button>
@@ -251,7 +395,6 @@ dialog::backdrop{background:#000b}
   </div>
   <pre id="report">No report collected.</pre>
   <details><summary>Event log</summary><pre id="log"></pre></details>
-
   <p class="muted">
    Signaling leaves are not deleted by this page. A separately tested server
    cleanup process is required to prevent indefinite growth.
@@ -276,18 +419,16 @@ dialog::backdrop{background:#000b}
 "use strict";
 
 /*
- Classroom simplified v35.
+ Classroom simplified v36.
 
- Fix:
- - heading, dbBadge and roleBadge all exist inside collapsed admin header.
- - No startup ID list that stops the application for optional display items.
- - Existing v28/v31–v34 database paths and signaling format.
- - GET/PATCH only; no null or empty-object writes.
- - No browser-side deletion of signaling or room hierarchy.
- - Compatibility seat claims are not atomic.
+ The bottom "Progress and help" section is hidden; #people is retained.
+ Existing v28/v31–v35 paths and signaling format are used.
+ GET/PATCH only; no null or empty-object writes.
+ No browser-side deletion of signaling or room hierarchy.
+ Compatibility seat claims are not atomic.
 */
 
-const VERSION="classroom-simplified-v35";
+const VERSION="classroom-simplified-v36";
 const SIGNAL_APP="classroom-low-data-v28";
 const DB="https://default--default.ubcoturneastasia.duckdns.org";
 const TURN={
@@ -522,7 +663,7 @@ function base(){
  const u=new URL(location.href);u.search="";u.hash="";return u;
 }
 function roomLink(e,kind,n){
- const u=base();u.searchParams.set("room",e.id);u.searchParams.set("build","35");
+ const u=base();u.searchParams.set("room",e.id);u.searchParams.set("build","36");
  if(kind==="student"){
   u.searchParams.set("start","1");if(n)u.searchParams.set("seat",n);
  }else{
@@ -582,7 +723,7 @@ function createSettings(){
 function createLink(){
  const m=meta||createSettings(),u=base();
  const values={
-  create:1,build:35,name:m.name,rows:m.rows,cols:m.cols,corner:m.corner,
+  create:1,build:36,name:m.name,rows:m.rows,cols:m.cols,corner:m.corner,
   width:m.w,fps:m.fps,ttl:m.ttl,transport:m.tr,
   maxViewers:m.maxViewers,view:$("view").value
  };
@@ -1664,7 +1805,7 @@ $("joinBtn").onclick=act(()=>{
  if(!validID(u.searchParams.get("room")))throw Error("Invalid invitation.");
  const destination=base();
  destination.search=u.search;destination.hash=u.hash;
- destination.searchParams.set("build","35");
+ destination.searchParams.set("build","36");
  location.href=destination.href;
 });
 $("menuBtn").onclick=()=>{
@@ -1778,7 +1919,7 @@ $("downloadBtn").onclick=act(async()=>{
   type:"text/plain;charset=utf-8"
  }));
  const a=document.createElement("a");
- a.href=url;a.download="classroom-simplified-v35.txt";a.click();
+ a.href=url;a.download="classroom-simplified-v36.txt";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),2000);
 });
 $("homeBtn").onclick=()=>{
@@ -1814,7 +1955,7 @@ setInterval(()=>launch(statsWorker),5000);
 setInterval(render,1000);
 
 showFeeling();renderHome();
-log(VERSION+" ready; heading, dbBadge and roleBadge are present.");
+log(VERSION+" ready; bottom progress/help section hidden.");
 
 if(wanted)openRoom().catch(fail);
 else if(Q.get("create")==="1")createRoom().catch(fail);
